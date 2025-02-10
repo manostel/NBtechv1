@@ -1,0 +1,21 @@
+.dashboard {
+    text-align: center;
+    padding: 20px;
+  }
+  
+  .charts {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap; /* ✅ Ensures proper layout on small screens */
+  }
+  
+  .chart-container {
+    width: 400px; /* ✅ Smaller graph width */
+    height: 300px; /* ✅ Smaller graph height */
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
