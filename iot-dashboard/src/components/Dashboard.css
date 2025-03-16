@@ -3,19 +3,163 @@
     padding: 20px;
   }
   
+  .controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+  }
+  
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 24px;
+  }
+  
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 4px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+  }
+  
+  input:checked + .slider {
+    background-color: #4caf50;
+  }
+  
+  input:checked + .slider:before {
+    transform: translateX(26px);
+  }
+  
   .charts {
     display: flex;
     justify-content: center;
     gap: 20px;
-    flex-wrap: wrap; /* ✅ Ensures proper layout on small screens */
+    flex-wrap: wrap;
   }
   
   .chart-container {
-    width: 400px; /* ✅ Smaller graph width */
-    height: 300px; /* ✅ Smaller graph height */
+    width: 400px;
+    height: 300px;
     padding: 10px;
     background: #f9f9f9;
     border-radius: 8px;
     box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  .battery-container {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .battery {
+    width: 150px;
+    height: 30px;
+    border: 2px solid #000;
+    border-radius: 5px;
+    position: relative;
+    margin: 0 auto;
+    background-color: #ddd;
+  }
+  
+  .battery-level {
+    height: 100%;
+    background-color: green;
+    transition: none;
+  }
+
+  .battery-container {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .battery {
+    width: 150px;
+    height: 30px;
+    border: 2px solid #000;
+    border-radius: 5px;
+    position: relative;
+    margin: 0 auto;
+    background-color: #ddd;
+  }
+  
+  .battery-level {
+    height: 100%;
+    background-color: green;
+    transition: none;
+  }
+  
+  .charts {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .chart-container {
+    width: 400px;
+    height: 300px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  .signal-container {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .signal-bar {
+    width: 200px;
+    height: 20px;
+    border: 2px solid #000;
+    border-radius: 5px;
+    background-color: #ddd;
+    margin: 0 auto;
+  }
+  
+  .signal-level {
+    height: 100%;
+    background-color: rgb(136, 0, 255);
+    transition: width 0.5s ease-in-out;
+  }
+  
+  .heartbeat-container {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .online {
+    color: green;
+    font-weight: bold;
+  }
+  
+  .offline {
+    color: red;
+    font-weight: bold;
   }
   

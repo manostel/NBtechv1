@@ -13,22 +13,31 @@ class MQTTClient:
 
     def on_connect(self, client, userdata, flags, rc):
         print("Connected with result code " + str(rc))
-        client.subscribe(self.topic)
+    
+        if not hasattr(self, "subscribed"):
+            client.subscribe(self.topic)
+            self.subscribed = True  # ✅ Ensures it subscribes only once
+            print(f"Subscribed to topic: {self.topic}")
+        else:
+            print("Already subscribed, skipping duplicate subscription.")
+
 
     def on_message(self, client, userdata, msg):
         try:
             message = json.loads(msg.payload.decode())  # Convert JSON to dict
             print(f"Message received: {message}")
 
-            # Extract temperature and humidity correctly
+            # Extract temperature, humidity, battery, and signal quality
             client_id = message["ClientID"]
             device = message["device"]
             timestamp = message["timestamp"]
-            temperature = message["data"].get("temperature")  # Extract temperature
-            humidity = message["data"].get("humidity")  # Extract humidity
+            temperature = message["data"].get("temperature")
+            humidity = message["data"].get("humidity")
+            battery = message["data"].get("battery", 100)  # ✅ Default to 100 if missing
+            signal_quality = message["data"].get("signal_quality")  # ✅ Default to 0 if missing
 
             # Store in SQLite
-            insert_data(client_id, device, timestamp, temperature, humidity)
+            insert_data(client_id, device, timestamp, temperature, humidity, battery, signal_quality)
 
         except json.JSONDecodeError:
             print("Invalid JSON received, ignoring...")
