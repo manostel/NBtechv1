@@ -40,7 +40,8 @@ function Dashboard() {
   const [toggle2, setToggle2] = useState(false);
 
   const API_URL = "https://5zmsoqz436.execute-api.eu-central-1.amazonaws.com/default/fetch-data";
-  const COMMAND_API_URL = "https://5zmsoqz436.execute-api.eu-central-1.amazonaws.com/default/send-command";
+  const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
+  
 
   // Fetch latest 50 records
   const fetchData = async () => {
