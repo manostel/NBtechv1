@@ -41,7 +41,7 @@ function Dashboard() {
 
   const API_URL = "https://5zmsoqz436.execute-api.eu-central-1.amazonaws.com/default/fetch-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
-  
+
 
   // Fetch latest 50 records
   const fetchData = async () => {
@@ -123,6 +123,27 @@ function Dashboard() {
     sendCommand(newState ? "TOGGLE_2_ON" : "TOGGLE_2_OFF");
   };
 
+ // Extra code for handling restart command
+const handleRestart = async () => {
+  try {
+    const payload = {
+      ClientID: clientID,      // Use the current clientID state value
+      action: "RESTART"        // Use "action" for consistency with other commands
+    };
+
+    const response = await fetch(COMMAND_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    console.log("Restart command sent:", result);
+  } catch (error) {
+    console.error("Error sending restart command:", error);
+  }
+};
+
   // Load data initially & refresh every 5 seconds
   useEffect(() => {
     fetchData();
@@ -154,7 +175,7 @@ function Dashboard() {
       <p><strong>Device:</strong> {deviceName}</p>
       <p><strong>Status:</strong> {deviceStatus}</p>
       {lastSeen && <p><strong>Last Online:</strong> {lastSeen.toLocaleString()}</p>}
-      
+
       {/* Toggle Switches */}
       <div className="toggles">
         <button onClick={handleToggle1} className={toggle1 ? "toggle-on" : "toggle-off"}>
@@ -162,6 +183,10 @@ function Dashboard() {
         </button>
         <button onClick={handleToggle2} className={toggle2 ? "toggle-on" : "toggle-off"}>
           {toggle2 ? "TOGGLE 2 ON" : "TOGGLE 2 OFF"}
+        </button>
+        {/* Restart Device Button */}
+        <button onClick={handleRestart} className="restart-button">
+          Restart Device
         </button>
       </div>
 
