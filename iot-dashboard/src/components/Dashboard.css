@@ -1,165 +1,179 @@
+/* Base styles for dashboard container */
 .dashboard {
-    text-align: center;
-    padding: 20px;
-  }
-  
-  .controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    margin-bottom: 20px;
-  }
-  
-  .switch {
-    position: relative;
-    display: inline-block;
-    width: 50px;
-    height: 24px;
-  }
-  
-  .switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-  
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #ccc;
-    transition: 0.4s;
-    border-radius: 24px;
-  }
-  
-  .slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 4px;
-    bottom: 3px;
-    background-color: white;
-    transition: 0.4s;
-    border-radius: 50%;
-  }
-  
-  input:checked + .slider {
-    background-color: #4caf50;
-  }
-  
-  input:checked + .slider:before {
-    transform: translateX(26px);
-  }
-  
-  .charts {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    flex-wrap: wrap;
-  }
-  
-  .chart-container {
-    width: 400px;
-    height: 300px;
-    padding: 10px;
-    background: #f9f9f9;
-    border-radius: 8px;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  .battery-container {
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  
-  .battery {
-    width: 150px;
-    height: 30px;
-    border: 2px solid #000;
-    border-radius: 5px;
-    position: relative;
-    margin: 0 auto;
-    background-color: #ddd;
-  }
-  
-  .battery-level {
-    height: 100%;
-    background-color: green;
-    transition: none;
-  }
+  text-align: center;
+  padding: 20px;
+}
 
-  .battery-container {
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  
-  .battery {
-    width: 150px;
-    height: 30px;
-    border: 2px solid #000;
-    border-radius: 5px;
-    position: relative;
-    margin: 0 auto;
-    background-color: #ddd;
-  }
-  
-  .battery-level {
-    height: 100%;
-    background-color: green;
-    transition: none;
-  }
-  
-  .charts {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    flex-wrap: wrap;
-  }
-  
-  .chart-container {
-    width: 400px;
-    height: 300px;
-    padding: 10px;
-    background: #f9f9f9;
-    border-radius: 8px;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  .signal-container {
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  
-  .signal-bar {
-    width: 200px;
-    height: 20px;
-    border: 2px solid #000;
-    border-radius: 5px;
-    background-color: #ddd;
-    margin: 0 auto;
-  }
-  
-  .signal-level {
-    height: 100%;
-    background-color: rgb(136, 0, 255);
-    transition: width 0.5s ease-in-out;
-  }
-  
-  .heartbeat-container {
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  
-  .online {
-    color: green;
-    font-weight: bold;
-  }
-  
-  .offline {
-    color: red;
-    font-weight: bold;
-  }
-  
+/* Light and dark mode backgrounds */
+.light-mode {
+  background-color: #f4f4f4;
+  color: #333;
+}
+
+.dark-mode {
+  background-color: #333;
+  color: #f4f4f4;
+}
+
+/* Controls container */
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Global button styling for better usability */
+button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  background-color: #4caf50;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+/* Dark mode toggle button specific style (optional) */
+.mode-toggle-btn {
+  background-color: #2196f3;
+}
+
+.mode-toggle-btn:hover {
+  background-color: #1976d2;
+}
+
+/* Reset (Restart) button with distinct styling */
+.reset-button {
+  background-color: #f44336;
+}
+
+.reset-button:hover {
+  background-color: #e53935;
+}
+
+/* Switch styling */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #4caf50;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+/* Chart container styles */
+.charts {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* Existing chart container styles */
+.chart-container {
+  width: 400px;
+  height: 300px;
+  padding: 10px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* When dark mode is active, update the chart container background */
+.dark-mode .chart-container {
+  background: #444;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.5);
+}
+
+
+/* Additional styles for battery, signal, etc. (if needed) */
+.battery-container,
+.signal-container,
+.heartbeat-container {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.battery {
+  width: 150px;
+  height: 30px;
+  border: 2px solid #000;
+  border-radius: 5px;
+  position: relative;
+  margin: 0 auto;
+  background-color: #ddd;
+}
+
+.battery-level {
+  height: 100%;
+  background-color: green;
+  transition: none;
+}
+
+.signal-bar {
+  width: 200px;
+  height: 20px;
+  border: 2px solid #000;
+  border-radius: 5px;
+  background-color: #ddd;
+  margin: 0 auto;
+}
+
+.signal-level {
+  height: 100%;
+  background-color: rgb(136, 0, 255);
+  transition: width 0.5s ease-in-out;
+}
+
+.online {
+  color: green;
+  font-weight: bold;
+}
+
+.offline {
+  color: red;
+  font-weight: bold;
+}
