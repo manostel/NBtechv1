@@ -13,7 +13,7 @@ import {
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
-import { FaSun, FaMoon } from "react-icons/fa";
+import { FaSun, FaMoon, FaRedoAlt } from "react-icons/fa";
 import "./Dashboard.css";
 
 // Register Chart.js components
@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [toggle1, setToggle1] = useState(false);
   const [toggle2, setToggle2] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [restartClicked, setRestartClicked] = useState(false);
 
   const API_URL =
     "https://5zmsoqz436.execute-api.eu-central-1.amazonaws.com/default/fetch-data";
@@ -118,6 +119,7 @@ export default function Dashboard() {
   };
 
   const handleRestart = async () => {
+    setRestartClicked(true); // Trigger the animation
     try {
       const payload = {
         ClientID: clientID,
@@ -134,6 +136,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error sending restart command:", error);
     }
+    setTimeout(() => setRestartClicked(false), 500);
   };
 
   useEffect(() => {
@@ -235,8 +238,11 @@ export default function Dashboard() {
             </label>
             <span>Toggle 2</span>
           </div>
-          <button onClick={handleRestart} className="reset-button">
-            Restart Device
+          <button
+            onClick={handleRestart}
+            className={`reset-button ${restartClicked ? "clicked" : ""}`}
+          >
+            <FaRedoAlt size={24} className="icon" />
           </button>
         </div>
 

@@ -68,10 +68,25 @@ button:hover {
 /* Reset (Restart) button styling */
 .reset-button {
   background-color: #f44336;
+  transition: transform 0.2s, background-color 0.2s;
 }
 
 .reset-button:hover {
   background-color: #e53935;
+}
+
+.reset-button:active {
+  transform: scale(0.95);
+}
+
+/* When the button has the "clicked" class, animate the icon */
+.reset-button.clicked .icon {
+  animation: rotate 0.5s linear;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Switch styling */
