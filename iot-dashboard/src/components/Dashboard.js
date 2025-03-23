@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
+import { useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -13,8 +14,11 @@ import {
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
-import { FaSun, FaMoon, FaRedoAlt } from "react-icons/fa";
+import { FaRedoAlt, FaCog } from "react-icons/fa";
 import "./Dashboard.css";
+import DeviceInfoCard from "./DeviceInfoCard";
+import BatteryIndicator from "./BatteryIndicator";
+import SignalIndicator from "./SignalIndicator";
 
 // Register Chart.js components
 ChartJS.register(
@@ -28,7 +32,13 @@ ChartJS.register(
   TimeScale
 );
 
-export default function Dashboard() {
+export default function Dashboard({ user, device, onLogout, onBack }) {
+  const navigate = useNavigate();
+
+  // Force dark mode (optional)
+  const [darkMode] = useState(true);
+
+  // API & IoT data states
   const [labels, setLabels] = useState([]);
   const [temperatureData, setTemperatureData] = useState([]);
   const [humidityData, setHumidityData] = useState([]);
@@ -40,7 +50,6 @@ export default function Dashboard() {
   const [deviceName, setDeviceName] = useState("Unknown");
   const [toggle1, setToggle1] = useState(false);
   const [toggle2, setToggle2] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
   const [restartClicked, setRestartClicked] = useState(false);
 
   const API_URL =
@@ -48,7 +57,7 @@ export default function Dashboard() {
   const COMMAND_API_URL =
     "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
 
-  // Fetch latest 50 records
+  // Fetch API data
   const fetchData = async () => {
     try {
       const url = `${API_URL}?limit=50`;
@@ -73,26 +82,23 @@ export default function Dashboard() {
         setBatteryData(batteries);
         setSignalQualityData(signals);
 
+        // Determine last online & status
         const lastTimestamp = timestamps[0];
         setLastSeen(lastTimestamp);
 
         const now = new Date();
         const timeDiff = (now - lastTimestamp) / 1000;
-        setDeviceStatus(timeDiff <= 60 ? "✅ Active" : "❌ Offline");
+        setDeviceStatus(timeDiff <= 60 ? "Active" : "Inactive");
       }
     } catch (error) {
       console.error("Error fetching data:", error);
     }
   };
 
-  // Send command via API Gateway
+  // Send command to device
   const sendCommand = async (action) => {
     try {
-      const payload = {
-        ClientID: clientID,
-        action: action,
-      };
-
+      const payload = { ClientID: clientID, action };
       const response = await fetch(COMMAND_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -105,7 +111,7 @@ export default function Dashboard() {
     }
   };
 
-  // Handlers for toggles and restart
+  // Toggle handlers
   const handleToggle1 = () => {
     const newState = !toggle1;
     setToggle1(newState);
@@ -118,14 +124,11 @@ export default function Dashboard() {
     sendCommand(newState ? "TOGGLE_2_ON" : "TOGGLE_2_OFF");
   };
 
+  // Restart command handler
   const handleRestart = async () => {
-    setRestartClicked(true); // Trigger the animation
+    setRestartClicked(true);
     try {
-      const payload = {
-        ClientID: clientID,
-        action: "RESTART",
-      };
-
+      const payload = { ClientID: clientID, action: "RESTART" };
       const response = await fetch(COMMAND_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -145,19 +148,19 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Chart options updated based on dark mode
+  // Chart.js options for dark mode
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         position: "top",
-        labels: { color: darkMode ? "#f4f4f4" : "#333" },
+        labels: { color: "#f4f4f4" },
       },
       title: {
         display: true,
         text: "Real-time IoT Data",
-        color: darkMode ? "#f4f4f4" : "#333",
+        color: "#f4f4f4",
       },
     },
     scales: {
@@ -167,73 +170,79 @@ export default function Dashboard() {
           unit: "minute",
           tooltipFormat: "yyyy-MM-dd HH:mm:ss",
         },
-        title: { display: true, text: "Time", color: darkMode ? "#f4f4f4" : "#333" },
-        ticks: { color: darkMode ? "#f4f4f4" : "#333" },
-        grid: { color: darkMode ? "rgba(255,255,255,0.3)" : "#ccc" },
+        title: { display: true, text: "Time", color: "#f4f4f4" },
+        ticks: { color: "#f4f4f4" },
+        grid: { color: "rgba(255,255,255,0.3)" },
       },
       y: {
         beginAtZero: true,
-        ticks: { color: darkMode ? "#f4f4f4" : "#333" },
-        grid: { color: darkMode ? "rgba(255,255,255,0.3)" : "#ccc" },
+        ticks: { color: "#f4f4f4" },
+        grid: { color: "rgba(255,255,255,0.3)" },
       },
     },
   };
 
   return (
-    <div className={`dashboard ${darkMode ? "dark-mode" : "light-mode"}`}>
+    <div className={`dashboard ${darkMode ? "dark-mode" : ""}`}>
       <Helmet>
         <title>IoT Dashboard</title>
         <meta name="description" content="IoT Dashboard with Dark/Light Mode" />
       </Helmet>
-      <header className="header">
-        {/* Dark/Light Mode Toggle in Upper Left */}
-        <button
-          onClick={() => setDarkMode(!darkMode)}
-          className="mode-toggle-btn"
-        >
-          {darkMode ? <FaSun size={24} /> : <FaMoon size={24} />}
-        </button>
+
+      {/* 
+        Fixed indicators at the top-left. 
+        This ensures they do NOT scroll with the page.
+      */}
+      <div className="left-sidebar">
+        <BatteryIndicator battery={batteryData.length ? batteryData[0] : 0} />
+        <SignalIndicator signal={signalQualityData.length ? signalQualityData[0] : 0} />
+      </div>
+
+      <header className="dashboard-header">
+        <div className="header-left">
+          <button onClick={onBack} className="back-button">
+            Back to Devices
+          </button>
+        </div>
+        <div className="header-right">
+          <div className="user-info">
+            <div className="user-avatar">{user.email[0].toUpperCase()}</div>
+            <span className="user-name">{user.email}</span>
+          </div>
+          <button onClick={() => navigate("/settings")} className="settings-button">
+            <FaCog size={24} />
+          </button>
+          <button onClick={onLogout} className="logout-button">
+            Logout
+          </button>
+        </div>
       </header>
 
       <main className="main-content">
-        <div className="device-info">
-          <h1>IoT Dashboard</h1>
-          <p>
-            <strong>Client ID:</strong> {clientID}
-          </p>
-          <p>
-            <strong>Device:</strong> {deviceName}
-          </p>
-          <p>
-            <strong>Status:</strong> {deviceStatus}
-          </p>
-          {lastSeen && (
-            <p>
-              <strong>Last Online:</strong> {lastSeen.toLocaleString()}
-            </p>
-          )}
-        </div>
+        {/* 
+          Centered device info card 
+        */}
+        <section className="device-info">
+          <DeviceInfoCard
+            clientID={clientID}
+            device={deviceName}
+            status={deviceStatus}
+            lastOnline={lastSeen ? lastSeen.toLocaleString() : "N/A"}
+          />
+        </section>
 
-        {/* Toggle Switches and Restart Button */}
-        <div className="controls">
-          <div>
+        {/* Toggles + Restart Button */}
+        <section className="controls">
+          <div className="control-item">
             <label className="switch">
-              <input
-                type="checkbox"
-                checked={toggle1}
-                onChange={handleToggle1}
-              />
+              <input type="checkbox" checked={toggle1} onChange={handleToggle1} />
               <span className="slider"></span>
             </label>
             <span>Toggle 1</span>
           </div>
-          <div>
+          <div className="control-item">
             <label className="switch">
-              <input
-                type="checkbox"
-                checked={toggle2}
-                onChange={handleToggle2}
-              />
+              <input type="checkbox" checked={toggle2} onChange={handleToggle2} />
               <span className="slider"></span>
             </label>
             <span>Toggle 2</span>
@@ -244,10 +253,10 @@ export default function Dashboard() {
           >
             <FaRedoAlt size={24} className="icon" />
           </button>
-        </div>
+        </section>
 
-        {/* Charts Section */}
-        <div className="charts">
+        {/* 4 Charts in a grid */}
+        <section className="charts">
           <div className="chart-container">
             <Line
               data={{
@@ -316,7 +325,7 @@ export default function Dashboard() {
               options={chartOptions}
             />
           </div>
-        </div>
+        </section>
       </main>
     </div>
   );

@@ -1,71 +1,132 @@
-/* Base styles for dashboard container */
+/* Overall dashboard styling */
 .dashboard {
-  text-align: center;
+  font-family: Arial, sans-serif;
+  min-height: 100vh;
   padding: 20px;
+  /* Make sure no overflow is restricting fixed elements */
+  overflow: visible;
 }
 
-/* Light and dark mode backgrounds */
-.light-mode {
-  background-color: #f4f4f4;
-  color: #333;
-}
-
+/* Dark mode overall background */
 .dark-mode {
-  background-color: #333;
+  background-color: #1e1e2f;
   color: #f4f4f4;
 }
 
-/* Header: Fixed at the top-left corner */
-.header {
+/* 
+  Fixed left sidebar for battery & signal bars.
+  They will remain at top-left, not scrollable with page.
+*/
+.left-sidebar {
   position: absolute;
-  top: 20px;
-  left: 20px;
-}
-
-/* Mode toggle button styling */
-.mode-toggle-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-}
-
-/* Main content styling */
-.main-content {
-  margin-top: 80px; /* space for header */
-}
-
-/* Device info styles */
-.device-info {
-  margin-bottom: 20px;
-}
-
-/* Controls container */
-.controls {
+  top: 100px; /* Adjust if your header is taller or shorter */
+  left: 10px;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
 }
 
-/* Global button styling */
-button {
+/* Dashboard header layout */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #444;
+}
+
+.header-left .back-button {
+  font-size: 1rem;
   background-color: #4caf50;
-  color: white;
-  font-size: 16px;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  color: #fff;
   cursor: pointer;
   transition: background-color 0.3s;
 }
 
-button:hover {
+.header-left .back-button:hover {
   background-color: #45a049;
 }
 
-/* Reset (Restart) button styling */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #4caf50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.user-name {
+  font-size: 1rem;
+}
+
+.settings-button,
+.logout-button {
+  background-color: #4caf50;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.settings-button:hover,
+.logout-button:hover {
+  background-color: #45a049;
+}
+
+/* Main content layout */
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 20px;
+  margin-left: 130px; /* Leave space for the fixed sidebar */
+}
+
+/* Device info card in center */
+.device-info {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+/* Controls section (toggles + restart) */
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.control-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Restart (Reset) button styling */
 .reset-button {
   background-color: #f44336;
   transition: transform 0.2s, background-color 0.2s;
@@ -79,7 +140,7 @@ button:hover {
   transform: scale(0.95);
 }
 
-/* When the button has the "clicked" class, animate the icon */
+/* Restart button animation */
 .reset-button.clicked .icon {
   animation: rotate 0.5s linear;
 }
@@ -106,11 +167,8 @@ button:hover {
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #555;
   transition: 0.4s;
   border-radius: 24px;
 }
@@ -120,9 +178,9 @@ button:hover {
   content: "";
   height: 18px;
   width: 18px;
-  left: 4px;
+  left: 3px;
   bottom: 3px;
-  background-color: white;
+  background-color: #f4f4f4;
   transition: 0.4s;
   border-radius: 50%;
 }
@@ -135,74 +193,17 @@ input:checked + .slider:before {
   transform: translateX(26px);
 }
 
-/* Chart container styles */
+/* Charts grid layout */
 .charts {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 30px;
 }
 
 .chart-container {
-  width: 400px;
-  height: 300px;
-  padding: 10px;
-  background: #f9f9f9;
+  background: #2b2b3d;
   border-radius: 8px;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* Dark mode chart container */
-.dark-mode .chart-container {
-  background: #444;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.5);
-}
-
-/* Additional styles for battery, signal, etc. (if needed) */
-.battery-container,
-.signal-container,
-.heartbeat-container {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.battery {
-  width: 150px;
-  height: 30px;
-  border: 2px solid #000;
-  border-radius: 5px;
-  position: relative;
-  margin: 0 auto;
-  background-color: #ddd;
-}
-
-.battery-level {
-  height: 100%;
-  background-color: green;
-  transition: none;
-}
-
-.signal-bar {
-  width: 200px;
-  height: 20px;
-  border: 2px solid #000;
-  border-radius: 5px;
-  background-color: #ddd;
-  margin: 0 auto;
-}
-
-.signal-level {
-  height: 100%;
-  background-color: rgb(136, 0, 255);
-  transition: width 0.5s ease-in-out;
-}
-
-.online {
-  color: green;
-  font-weight: bold;
-}
-
-.offline {
-  color: red;
-  font-weight: bold;
+  padding: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  height: 300px;
 }

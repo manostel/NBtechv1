@@ -1,0 +1,26 @@
+.battery-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px; /* smaller gap */
+  }
+  
+  .battery-icon {
+    color: #4caf50;
+    /* reduce icon size by setting it in the component call (or override here if needed) */
+  }
+  
+  .battery-bar {
+    width: 70px; /* reduced width */
+    height: 6px;  /* reduced height */
+    background-color: #555;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  
+  .battery-level {
+    height: 100%;
+    background-color: #4caf50;
+    transition: width 0.3s ease;
+  }
+  

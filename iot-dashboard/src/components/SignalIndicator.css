@@ -1,0 +1,25 @@
+.signal-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  
+  .signal-icon {
+    color: #2196f3;
+  }
+  
+  .signal-bar {
+    width: 70px; /* reduced width */
+    height: 6px;  /* reduced height */
+    background-color: #555;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  
+  .signal-level {
+    height: 100%;
+    background-color: #2196f3;
+    transition: width 0.3s ease;
+  }
+  

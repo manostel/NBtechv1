@@ -1,0 +1,28 @@
+.device-info-card {
+  background-color: #2b2b3d;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  margin: 20px auto;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(244, 244, 244, 0.2);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-weight: bold;
+  color: #f4f4f4;
+}
+
+.value {
+  color: #f4f4f4;
+}
