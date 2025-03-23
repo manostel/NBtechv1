@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { Helmet } from "react-helmet";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -12,6 +13,7 @@ import {
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
+import { FaSun, FaMoon } from "react-icons/fa";
 import "./Dashboard.css";
 
 // Register Chart.js components
@@ -26,7 +28,7 @@ ChartJS.register(
   TimeScale
 );
 
-function Dashboard() {
+export default function Dashboard() {
   const [labels, setLabels] = useState([]);
   const [temperatureData, setTemperatureData] = useState([]);
   const [humidityData, setHumidityData] = useState([]);
@@ -136,10 +138,11 @@ function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => fetchData(), 60000);
+    const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
 
+  // Chart options updated based on dark mode
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -161,11 +164,7 @@ function Dashboard() {
           unit: "minute",
           tooltipFormat: "yyyy-MM-dd HH:mm:ss",
         },
-        title: {
-          display: true,
-          text: "Time",
-          color: darkMode ? "#f4f4f4" : "#333",
-        },
+        title: { display: true, text: "Time", color: darkMode ? "#f4f4f4" : "#333" },
         ticks: { color: darkMode ? "#f4f4f4" : "#333" },
         grid: { color: darkMode ? "rgba(255,255,255,0.3)" : "#ccc" },
       },
@@ -176,129 +175,143 @@ function Dashboard() {
       },
     },
   };
-  
 
   return (
     <div className={`dashboard ${darkMode ? "dark-mode" : "light-mode"}`}>
-      <h1>IoT Dashboard</h1>
-      <p>
-        <strong>Client ID:</strong> {clientID}
-      </p>
-      <p>
-        <strong>Device:</strong> {deviceName}
-      </p>
-      <p>
-        <strong>Status:</strong> {deviceStatus}
-      </p>
-      {lastSeen && (
-        <p>
-          <strong>Last Online:</strong> {lastSeen.toLocaleString()}
-        </p>
-      )}
-
-      {/* Dark/Light Mode Toggle */}
-      <div className="controls">
+      <Helmet>
+        <title>IoT Dashboard</title>
+        <meta name="description" content="IoT Dashboard with Dark/Light Mode" />
+      </Helmet>
+      <header className="header">
+        {/* Dark/Light Mode Toggle in Upper Left */}
         <button
-          className="mode-toggle-btn"
           onClick={() => setDarkMode(!darkMode)}
+          className="mode-toggle-btn"
         >
-          {darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          {darkMode ? <FaSun size={24} /> : <FaMoon size={24} />}
         </button>
-      </div>
+      </header>
 
-      {/* Toggle Switches and Restart Button */}
-      <div className="controls">
-        <div>
-          <label className="switch">
-            <input type="checkbox" checked={toggle1} onChange={handleToggle1} />
-            <span className="slider"></span>
-          </label>
-          <span>Toggle 1</span>
+      <main className="main-content">
+        <div className="device-info">
+          <h1>IoT Dashboard</h1>
+          <p>
+            <strong>Client ID:</strong> {clientID}
+          </p>
+          <p>
+            <strong>Device:</strong> {deviceName}
+          </p>
+          <p>
+            <strong>Status:</strong> {deviceStatus}
+          </p>
+          {lastSeen && (
+            <p>
+              <strong>Last Online:</strong> {lastSeen.toLocaleString()}
+            </p>
+          )}
         </div>
-        <div>
-          <label className="switch">
-            <input type="checkbox" checked={toggle2} onChange={handleToggle2} />
-            <span className="slider"></span>
-          </label>
-          <span>Toggle 2</span>
-        </div>
-        <button onClick={handleRestart} className="reset-button">
-          Restart Device
-        </button>
-      </div>
 
-      <div className="charts">
-        <div className="chart-container">
-          <Line
-            data={{
-              labels,
-              datasets: [
-                {
-                  label: "Temperature (°C)",
-                  data: temperatureData,
-                  borderColor: "red",
-                  backgroundColor: "rgba(255, 99, 132, 0.2)",
-                  fill: true,
-                },
-              ],
-            }}
-            options={chartOptions}
-          />
+        {/* Toggle Switches and Restart Button */}
+        <div className="controls">
+          <div>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={toggle1}
+                onChange={handleToggle1}
+              />
+              <span className="slider"></span>
+            </label>
+            <span>Toggle 1</span>
+          </div>
+          <div>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={toggle2}
+                onChange={handleToggle2}
+              />
+              <span className="slider"></span>
+            </label>
+            <span>Toggle 2</span>
+          </div>
+          <button onClick={handleRestart} className="reset-button">
+            Restart Device
+          </button>
         </div>
-        <div className="chart-container">
-          <Line
-            data={{
-              labels,
-              datasets: [
-                {
-                  label: "Humidity (%)",
-                  data: humidityData,
-                  borderColor: "blue",
-                  backgroundColor: "rgba(54, 162, 235, 0.2)",
-                  fill: true,
-                },
-              ],
-            }}
-            options={chartOptions}
-          />
+
+        {/* Charts Section */}
+        <div className="charts">
+          <div className="chart-container">
+            <Line
+              data={{
+                labels,
+                datasets: [
+                  {
+                    label: "Temperature (°C)",
+                    data: temperatureData,
+                    borderColor: "red",
+                    backgroundColor: "rgba(255, 99, 132, 0.2)",
+                    fill: true,
+                  },
+                ],
+              }}
+              options={chartOptions}
+            />
+          </div>
+          <div className="chart-container">
+            <Line
+              data={{
+                labels,
+                datasets: [
+                  {
+                    label: "Humidity (%)",
+                    data: humidityData,
+                    borderColor: "blue",
+                    backgroundColor: "rgba(54, 162, 235, 0.2)",
+                    fill: true,
+                  },
+                ],
+              }}
+              options={chartOptions}
+            />
+          </div>
+          <div className="chart-container">
+            <Line
+              data={{
+                labels,
+                datasets: [
+                  {
+                    label: "Battery Level (%)",
+                    data: batteryData,
+                    borderColor: "green",
+                    backgroundColor: "rgba(75, 192, 75, 0.2)",
+                    fill: true,
+                  },
+                ],
+              }}
+              options={chartOptions}
+            />
+          </div>
+          <div className="chart-container">
+            <Line
+              data={{
+                labels,
+                datasets: [
+                  {
+                    label: "Signal Quality (%)",
+                    data: signalQualityData,
+                    borderColor: "purple",
+                    backgroundColor: "rgba(128, 0, 128, 0.2)",
+                    fill: true,
+                  },
+                ],
+              }}
+              options={chartOptions}
+            />
+          </div>
         </div>
-        <div className="chart-container">
-          <Line
-            data={{
-              labels,
-              datasets: [
-                {
-                  label: "Battery Level (%)",
-                  data: batteryData,
-                  borderColor: "green",
-                  backgroundColor: "rgba(75, 192, 75, 0.2)",
-                  fill: true,
-                },
-              ],
-            }}
-            options={chartOptions}
-          />
-        </div>
-        <div className="chart-container">
-          <Line
-            data={{
-              labels,
-              datasets: [
-                {
-                  label: "Signal Quality (%)",
-                  data: signalQualityData,
-                  borderColor: "purple",
-                  backgroundColor: "rgba(128, 0, 128, 0.2)",
-                  fill: true,
-                },
-              ],
-            }}
-            options={chartOptions}
-          />
-        </div>
-      </div>
+      </main>
     </div>
   );
 }
-
-export default Dashboard;

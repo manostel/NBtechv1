@@ -15,6 +15,31 @@
   color: #f4f4f4;
 }
 
+/* Header: Fixed at the top-left corner */
+.header {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+}
+
+/* Mode toggle button styling */
+.mode-toggle-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+/* Main content styling */
+.main-content {
+  margin-top: 80px; /* space for header */
+}
+
+/* Device info styles */
+.device-info {
+  margin-bottom: 20px;
+}
+
 /* Controls container */
 .controls {
   display: flex;
@@ -24,7 +49,7 @@
   margin-bottom: 20px;
 }
 
-/* Global button styling for better usability */
+/* Global button styling */
 button {
   padding: 10px 20px;
   border: none;
@@ -40,16 +65,7 @@ button:hover {
   background-color: #45a049;
 }
 
-/* Dark mode toggle button specific style (optional) */
-.mode-toggle-btn {
-  background-color: #2196f3;
-}
-
-.mode-toggle-btn:hover {
-  background-color: #1976d2;
-}
-
-/* Reset (Restart) button with distinct styling */
+/* Reset (Restart) button styling */
 .reset-button {
   background-color: #f44336;
 }
@@ -112,7 +128,6 @@ input:checked + .slider:before {
   flex-wrap: wrap;
 }
 
-/* Existing chart container styles */
 .chart-container {
   width: 400px;
   height: 300px;
@@ -122,12 +137,11 @@ input:checked + .slider:before {
   box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* When dark mode is active, update the chart container background */
+/* Dark mode chart container */
 .dark-mode .chart-container {
   background: #444;
   box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.5);
 }
-
 
 /* Additional styles for battery, signal, etc. (if needed) */
 .battery-container,
