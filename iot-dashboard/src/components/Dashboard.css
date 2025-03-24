@@ -3,6 +3,7 @@
   font-family: Arial, sans-serif;
   min-height: 100vh;
   padding: 2rem;
+  /* No overflow restrictions on the root container */
   overflow: visible;
 }
 
@@ -12,15 +13,23 @@
   color: #f4f4f4;
 }
 
-/* Fixed left sidebar for small indicator bars */
-.left-sidebar {
-  position: absolute;
-  top: 100px; /* Adjust if your header is taller or shorter */
-  left: 1rem;
+/* Module toggles section with indicators in one horizontal row */
+.module-toggles {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding: 0 1rem;
+}
+
+.module-buttons {
+  display: flex;
+  gap: 0.625rem;
+}
+
+.module-indicators {
+  display: flex;
   gap: 0.5rem;
-  z-index: 1000;
 }
 
 /* Dashboard header layout */
@@ -29,11 +38,12 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 1rem;
+  height: 80px;          /* Explicit header height */
   margin-bottom: 1rem;
   border-bottom: 1px solid #444;
+  box-sizing: border-box;
 }
 
-/* Back button styling */
 .header-left .back-button {
   font-size: 1rem;
   background-color: #4caf50;
@@ -49,7 +59,6 @@
   background-color: #45a049;
 }
 
-/* Header right section */
 .header-right {
   display: flex;
   align-items: center;
@@ -79,7 +88,6 @@
   font-size: 1rem;
 }
 
-/* Settings & Logout buttons */
 .settings-button,
 .logout-button {
   background-color: #4caf50;
@@ -101,7 +109,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding-top: 1rem;
-  margin-left: 8rem; /* Leaves space for the fixed sidebar */
+  margin-left: 8rem; /* Leaves space if any fixed element on left */
 }
 
 /* Device info card in center */
@@ -110,7 +118,7 @@
   margin-bottom: 1.5rem;
 }
 
-/* Controls section (toggles + reset + command input) */
+/* Controls section (toggles, reset, and command input) */
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -126,7 +134,7 @@
   align-items: center;
 }
 
-/* Reset (Reset) button styling */
+/* Reset button styling */
 .reset-button {
   background-color: #f44336;
   transition: transform 0.2s, background-color 0.2s;
@@ -142,7 +150,6 @@
   transform: scale(0.95);
 }
 
-/* Restart button animation */
 .reset-button.clicked .icon {
   animation: rotate 0.5s linear;
 }
@@ -213,28 +220,7 @@ input:checked + .slider:before {
   height: 18.75rem; /* 300px */
 }
 
-/* Module toggles (for showing/hiding sections) */
-.module-toggles {
-  text-align: center;
-  margin-bottom: 1.25rem;
-}
-
-.toggle-module {
-  background-color: #4caf50;
-  border: none;
-  padding: 0.5rem 1rem;
-  margin: 0 0.625rem;
-  border-radius: 4px;
-  color: #fff;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.toggle-module:hover {
-  background-color: #45a049;
-}
-
-/* Command input styling for custom command */
+/* Command input styling */
 .command-input {
   display: flex;
   align-items: center;
@@ -271,7 +257,6 @@ input:checked + .slider:before {
     padding-top: 1rem;
   }
   .left-sidebar {
-    position: fixed;
     top: 60px;
     left: 10px;
   }

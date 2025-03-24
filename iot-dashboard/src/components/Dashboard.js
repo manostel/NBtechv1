@@ -15,7 +15,7 @@ import {
 } from "chart.js";
 import "chartjs-adapter-date-fns";
 import { FaCog } from "react-icons/fa";
-import { MdRefresh } from "react-icons/md";
+import { MdRefresh } from "react-icons/md"; // reset icon
 import "./Dashboard.css";
 import DeviceInfoCard from "./DeviceInfoCard";
 import BatteryIndicator from "./BatteryIndicator";
@@ -34,8 +34,6 @@ ChartJS.register(
 
 export default function Dashboard({ user, device, onLogout, onBack }) {
   const navigate = useNavigate();
-
-  // Force dark mode
   const [darkMode] = useState(true);
 
   // API & IoT data states
@@ -51,11 +49,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const [toggle1, setToggle1] = useState(false);
   const [toggle2, setToggle2] = useState(false);
   const [restartClicked, setRestartClicked] = useState(false);
-
-  // New state for custom command input (e.g. set speed)
   const [speedInput, setSpeedInput] = useState("");
 
-  // Module toggle states
+  // Module toggles for commands and charts
   const [showCharts, setShowCharts] = useState(true);
   const [showCommands, setShowCommands] = useState(true);
 
@@ -64,7 +60,6 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const COMMAND_API_URL =
     "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
 
-  // Fetch API data
   const fetchData = async () => {
     try {
       const url = `${API_URL}?limit=50`;
@@ -100,7 +95,6 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     }
   };
 
-  // Send command to device
   const sendCommand = async (action, additionalData = {}) => {
     try {
       const payload = { ClientID: clientID, action, ...additionalData };
@@ -116,7 +110,6 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     }
   };
 
-  // Handlers for toggles and restart command
   const handleToggle1 = () => {
     const newState = !toggle1;
     setToggle1(newState);
@@ -135,9 +128,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     setTimeout(() => setRestartClicked(false), 500);
   };
 
-  // Handler for custom command "Set Speed"
   const handleSendSpeed = async () => {
-    // For example, the action could be "SET_SPEED" and we include the speed value.
     if (speedInput.trim() !== "") {
       await sendCommand("SET_SPEED", { speed: speedInput });
       setSpeedInput("");
@@ -150,7 +141,6 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Chart options for dark mode
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -191,11 +181,27 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         <meta name="description" content="IoT Dashboard with Dark Mode" />
       </Helmet>
 
-      {/* Fixed Left Sidebar for Indicators */}
-      <div className="left-sidebar">
-        <BatteryIndicator battery={batteryData.length ? batteryData[0] : 0} />
-        <SignalIndicator signal={signalQualityData.length ? signalQualityData[0] : 0} />
-      </div>
+      {/* Module toggles row with indicators */}
+      <section className="module-toggles">
+        <div className="module-buttons">
+          <button
+            onClick={() => setShowCommands((prev) => !prev)}
+            className="toggle-module"
+          >
+            {showCommands ? "Hide Commands" : "Show Commands"}
+          </button>
+          <button
+            onClick={() => setShowCharts((prev) => !prev)}
+            className="toggle-module"
+          >
+            {showCharts ? "Hide Charts" : "Show Charts"}
+          </button>
+        </div>
+        <div className="module-indicators">
+          <BatteryIndicator battery={batteryData.length ? batteryData[0] : 0} />
+          <SignalIndicator signal={signalQualityData.length ? signalQualityData[0] : 0} />
+        </div>
+      </section>
 
       <header className="dashboard-header">
         <div className="header-left">
@@ -219,22 +225,6 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           </button>
         </div>
       </header>
-
-      {/* Module Toggles placed above the device info card */}
-      <section className="module-toggles">
-        <button
-          onClick={() => setShowCommands((prev) => !prev)}
-          className="toggle-module"
-        >
-          {showCommands ? "Hide Commands" : "Show Commands"}
-        </button>
-        <button
-          onClick={() => setShowCharts((prev) => !prev)}
-          className="toggle-module"
-        >
-          {showCharts ? "Hide Charts" : "Show Charts"}
-        </button>
-      </section>
 
       <main className="main-content">
         <section className="device-info">
@@ -268,7 +258,6 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             >
               <MdRefresh size={24} className="icon" />
             </button>
-            {/* New command input for "set speed" */}
             <div className="command-input">
               <input
                 type="text"
