@@ -3,7 +3,6 @@
   font-family: Arial, sans-serif;
   min-height: 100vh;
   padding: 2rem;
-  /* No overflow restrictions on the root container */
   overflow: visible;
 }
 
@@ -38,7 +37,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 1rem;
-  height: 80px;          /* Explicit header height */
+  height: 80px;
   margin-bottom: 1rem;
   border-bottom: 1px solid #444;
   box-sizing: border-box;
@@ -59,10 +58,19 @@
   background-color: #45a049;
 }
 
+/* Header right section */
 .header-right {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+/* New client title styling */
+.client-title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-right: 1rem;
+  color: #f4f4f4;
 }
 
 .user-info {
@@ -109,7 +117,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding-top: 1rem;
-  margin-left: 8rem; /* Leaves space if any fixed element on left */
+  margin-left: 0; /* Removing left margin since toggles are on top now */
 }
 
 /* Device info card in center */
@@ -118,7 +126,7 @@
   margin-bottom: 1.5rem;
 }
 
-/* Controls section (toggles, reset, and command input) */
+/* Controls section (toggles, reset, command input) */
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -252,12 +260,29 @@ input:checked + .slider:before {
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    height: auto;
+    padding: 0.5rem;
+  }
+  .header-right {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .client-title {
+    font-size: 1rem;
+  }
+  .user-info {
+    font-size: 0.9rem;
+  }
+  .settings-button,
+  .logout-button {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.9rem;
+  }
   .main-content {
     margin-left: 0;
     padding-top: 1rem;
-  }
-  .left-sidebar {
-    top: 60px;
-    left: 10px;
   }
 }

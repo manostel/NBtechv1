@@ -181,7 +181,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         <meta name="description" content="IoT Dashboard with Dark Mode" />
       </Helmet>
 
-      {/* Module toggles row with indicators */}
+      {/* Module toggles & indicators row */}
       <section className="module-toggles">
         <div className="module-buttons">
           <button
@@ -210,6 +210,8 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           </button>
         </div>
         <div className="header-right">
+          {/* Client title added before user info */}
+          <div className="client-title">{clientID}</div>
           <div className="user-info">
             <div className="user-avatar">{user.email[0].toUpperCase()}</div>
             <span className="user-name">{user.email}</span>
