@@ -52,7 +52,10 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const [toggle2, setToggle2] = useState(false);
   const [restartClicked, setRestartClicked] = useState(false);
 
-  // New states to toggle sections
+  // New state for custom command input (e.g. set speed)
+  const [speedInput, setSpeedInput] = useState("");
+
+  // Module toggle states
   const [showCharts, setShowCharts] = useState(true);
   const [showCommands, setShowCommands] = useState(true);
 
@@ -98,9 +101,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   };
 
   // Send command to device
-  const sendCommand = async (action) => {
+  const sendCommand = async (action, additionalData = {}) => {
     try {
-      const payload = { ClientID: clientID, action };
+      const payload = { ClientID: clientID, action, ...additionalData };
       const response = await fetch(COMMAND_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -113,7 +116,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     }
   };
 
-  // Command handlers
+  // Handlers for toggles and restart command
   const handleToggle1 = () => {
     const newState = !toggle1;
     setToggle1(newState);
@@ -128,19 +131,17 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
 
   const handleRestart = async () => {
     setRestartClicked(true);
-    try {
-      const payload = { ClientID: clientID, action: "RESTART" };
-      const response = await fetch(COMMAND_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      console.log("Restart command sent:", result);
-    } catch (error) {
-      console.error("Error sending restart command:", error);
-    }
+    await sendCommand("RESTART");
     setTimeout(() => setRestartClicked(false), 500);
+  };
+
+  // Handler for custom command "Set Speed"
+  const handleSendSpeed = async () => {
+    // For example, the action could be "SET_SPEED" and we include the speed value.
+    if (speedInput.trim() !== "") {
+      await sendCommand("SET_SPEED", { speed: speedInput });
+      setSpeedInput("");
+    }
   };
 
   useEffect(() => {
@@ -190,7 +191,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         <meta name="description" content="IoT Dashboard with Dark Mode" />
       </Helmet>
 
-      {/* Fixed left sidebar for indicators */}
+      {/* Fixed Left Sidebar for Indicators */}
       <div className="left-sidebar">
         <BatteryIndicator battery={batteryData.length ? batteryData[0] : 0} />
         <SignalIndicator signal={signalQualityData.length ? signalQualityData[0] : 0} />
@@ -219,6 +220,22 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         </div>
       </header>
 
+      {/* Module Toggles placed above the device info card */}
+      <section className="module-toggles">
+        <button
+          onClick={() => setShowCommands((prev) => !prev)}
+          className="toggle-module"
+        >
+          {showCommands ? "Hide Commands" : "Show Commands"}
+        </button>
+        <button
+          onClick={() => setShowCharts((prev) => !prev)}
+          className="toggle-module"
+        >
+          {showCharts ? "Hide Charts" : "Show Charts"}
+        </button>
+      </section>
+
       <main className="main-content">
         <section className="device-info">
           <DeviceInfoCard
@@ -229,42 +246,18 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           />
         </section>
 
-        {/* Toggle buttons for showing/hiding commands and charts */}
-        <section className="module-toggles">
-          <button
-            onClick={() => setShowCommands((prev) => !prev)}
-            className="toggle-module"
-          >
-            {showCommands ? "Hide Commands" : "Show Commands"}
-          </button>
-          <button
-            onClick={() => setShowCharts((prev) => !prev)}
-            className="toggle-module"
-          >
-            {showCharts ? "Hide Charts" : "Show Charts"}
-          </button>
-        </section>
-
         {showCommands && (
           <section className="controls">
             <div className="control-item">
               <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={toggle1}
-                  onChange={handleToggle1}
-                />
+                <input type="checkbox" checked={toggle1} onChange={handleToggle1} />
                 <span className="slider"></span>
               </label>
               <span>Toggle 1</span>
             </div>
             <div className="control-item">
               <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={toggle2}
-                  onChange={handleToggle2}
-                />
+                <input type="checkbox" checked={toggle2} onChange={handleToggle2} />
                 <span className="slider"></span>
               </label>
               <span>Toggle 2</span>
@@ -275,6 +268,16 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             >
               <MdRefresh size={24} className="icon" />
             </button>
+            {/* New command input for "set speed" */}
+            <div className="command-input">
+              <input
+                type="text"
+                placeholder="Set Speed"
+                value={speedInput}
+                onChange={(e) => setSpeedInput(e.target.value)}
+              />
+              <button onClick={handleSendSpeed}>Send</button>
+            </div>
           </section>
         )}
 

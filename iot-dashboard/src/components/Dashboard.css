@@ -2,8 +2,7 @@
 .dashboard {
   font-family: Arial, sans-serif;
   min-height: 100vh;
-  padding: 20px;
-  /* Make sure no overflow is restricting fixed elements */
+  padding: 2rem;
   overflow: visible;
 }
 
@@ -13,17 +12,14 @@
   color: #f4f4f4;
 }
 
-/* 
-  Fixed left sidebar for battery & signal bars.
-  They will remain at top-left, not scrollable with page.
-*/
+/* Fixed left sidebar for small indicator bars */
 .left-sidebar {
   position: absolute;
   top: 100px; /* Adjust if your header is taller or shorter */
-  left: 10px;
+  left: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0.5rem;
   z-index: 1000;
 }
 
@@ -32,16 +28,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
-  margin-bottom: 20px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
   border-bottom: 1px solid #444;
 }
 
+/* Back button styling */
 .header-left .back-button {
   font-size: 1rem;
   background-color: #4caf50;
   border: none;
-  padding: 8px 12px;
+  padding: 0.5rem 0.75rem;
   border-radius: 4px;
   color: #fff;
   cursor: pointer;
@@ -52,21 +49,22 @@
   background-color: #45a049;
 }
 
+/* Header right section */
 .header-right {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 0.75rem;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .user-avatar {
-  width: 40px;
-  height: 40px;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
   background-color: #4caf50;
   display: flex;
@@ -81,11 +79,12 @@
   font-size: 1rem;
 }
 
+/* Settings & Logout buttons */
 .settings-button,
 .logout-button {
   background-color: #4caf50;
   border: none;
-  padding: 8px 12px;
+  padding: 0.5rem 0.75rem;
   border-radius: 4px;
   color: #fff;
   cursor: pointer;
@@ -101,43 +100,24 @@
 .main-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding-top: 20px;
-  margin-left: 130px; /* Leave space for the fixed sidebar */
+  padding-top: 1rem;
+  margin-left: 8rem; /* Leaves space for the fixed sidebar */
 }
 
 /* Device info card in center */
 .device-info {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 1.5rem;
 }
 
-/* Controls section (toggles + restart) */
+/* Controls section (toggles + reset + command input) */
 .controls {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 30px;
-  margin-bottom: 40px;
-}
-
-.module-toggles {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.toggle-module {
-  background-color: #4caf50;
-  border: none;
-  padding: 8px 16px;
-  margin: 0 10px;
-  border-radius: 4px;
-  color: #fff;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.toggle-module:hover {
-  background-color: #45a049;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
 }
 
 .control-item {
@@ -146,10 +126,12 @@
   align-items: center;
 }
 
-/* Restart (Reset) button styling */
+/* Reset (Reset) button styling */
 .reset-button {
   background-color: #f44336;
   transition: transform 0.2s, background-color 0.2s;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
 }
 
 .reset-button:hover {
@@ -174,8 +156,8 @@
 .switch {
   position: relative;
   display: inline-block;
-  width: 50px;
-  height: 24px;
+  width: 3.125rem;  /* 50px */
+  height: 1.5rem;   /* 24px */
 }
 
 .switch input {
@@ -187,19 +169,22 @@
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-color: #555;
   transition: 0.4s;
-  border-radius: 24px;
+  border-radius: 1.5rem;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
+  height: 1.125rem; /* 18px */
+  width: 1.125rem;  /* 18px */
+  left: 0.1875rem;  /* 3px */
+  bottom: 0.1875rem; /* 3px */
   background-color: #f4f4f4;
   transition: 0.4s;
   border-radius: 50%;
@@ -210,20 +195,84 @@ input:checked + .slider {
 }
 
 input:checked + .slider:before {
-  transform: translateX(26px);
+  transform: translateX(1.625rem); /* 26px */
 }
 
 /* Charts grid layout */
 .charts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 30px;
+  gap: 1.875rem; /* 30px */
 }
 
 .chart-container {
   background: #2b2b3d;
   border-radius: 8px;
-  padding: 15px;
+  padding: 0.9375rem; /* 15px */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  height: 300px;
+  height: 18.75rem; /* 300px */
+}
+
+/* Module toggles (for showing/hiding sections) */
+.module-toggles {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.toggle-module {
+  background-color: #4caf50;
+  border: none;
+  padding: 0.5rem 1rem;
+  margin: 0 0.625rem;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.toggle-module:hover {
+  background-color: #45a049;
+}
+
+/* Command input styling for custom command */
+.command-input {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-top: 0.625rem;
+}
+
+.command-input input {
+  padding: 0.375rem;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background-color: #2b2b3d;
+  color: #f4f4f4;
+}
+
+.command-input button {
+  background-color: #4caf50;
+  border: none;
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.command-input button:hover {
+  background-color: #45a049;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+    padding-top: 1rem;
+  }
+  .left-sidebar {
+    position: fixed;
+    top: 60px;
+    left: 10px;
+  }
 }
