@@ -1,32 +1,46 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import { useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
+import {
+  AppBar,
+  Toolbar,
+  Box,
+  Button,
+  Typography,
+  IconButton,
+  Grid,
+  Paper,
+  TextField,
+  Switch,
+  FormControlLabel,
+  useTheme,
+} from "@mui/material";
+import { FaCog } from "react-icons/fa";
+import { MdRefresh } from "react-icons/md";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  Title,
+  Title as ChartTitle,
   Tooltip,
   Legend,
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
-import { FaCog } from "react-icons/fa";
-import { MdRefresh } from "react-icons/md"; // reset icon
-import "./Dashboard.css";
 import DeviceInfoCard from "./DeviceInfoCard";
 import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
+import SettingsDrawer from "./SettingsDrawer";
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  Title,
+  ChartTitle,
   Tooltip,
   Legend,
   TimeScale
@@ -34,7 +48,7 @@ ChartJS.register(
 
 export default function Dashboard({ user, device, onLogout, onBack }) {
   const navigate = useNavigate();
-  const [darkMode] = useState(true);
+  const theme = useTheme();
 
   // API & IoT data states
   const [labels, setLabels] = useState([]);
@@ -55,6 +69,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const [showCharts, setShowCharts] = useState(true);
   const [showCommands, setShowCommands] = useState(true);
 
+  // Settings drawer state
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const API_URL =
     "https://5zmsoqz436.execute-api.eu-central-1.amazonaws.com/default/fetch-data";
   const COMMAND_API_URL =
@@ -62,10 +79,8 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
 
   const fetchData = async () => {
     try {
-      const url = `${API_URL}?limit=50`;
-      const response = await fetch(url);
+      const response = await fetch(`${API_URL}?limit=50`);
       const { data } = await response.json();
-
       if (Array.isArray(data) && data.length > 0) {
         const timestamps = data.map((entry) => new Date(entry.timestamp));
         const temperatures = data.map((entry) => parseFloat(entry.temperature));
@@ -145,206 +160,245 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: "top",
-        labels: { color: "#f4f4f4" },
-      },
-      title: {
-        display: true,
-        text: "Real-time IoT Data",
-        color: "#f4f4f4",
-      },
+      legend: { position: "top", labels: { color: theme.palette.text.primary } },
+      title: { display: true, text: "Real-time IoT Data", color: theme.palette.text.primary },
     },
     scales: {
       x: {
         type: "time",
-        time: {
-          unit: "minute",
-          tooltipFormat: "yyyy-MM-dd HH:mm:ss",
-        },
-        title: { display: true, text: "Time", color: "#f4f4f4" },
-        ticks: { color: "#f4f4f4" },
+        time: { unit: "minute", tooltipFormat: "yyyy-MM-dd HH:mm:ss" },
+        title: { display: true, text: "Time", color: theme.palette.text.primary },
+        ticks: { color: theme.palette.text.primary },
         grid: { color: "rgba(255,255,255,0.3)" },
       },
       y: {
         beginAtZero: true,
-        ticks: { color: "#f4f4f4" },
+        ticks: { color: theme.palette.text.primary },
         grid: { color: "rgba(255,255,255,0.3)" },
       },
     },
   };
 
   return (
-    <div className="dashboard dark-mode">
+    <Box sx={{ backgroundColor: theme.palette.background.default, color: theme.palette.text.primary, minHeight: "100vh", p: 4 }}>
       <Helmet>
         <title>IoT Dashboard</title>
         <meta name="description" content="IoT Dashboard with Dark Mode" />
       </Helmet>
 
+      {/* Settings Drawer */}
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
       {/* Module toggles & indicators row */}
-      <section className="module-toggles">
-        <div className="module-buttons">
-          <button
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, px: 2 }}>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="contained"
             onClick={() => setShowCommands((prev) => !prev)}
-            className="toggle-module"
+            sx={{ bgcolor: theme.palette.primary.main, "&:hover": { bgcolor: theme.palette.primary.dark } }}
           >
             {showCommands ? "Hide Commands" : "Show Commands"}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="contained"
             onClick={() => setShowCharts((prev) => !prev)}
-            className="toggle-module"
+            sx={{ bgcolor: theme.palette.primary.main, "&:hover": { bgcolor: theme.palette.primary.dark } }}
           >
             {showCharts ? "Hide Charts" : "Show Charts"}
-          </button>
-        </div>
-        <div className="module-indicators">
+          </Button>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1 }}>
           <BatteryIndicator battery={batteryData.length ? batteryData[0] : 0} />
           <SignalIndicator signal={signalQualityData.length ? signalQualityData[0] : 0} />
-        </div>
-      </section>
+        </Box>
+      </Box>
 
-      <header className="dashboard-header">
-        <div className="header-left">
-          <button onClick={onBack} className="back-button">
-            Back to Devices
-          </button>
-        </div>
-        <div className="header-right">
-          {/* Client title added before user info */}
-          <div className="client-title">{clientID}</div>
-          <div className="user-info">
-            <div className="user-avatar">{user.email[0].toUpperCase()}</div>
-            <span className="user-name">{user.email}</span>
-          </div>
-          <button
-            onClick={() => navigate("/settings")}
-            className="settings-button"
+      {/* Header */}
+      <AppBar position="static" sx={{ bgcolor: theme.palette.background.default, boxShadow: "none", mb: 2 }}>
+        <Toolbar sx={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center", px: 2 }}>
+          <Button
+            variant="contained"
+            onClick={onBack}
+            sx={{
+              position: "absolute",
+              left: 16,
+              bgcolor: theme.palette.primary.main,
+              "&:hover": { bgcolor: theme.palette.primary.dark },
+            }}
           >
-            <FaCog size={24} />
-          </button>
-          <button onClick={onLogout} className="logout-button">
-            Logout
-          </button>
-        </div>
-      </header>
-
-      <main className="main-content">
-        <section className="device-info">
-          <DeviceInfoCard
-            clientID={clientID}
-            device={deviceName}
-            status={deviceStatus}
-            lastOnline={lastSeen ? lastSeen.toLocaleString() : "N/A"}
-          />
-        </section>
-
-        {showCommands && (
-          <section className="controls">
-            <div className="control-item">
-              <label className="switch">
-                <input type="checkbox" checked={toggle1} onChange={handleToggle1} />
-                <span className="slider"></span>
-              </label>
-              <span>Toggle 1</span>
-            </div>
-            <div className="control-item">
-              <label className="switch">
-                <input type="checkbox" checked={toggle2} onChange={handleToggle2} />
-                <span className="slider"></span>
-              </label>
-              <span>Toggle 2</span>
-            </div>
-            <button
-              onClick={handleRestart}
-              className={`reset-button ${restartClicked ? "clicked" : ""}`}
+            Back to Devices
+          </Button>
+          <Typography variant="h6" sx={{ fontWeight: "bold", textAlign: "center" }}>
+            {clientID}
+          </Typography>
+          <Box sx={{ position: "absolute", right: 16, display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                bgcolor: theme.palette.primary.main,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
-              <MdRefresh size={24} className="icon" />
-            </button>
-            <div className="command-input">
-              <input
-                type="text"
-                placeholder="Set Speed"
-                value={speedInput}
-                onChange={(e) => setSpeedInput(e.target.value)}
-              />
-              <button onClick={handleSendSpeed}>Send</button>
-            </div>
-          </section>
-        )}
+              <Typography variant="h6" sx={{ color: "#fff" }}>
+                {user.email[0].toUpperCase()}
+              </Typography>
+            </Box>
+            <Typography variant="body1">{user.email}</Typography>
+            <IconButton onClick={() => setSettingsOpen(true)} sx={{ color: theme.palette.text.primary }}>
+              <FaCog />
+            </IconButton>
+            <Button variant="contained" onClick={onLogout} sx={{ bgcolor: theme.palette.secondary.main, "&:hover": { bgcolor: theme.palette.secondary.dark } }}>
+              Logout
+            </Button>
+          </Box>
+        </Toolbar>
+      </AppBar>
 
-        {showCharts && (
-          <section className="charts">
-            <div className="chart-container">
-              <Line
-                data={{
-                  labels,
-                  datasets: [
-                    {
-                      label: "Temperature (°C)",
-                      data: temperatureData,
-                      borderColor: "red",
-                      backgroundColor: "rgba(255, 99, 132, 0.2)",
-                      fill: true,
-                    },
-                  ],
-                }}
-                options={chartOptions}
+      {/* Main Content */}
+      <Box sx={{ maxWidth: "1200px", mx: "auto", pt: 2 }}>
+        <DeviceInfoCard
+          clientID={clientID}
+          device={deviceName}
+          status={deviceStatus}
+          lastOnline={lastSeen ? lastSeen.toLocaleString() : "N/A"}
+        />
+        {showCommands && (
+          <Paper sx={{ p: 2, mt: 2, bgcolor: theme.palette.background.paper }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 2 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={toggle1}
+                    onChange={handleToggle1}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
+                    }}
+                  />
+                }
+                label="Toggle 1"
               />
-            </div>
-            <div className="chart-container">
-              <Line
-                data={{
-                  labels,
-                  datasets: [
-                    {
-                      label: "Humidity (%)",
-                      data: humidityData,
-                      borderColor: "blue",
-                      backgroundColor: "rgba(54, 162, 235, 0.2)",
-                      fill: true,
-                    },
-                  ],
-                }}
-                options={chartOptions}
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={toggle2}
+                    onChange={handleToggle2}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
+                    }}
+                  />
+                }
+                label="Toggle 2"
               />
-            </div>
-            <div className="chart-container">
-              <Line
-                data={{
-                  labels,
-                  datasets: [
-                    {
-                      label: "Battery Level (%)",
-                      data: batteryData,
-                      borderColor: "green",
-                      backgroundColor: "rgba(75, 192, 75, 0.2)",
-                      fill: true,
-                    },
-                  ],
-                }}
-                options={chartOptions}
-              />
-            </div>
-            <div className="chart-container">
-              <Line
-                data={{
-                  labels,
-                  datasets: [
-                    {
-                      label: "Signal Quality (%)",
-                      data: signalQualityData,
-                      borderColor: "purple",
-                      backgroundColor: "rgba(128, 0, 128, 0.2)",
-                      fill: true,
-                    },
-                  ],
-                }}
-                options={chartOptions}
-              />
-            </div>
-          </section>
+              <Button variant="contained" onClick={handleRestart} sx={{ bgcolor: theme.palette.secondary.main, "&:hover": { bgcolor: theme.palette.secondary.dark } }}>
+                <MdRefresh size={24} />
+              </Button>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <TextField
+                  variant="outlined"
+                  size="small"
+                  placeholder="Set Speed"
+                  value={speedInput}
+                  onChange={(e) => setSpeedInput(e.target.value)}
+                  sx={{
+                    bgcolor: theme.palette.background.default,
+                    input: { color: theme.palette.text.primary },
+                    "& .MuiOutlinedInput-notchedOutline": { borderColor: "#555" },
+                  }}
+                />
+                <Button variant="contained" onClick={handleSendSpeed} sx={{ bgcolor: theme.palette.primary.main, "&:hover": { bgcolor: theme.palette.primary.dark } }}>
+                  Send
+                </Button>
+              </Box>
+            </Box>
+          </Paper>
         )}
-      </main>
-    </div>
+        {showCharts && (
+          <Grid container spacing={3} sx={{ mt: 2 }}>
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
+                <Line
+                  data={{
+                    labels,
+                    datasets: [
+                      {
+                        label: "Temperature (°C)",
+                        data: temperatureData,
+                        borderColor: "red",
+                        backgroundColor: "rgba(255, 99, 132, 0.2)",
+                        fill: true,
+                      },
+                    ],
+                  }}
+                  options={chartOptions}
+                />
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
+                <Line
+                  data={{
+                    labels,
+                    datasets: [
+                      {
+                        label: "Humidity (%)",
+                        data: humidityData,
+                        borderColor: "blue",
+                        backgroundColor: "rgba(54, 162, 235, 0.2)",
+                        fill: true,
+                      },
+                    ],
+                  }}
+                  options={chartOptions}
+                />
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
+                <Line
+                  data={{
+                    labels,
+                    datasets: [
+                      {
+                        label: "Battery Level (%)",
+                        data: batteryData,
+                        borderColor: "green",
+                        backgroundColor: "rgba(75, 192, 75, 0.2)",
+                        fill: true,
+                      },
+                    ],
+                  }}
+                  options={chartOptions}
+                />
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
+                <Line
+                  data={{
+                    labels,
+                    datasets: [
+                      {
+                        label: "Signal Quality (%)",
+                        data: signalQualityData,
+                        borderColor: "purple",
+                        backgroundColor: "rgba(128, 0, 128, 0.2)",
+                        fill: true,
+                      },
+                    ],
+                  }}
+                  options={chartOptions}
+                />
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+      </Box>
+    </Box>
   );
 }
