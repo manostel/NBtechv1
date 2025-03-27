@@ -18,22 +18,24 @@ function App() {
   };
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={user ? <Navigate to="/devices" /> : <LoginPage onLogin={setUser} />} />
-        <Route path="/register" element={user ? <Navigate to="/devices" /> : <RegisterPage />} />
-        <Route path="/devices" element={user ? <DevicesPage user={user} onSelectDevice={setSelectedDevice} /> : <Navigate to="/" />} />
-        <Route
-          path="/dashboard"
-          element={user && selectedDevice ? (
-            <Dashboard user={user} device={selectedDevice} onLogout={handleLogout} onBack={() => setSelectedDevice(null)} />
-          ) : (
-            <Navigate to="/devices" />
-          )}
-        />
-        <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/" />} />
-      </Routes>
-    </Router>
+    <CustomThemeProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={user ? <Navigate to="/devices" /> : <LoginPage onLogin={setUser} />} />
+          <Route path="/register" element={user ? <Navigate to="/devices" /> : <RegisterPage onRegister={setUser} />} />
+          <Route path="/devices" element={user ? <DevicesPage user={user} onSelectDevice={setSelectedDevice} onLogout={handleLogout} /> : <Navigate to="/" />} />
+          <Route
+            path="/dashboard"
+            element={user && selectedDevice ? (
+              <Dashboard user={user} device={selectedDevice} onLogout={handleLogout} onBack={() => setSelectedDevice(null)} />
+            ) : (
+              <Navigate to="/devices" />
+            )}
+          />
+          <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/" />} />
+        </Routes>
+      </Router>
+    </CustomThemeProvider>
   );
 }
 

@@ -1,41 +1,62 @@
 import React, { useState } from "react";
 import { Helmet } from "react-helmet";
 import { Box, Button, TextField, Typography, Paper } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 // Use the same API endpoint as your Lambda
-const API_URL = "https://5t48jkao80.execute-api.eu-central-1.amazonaws.com/default";
+const API_URL = "https://dv7723iff5.execute-api.eu-central-1.amazonaws.com/default/auth/register";
 
 export default function RegisterPage({ onRegister }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [clientID, setClientID] = useState(""); // Optional: you can auto-generate or let the user specify a device/client id
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
     try {
+      const payload = {
+        email,
+        password,
+        action: 'register',
+        auth_type: 'email',
+        client_id: email  // Using email as client_id for now
+      };
+
+      console.log('Sending registration request with payload:', payload);
+
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "register",
-          email,
-          password,
-          client_id: clientID, // you might generate this or ask the user to input it
-          auth_type: "email"
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(payload)
       });
-      const result = await response.json();
-      if (response.ok) {
-        alert("Registration successful");
-        if (onRegister) {
-          onRegister({ email, clientID });
-        }
-      } else {
-        console.error("Registration failed:", result.error || result.message);
-        alert("Registration failed. " + (result.error || result.message));
+
+      const data = await response.json();
+      console.log('Registration response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Registration failed");
       }
-    } catch (error) {
-      console.error("Registration error:", error);
+
+      // Store the user data including client_id
+      onRegister({ 
+        email: data.email,
+        clientId: data.client_id,
+        authType: data.auth_type
+      });
+      navigate("/devices");
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -55,7 +76,7 @@ export default function RegisterPage({ onRegister }) {
         <title>Register | IoT Dashboard</title>
         <meta name="description" content="Register for your IoT Dashboard" />
       </Helmet>
-      <Paper sx={(theme) => ({ p: 3, width: 300, bgcolor: theme.palette.background.paper })}>
+      <Paper sx={(theme) => ({ p: 3, width: 400, bgcolor: theme.palette.background.paper })}>
         <Typography variant="h4" align="center" sx={{ mb: 2 }}>
           Register
         </Typography>
@@ -74,17 +95,10 @@ export default function RegisterPage({ onRegister }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <TextField
-            label="Client ID"
-            type="text"
-            required
-            value={clientID}
-            onChange={(e) => setClientID(e.target.value)}
-            helperText="Enter the device or client identifier"
-          />
-          <Button type="submit" variant="contained">
-            Sign Up
+          <Button type="submit" variant="contained" disabled={isLoading}>
+            {isLoading ? 'Registering...' : 'Register'}
           </Button>
+          {error && <Typography color="error">{error}</Typography>}
         </Box>
       </Paper>
     </Box>

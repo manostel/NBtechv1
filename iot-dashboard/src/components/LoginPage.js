@@ -3,35 +3,55 @@ import { Helmet } from "react-helmet";
 import { Box, Button, TextField, Typography, Paper } from "@mui/material";
 import { Link } from "react-router-dom";
 
-// Lambda API base endpoint
-const API_URL = "https://5t48jkao80.execute-api.eu-central-1.amazonaws.com/default";
+// Update the API URL to include /auth
+const API_URL = "https://dv7723iff5.execute-api.eu-central-1.amazonaws.com/default/auth/login";
 
-export default function LoginPage({ onLogin }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+// Add console logging for debugging
+console.log('API URL:', API_URL); // Debug log
 
-  // Email/Password Login Handler
+const LoginPage = ({ onLogin }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    
     try {
       const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          action: "login",
-          email,
-          password,
+          email: username,
+          password: password,
+          action: 'login'
         }),
       });
-      const result = await response.json();
-      if (response.ok) {
-        onLogin({ email: result.email, clientID: result.client_id });
-      } else {
-        console.error("Login failed:", result.error || result.message);
-        alert("Login failed. Please check your credentials.");
+
+      const data = await response.json();
+      console.log('Login response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
       }
+
+      // Store the user data including client_id
+      onLogin({
+        email: data.email,
+        clientId: data.client_id || null,  // Handle case where client_id is not present
+        authType: data.auth_type
+      });
+      
     } catch (error) {
-      console.error("Login error:", error);
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed. Please check your credentials and try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -60,8 +80,8 @@ export default function LoginPage({ onLogin }) {
             label="Email"
             type="email"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
           />
           <TextField
             label="Password"
@@ -70,10 +90,15 @@ export default function LoginPage({ onLogin }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <Button type="submit" variant="contained">
-            Log In
+          <Button type="submit" variant="contained" disabled={isLoading}>
+            {isLoading ? 'Logging in...' : 'Login'}
           </Button>
         </Box>
+        {error && (
+          <Typography variant="body2" color="error" sx={{ mt: 2, textAlign: "center" }}>
+            {error}
+          </Typography>
+        )}
         <Box sx={{ mt: 2, textAlign: "center" }}>
           <Typography variant="body2">
             Don't have an account?{" "}
@@ -85,4 +110,6 @@ export default function LoginPage({ onLogin }) {
       </Paper>
     </Box>
   );
-}
+};
+
+export default LoginPage;
