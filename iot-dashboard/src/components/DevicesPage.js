@@ -144,7 +144,15 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   };
 
   const handleDeviceClick = (dev) => {
-    onSelectDevice(dev);
+    console.log('Device clicked:', dev);
+    // Ensure we have all required device data
+    const deviceData = {
+      device_id: dev.client_id,
+      device_name: dev.device_name || dev.client_id,
+      // Add any other required device properties
+    };
+    console.log('Passing device data to dashboard:', deviceData);
+    onSelectDevice(deviceData);
     navigate("/dashboard");
   };
 

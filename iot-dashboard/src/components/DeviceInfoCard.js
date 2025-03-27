@@ -1,39 +1,59 @@
 import React from "react";
-import { Card, CardContent, Typography, Box } from "@mui/material";
-import { FaCircle } from "react-icons/fa";
+import { Card, CardContent, Typography, Box, CircularProgress } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
-export default function DeviceInfoCard({ clientID, device, status, lastOnline }) {
-  const statusColor = status === "Active" ? "#4caf50" : "#f44336";
+export default function DeviceInfoCard({ clientID, device, status, lastOnline, isLoading }) {
+  const theme = useTheme();
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Active":
+        return theme.palette.success.main;
+      case "Inactive":
+        return theme.palette.error.main;
+      case "Error":
+        return theme.palette.error.main;
+      default:
+        return theme.palette.grey[500];
+    }
+  };
+
   return (
-    <Card sx={{ bgcolor: "background.paper", color: "text.primary", maxWidth: 400, mx: "auto", mb: 2 }}>
+    <Card sx={{ mb: 3, bgcolor: theme.palette.background.paper }}>
       <CardContent>
-        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-            Client ID:
-          </Typography>
-          <Typography variant="subtitle1">{clientID}</Typography>
-        </Box>
-        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-            Device:
-          </Typography>
-          <Typography variant="subtitle1">{device}</Typography>
-        </Box>
-        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1, alignItems: "center" }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-            Status:
-          </Typography>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <FaCircle style={{ color: statusColor, marginRight: 4 }} />
-            <Typography variant="subtitle1">{status === "Active" ? "Online" : "Offline"}</Typography>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              {isLoading ? "Loading..." : device}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              ID: {isLoading ? "..." : clientID}
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {isLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              <>
+                <Box
+                  sx={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    bgcolor: getStatusColor(status),
+                    mr: 1,
+                  }}
+                />
+                <Typography variant="body2" color="textSecondary">
+                  {status}
+                </Typography>
+              </>
+            )}
           </Box>
         </Box>
-        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-            Last Online:
-          </Typography>
-          <Typography variant="subtitle1">{lastOnline}</Typography>
-        </Box>
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+          Last Online: {isLoading ? "..." : lastOnline}
+        </Typography>
       </CardContent>
     </Card>
   );

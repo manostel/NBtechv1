@@ -49,6 +49,9 @@ def lambda_handler(event, context):
         else:
             body = event
 
+        # Log the parsed body
+        logger.info(f"Parsed body: {json.dumps(body)}")
+
         # Validate required fields
         if 'action' not in body:
             return create_cors_response(400, {'error': 'Missing action in request body'})
@@ -65,6 +68,11 @@ def lambda_handler(event, context):
         # Get time range from request or default to 1h
         time_range = body.get('time_range', '1h')
         start_time = get_time_range(time_range)
+        
+        # Log the query parameters
+        logger.info(f"Querying for device_id: {body['client_id']}")
+        logger.info(f"Start time: {start_time.isoformat()}")
+        logger.info(f"Time range: {time_range}")
 
         # Get the device data from DynamoDB
         response = device_data_table.query(
@@ -79,8 +87,12 @@ def lambda_handler(event, context):
             ScanIndexForward=True  # Get data in chronological order
         )
 
+        # Log the DynamoDB response
+        logger.info(f"DynamoDB response: {json.dumps(response, default=str)}")
+
         # Check if we got any data
         if 'Items' not in response or not response['Items']:
+            logger.info("No data found for the specified criteria")
             return create_cors_response(200, {
                 'data': [],
                 'summary': {
@@ -132,8 +144,9 @@ def lambda_handler(event, context):
             'data_points': data_points
         }
 
-        # Log the response for debugging
-        logger.info(f"Returning data: {json.dumps({'data': processed_data, 'summary': summary})}")
+        # Log the processed data and summary
+        logger.info(f"Processed {data_points} data points")
+        logger.info(f"Summary statistics: {json.dumps(summary)}")
 
         return create_cors_response(200, {
             'data': processed_data,
