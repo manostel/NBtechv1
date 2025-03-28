@@ -67,6 +67,81 @@ ChartJS.register(
   ArcElement
 );
 
+// Remove the static METRICS_CONFIG and replace with a function to generate config
+const generateMetricConfig = (key) => {
+  // Default configurations for known metrics
+  const defaultConfigs = {
+    temperature: {
+      label: "Temperature",
+      unit: "°C",
+      color: "#FF6B6B",
+      icon: "thermostat",
+      alertThresholds: { min: 10, max: 30 }
+    },
+    humidity: {
+      label: "Humidity",
+      unit: "%",
+      color: "#4ECDC4",
+      icon: "water_drop",
+      alertThresholds: { min: 30, max: 70 }
+    },
+    battery: {
+      label: "Battery",
+      unit: "%",
+      color: "#45B7D1",
+      icon: "battery_full",
+      alertThresholds: { min: 20 }
+    },
+    signal: {
+      label: "Signal Quality",
+      unit: "%",
+      color: "#96CEB4",
+      icon: "signal_cellular_alt",
+      alertThresholds: { min: 30 }
+    },
+    signal_quality: {
+      label: "Signal Quality",
+      unit: "%",
+      color: "#96CEB4",
+      icon: "signal_cellular_alt",
+      alertThresholds: { min: 30 }
+    }
+  };
+
+  // If we have a default config, use it
+  if (defaultConfigs[key]) {
+    return {
+      ...defaultConfigs[key],
+      summaryKey: key === 'signal' ? 'avg_signal' : `avg_${key}`,
+      dataKey: key
+    };
+  }
+
+  // For unknown metrics, generate a config
+  const colors = [
+    "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#9B59B6",
+    "#E67E22", "#3498DB", "#2ECC71", "#F1C40F", "#E74C3C"
+  ];
+  const icons = [
+    "speed", "analytics", "assessment", "trending_up", "data_usage",
+    "monitoring", "insights", "query_stats", "bar_chart", "line_axis"
+  ];
+
+  // Generate a deterministic color and icon based on the key
+  const colorIndex = Math.abs(key.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+  const iconIndex = Math.abs(key.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % icons.length;
+
+  return {
+    label: key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+    unit: "%", // Default unit, can be updated based on data type
+    color: colors[colorIndex],
+    icon: icons[iconIndex],
+    alertThresholds: { min: 0, max: 100 }, // Default thresholds
+    summaryKey: `avg_${key}`,
+    dataKey: key
+  };
+};
+
 export default function Dashboard({ user, device, onLogout, onBack }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -111,7 +186,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   // Add new state for chart customization
   const [chartConfig, setChartConfig] = useState({
     showGrid: true,
-    showPoints: true,
+    showPoints: false,
     showLines: true,
     animation: true
   });
@@ -123,6 +198,15 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     battery: { min: 20 },
     signal: { min: 30 }
   });
+
+  // Replace individual state variables with a dynamic state object
+  const [metricsData, setMetricsData] = useState({});
+
+  // Add state for dynamic metrics config
+  const [metricsConfig, setMetricsConfig] = useState({});
+
+  // Add this state near the other state declarations
+  const [summaryType, setSummaryType] = useState('avg'); // 'avg', 'min', or 'max'
 
   const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
@@ -144,7 +228,6 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         user_email: user.email,
         time_range: timeRange
       };
-      console.log('Request body:', requestBody);
 
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -154,32 +237,36 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         body: JSON.stringify(requestBody)
       });
 
-      console.log('Response status:', response.status);
       const result = await response.json();
-      console.log('Dashboard data response:', result);
       
       if (!result.data) {
-        console.error('No data received from server');
         throw new Error('No data received from server');
       }
 
       const data = result.data;
       if (Array.isArray(data) && data.length > 0) {
-        console.log('Processing data array with length:', data.length);
         const timestamps = data.map((entry) => new Date(entry.timestamp));
-        const temperatures = data.map((entry) => parseFloat(entry.temperature));
-        const humidities = data.map((entry) => parseFloat(entry.humidity));
-        const batteries = data.map((entry) => parseFloat(entry.battery));
-        const signals = data.map((entry) => parseFloat(entry.signal_quality));
+        setLabels(timestamps);
+
+        // Dynamically create metrics config from the first data point
+        const firstDataPoint = data[0];
+        const newMetricsConfig = {};
+        Object.keys(firstDataPoint).forEach(key => {
+          if (key !== 'timestamp') {
+            newMetricsConfig[key] = generateMetricConfig(key);
+          }
+        });
+        setMetricsConfig(newMetricsConfig);
+
+        // Process each metric dynamically
+        const newMetricsData = {};
+        Object.keys(newMetricsConfig).forEach(key => {
+          newMetricsData[key] = data.map(entry => parseFloat(entry[key]));
+        });
+        setMetricsData(newMetricsData);
 
         setClientID(device.device_id);
         setDeviceName(device.device_name || "Unknown");
-
-        setLabels(timestamps);
-        setTemperatureData(temperatures);
-        setHumidityData(humidities);
-        setBatteryData(batteries);
-        setSignalQualityData(signals);
 
         const lastTimestamp = timestamps[timestamps.length - 1];
         setLastSeen(lastTimestamp);
@@ -187,19 +274,32 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         const timeDiff = (now - lastTimestamp) / 1000;
         setDeviceStatus(timeDiff <= 60 ? "Active" : "Inactive");
 
-        // Update summary statistics
-        if (result.summary) {
-          console.log('Updating summary:', result.summary);
-          setSummary(result.summary);
-        }
+        // Calculate summary statistics for all metrics
+        const calculatedSummary = {};
+        Object.keys(newMetricsConfig).forEach(key => {
+          const values = newMetricsData[key].filter(v => !isNaN(v));
+          if (values.length > 0) {
+            calculatedSummary[`avg_${key}`] = values.reduce((a, b) => a + b, 0) / values.length;
+            calculatedSummary[`min_${key}`] = Math.min(...values);
+            calculatedSummary[`max_${key}`] = Math.max(...values);
+          }
+        });
 
-        // Check for alerts
-        checkAlerts(temperatures[temperatures.length - 1], 
-                   humidities[humidities.length - 1], 
-                   batteries[batteries.length - 1], 
-                   signals[signals.length - 1]);
-      } else {
-        console.log('No data points found in response');
+        // Use API summary if available, otherwise use calculated summary
+        const finalSummary = result.summary || {};
+        // Merge API summary with calculated summary, preferring API values
+        const mergedSummary = {
+          ...calculatedSummary,
+          ...finalSummary
+        };
+        setSummary(mergedSummary);
+
+        // Check alerts for all metrics
+        Object.keys(newMetricsConfig).forEach(key => {
+          const value = newMetricsData[key][newMetricsData[key].length - 1];
+          const config = newMetricsConfig[key];
+          checkMetricAlert(key, value, config.alertThresholds);
+        });
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -210,12 +310,15 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     }
   };
 
-  const checkAlerts = (temperature, humidity, battery, signal) => {
+  // Modify the checkAlerts function to handle dynamic metrics
+  const checkMetricAlert = (metric, value, thresholds) => {
     const newAlerts = [];
-    if (temperature > 30) newAlerts.push('High temperature alert!');
-    if (humidity > 80) newAlerts.push('High humidity alert!');
-    if (battery < 20) newAlerts.push('Low battery alert!');
-    if (signal < 30) newAlerts.push('Poor signal strength alert!');
+    if (thresholds.max && value > thresholds.max) {
+      newAlerts.push(`High ${metricsConfig[metric]?.label || metric} alert!`);
+    }
+    if (thresholds.min && value < thresholds.min) {
+      newAlerts.push(`Low ${metricsConfig[metric]?.label || metric} alert!`);
+    }
     
     if (newAlerts.length > 0) {
       setAlerts(prev => [...newAlerts, ...prev]);
@@ -385,7 +488,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       x: {
         type: "time",
         time: { 
-          unit: timeRange === '1h' ? 'minute' : timeRange === '24h' ? 'hour' : 'day',
+          unit: timeRange === '1h' ? 'minute' : 'hour',
           tooltipFormat: "yyyy-MM-dd HH:mm:ss" 
         },
         title: { 
@@ -437,28 +540,38 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     }
   };
 
-  const renderChart = (data, label, color) => {
+  // Modify the renderChart function to handle dynamic metrics
+  const renderChart = (data, metricKey) => {
+    const config = metricsConfig[metricKey];
+    if (!config) return null;
+
     const chartData = {
       labels,
       datasets: [
         {
-          label,
+          label: `${config.label} (${config.unit})`,
           data,
-          borderColor: color,
-          backgroundColor: `${color}40`,
+          borderColor: config.color,
+          backgroundColor: `${config.color}40`,
           fill: true,
+          tension: 0.4,
+          borderWidth: 2,
+          pointRadius: chartConfig.showPoints ? 4 : 0,
+          pointHoverRadius: 6,
+          pointBackgroundColor: config.color,
+          pointBorderColor: config.color,
+          pointBorderWidth: 2,
         },
       ],
     };
 
-    // Create a copy of chartOptions for this specific chart
     const chartSpecificOptions = {
       ...chartOptions,
       plugins: {
         ...chartOptions.plugins,
         title: {
           ...chartOptions.plugins.title,
-          text: label // Use the label as the chart title
+          text: config.label
         }
       },
       scales: {
@@ -468,9 +581,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           ticks: {
             ...chartOptions.scales.y.ticks,
             callback: function(value) {
-              // Check if this is the temperature chart by looking at the label
-              const isTemperature = label.includes('Temperature');
-              return value + (isTemperature ? '°C' : '%');
+              return value + config.unit;
             }
           }
         }
@@ -484,6 +595,100 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     }
     return null;
   };
+
+  // Add this function to cycle through summary types
+  const cycleSummaryType = () => {
+    setSummaryType(prev => {
+      switch(prev) {
+        case 'avg': return 'min';
+        case 'min': return 'max';
+        case 'max': return 'avg';
+        default: return 'avg';
+      }
+    });
+  };
+
+  // Update the renderSummaryCards function
+  const renderSummaryCards = () => (
+    <Grid container spacing={3} sx={{ mb: 3 }}>
+      {Object.entries(metricsConfig).map(([key, config]) => {
+        // Get the value from summary based on the current summary type
+        const value = summary[`${summaryType}_${key}`] || summary[key];
+        const displayValue = value !== undefined && !isNaN(value) ? value.toFixed(1) : 'N/A';
+        
+        return (
+          <Grid item xs={12} sm={6} md={3} key={key}>
+            <Paper 
+              sx={{ 
+                p: 2, 
+                bgcolor: theme.palette.background.paper,
+                transition: 'transform 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: 3
+                }
+              }}
+            >
+              <Typography variant="h6" gutterBottom color="primary">
+                {config.label}
+              </Typography>
+              <Typography variant="h4" sx={{ mb: 1 }}>
+                {displayValue}{value !== undefined && !isNaN(value) ? config.unit : ''}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                {summaryType === 'avg' ? 'Average' : summaryType === 'min' ? 'Minimum' : 'Maximum'}
+              </Typography>
+              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: value !== undefined && !isNaN(value) ? (
+                      config.alertThresholds.max && value > config.alertThresholds.max ? 'error.main' :
+                      config.alertThresholds.min && value < config.alertThresholds.min ? 'warning.main' :
+                      'success.main'
+                    ) : 'grey.500'
+                  }}
+                />
+                <Typography variant="caption" color="textSecondary">
+                  {value !== undefined && !isNaN(value) ? (
+                    config.alertThresholds.max && value > config.alertThresholds.max ? 'High' :
+                    config.alertThresholds.min && value < config.alertThresholds.min ? 'Low' :
+                    'Normal'
+                  ) : 'No Data'}
+                </Typography>
+              </Box>
+            </Paper>
+          </Grid>
+        );
+      })}
+    </Grid>
+  );
+
+  // Modify the Charts section to be dynamic
+  const renderCharts = () => (
+    <Grid container spacing={3}>
+      {Object.entries(metricsConfig).map(([key, config]) => (
+        <Grid item xs={12} md={6} key={key}>
+          <Paper 
+            sx={{ 
+              p: 2, 
+              bgcolor: theme.palette.background.paper,
+              height: 400,
+              transition: 'transform 0.2s',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 3
+              }
+            }}
+          >
+            {renderChart(metricsData[key], key)}
+          </Paper>
+        </Grid>
+      ))}
+    </Grid>
+  );
 
   return (
     <Box sx={{ backgroundColor: theme.palette.background.default, color: theme.palette.text.primary, minHeight: "100vh", p: 4 }}>
@@ -591,200 +796,99 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             {/* Controls Bar */}
             <Paper sx={{ p: 2, mb: 3, bgcolor: theme.palette.background.paper }}>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<MdRefresh />}
-                  onClick={handleRefresh}
-                  disabled={isLoading}
-                >
-                  Refresh Data
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => setTimeRange(prev => prev === '1h' ? '24h' : prev === '24h' ? '7d' : '1h')}
-                >
-                  {timeRange === '1h' ? '1 Hour' : timeRange === '24h' ? '24 Hours' : '7 Days'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={(e) => setChartMenuAnchor(e.currentTarget)}
-                >
-                  Chart Options
-                </Button>
-                <Menu
-                  anchorEl={chartMenuAnchor}
-                  open={Boolean(chartMenuAnchor)}
-                  onClose={() => setChartMenuAnchor(null)}
-                >
-                  <MenuItem>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={chartConfig.showGrid}
-                          onChange={(e) => setChartConfig(prev => ({ ...prev, showGrid: e.target.checked }))}
-                        />
-                      }
-                      label="Show Grid"
-                    />
-                  </MenuItem>
-                  <MenuItem>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={chartConfig.showPoints}
-                          onChange={(e) => setChartConfig(prev => ({ ...prev, showPoints: e.target.checked }))}
-                        />
-                      }
-                      label="Show Points"
-                    />
-                  </MenuItem>
-                  <MenuItem>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={chartConfig.animation}
-                          onChange={(e) => setChartConfig(prev => ({ ...prev, animation: e.target.checked }))}
-                        />
-                      }
-                      label="Enable Animation"
-                    />
-                  </MenuItem>
-                </Menu>
+                {/* Group 1: Data Controls */}
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', borderRight: 1, borderColor: 'divider', pr: 2 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<MdRefresh />}
+                    onClick={handleRefresh}
+                    disabled={isLoading}
+                    sx={{ minWidth: 120 }}
+                  >
+                    Refresh Data
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setTimeRange(prev => prev === '1h' ? '24h' : '1h')}
+                    sx={{ minWidth: 100 }}
+                  >
+                    {timeRange === '1h' ? '1 Hour' : '24 Hours'}
+                  </Button>
+                </Box>
+
+                {/* Group 2: Chart Controls */}
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', borderRight: 1, borderColor: 'divider', pr: 2 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={(e) => setChartMenuAnchor(e.currentTarget)}
+                    startIcon={<FaChartLine />}
+                    sx={{ minWidth: 120 }}
+                  >
+                    Chart Options
+                  </Button>
+                  <Menu
+                    anchorEl={chartMenuAnchor}
+                    open={Boolean(chartMenuAnchor)}
+                    onClose={() => setChartMenuAnchor(null)}
+                  >
+                    <MenuItem>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={chartConfig.showGrid}
+                            onChange={(e) => setChartConfig(prev => ({ ...prev, showGrid: e.target.checked }))}
+                          />
+                        }
+                        label="Show Grid"
+                      />
+                    </MenuItem>
+                    <MenuItem>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={chartConfig.showPoints}
+                            onChange={(e) => setChartConfig(prev => ({ ...prev, showPoints: e.target.checked }))}
+                          />
+                        }
+                        label="Show Points"
+                      />
+                    </MenuItem>
+                    <MenuItem>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={chartConfig.animation}
+                            onChange={(e) => setChartConfig(prev => ({ ...prev, animation: e.target.checked }))}
+                          />
+                        }
+                        label="Enable Animation"
+                      />
+                    </MenuItem>
+                  </Menu>
+                </Box>
+
+                {/* Group 3: Summary Type Controls */}
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Button
+                    variant="outlined"
+                    onClick={cycleSummaryType}
+                    startIcon={<FaChartLine />}
+                    sx={{ 
+                      minWidth: 120,
+                      textTransform: 'capitalize'
+                    }}
+                  >
+                    {summaryType === 'avg' ? 'Average' : summaryType === 'min' ? 'Minimum' : 'Maximum'}
+                  </Button>
+                </Box>
               </Box>
             </Paper>
 
             {/* Summary Statistics */}
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper 
-                  sx={{ 
-                    p: 2, 
-                    bgcolor: theme.palette.background.paper,
-                    transition: 'transform 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 3
-                    }
-                  }}
-                >
-                  <Typography variant="h6" gutterBottom color="primary">
-                    Temperature
-                  </Typography>
-                  <Typography variant="h4" sx={{ mb: 1 }}>
-                    {summary.avg_temperature.toFixed(1)}°C
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    Average
-                  </Typography>
-                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        bgcolor: summary.avg_temperature > alertThresholds.temperature.max ? 'error.main' :
-                                summary.avg_temperature < alertThresholds.temperature.min ? 'warning.main' :
-                                'success.main'
-                      }}
-                    />
-                    <Typography variant="caption" color="textSecondary">
-                      {summary.avg_temperature > alertThresholds.temperature.max ? 'High' :
-                       summary.avg_temperature < alertThresholds.temperature.min ? 'Low' :
-                       'Normal'}
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                  <Typography variant="h6" gutterBottom>Humidity</Typography>
-                  <Typography variant="h4">{summary.avg_humidity.toFixed(1)}%</Typography>
-                  <Typography variant="body2" color="textSecondary">Average</Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                  <Typography variant="h6" gutterBottom>Battery</Typography>
-                  <Typography variant="h4">{summary.min_battery.toFixed(1)}%</Typography>
-                  <Typography variant="body2" color="textSecondary">Minimum</Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                  <Typography variant="h6" gutterBottom>Signal</Typography>
-                  <Typography variant="h4">{summary.avg_signal.toFixed(1)}%</Typography>
-                  <Typography variant="body2" color="textSecondary">Average</Typography>
-                </Paper>
-              </Grid>
-            </Grid>
+            {renderSummaryCards()}
 
             {/* Charts */}
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  sx={{ 
-                    p: 2, 
-                    bgcolor: theme.palette.background.paper,
-                    height: 400,
-                    transition: 'transform 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 3
-                    }
-                  }}
-                >
-                  {renderChart(temperatureData, "Temperature (°C)", theme.palette.error.main)}
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  sx={{ 
-                    p: 2, 
-                    bgcolor: theme.palette.background.paper,
-                    height: 400,
-                    transition: 'transform 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 3
-                    }
-                  }}
-                >
-                  {renderChart(humidityData, "Humidity (%)", theme.palette.info.main)}
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  sx={{ 
-                    p: 2, 
-                    bgcolor: theme.palette.background.paper,
-                    height: 400,
-                    transition: 'transform 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 3
-                    }
-                  }}
-                >
-                  {renderChart(batteryData, "Battery Level (%)", theme.palette.success.main)}
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  sx={{ 
-                    p: 2, 
-                    bgcolor: theme.palette.background.paper,
-                    height: 400,
-                    transition: 'transform 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 3
-                    }
-                  }}
-                >
-                  {renderChart(signalQualityData, "Signal Quality (%)", theme.palette.warning.main)}
-                </Paper>
-              </Grid>
-            </Grid>
+            {renderCharts()}
           </>
         )}
 
