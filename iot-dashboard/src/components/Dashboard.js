@@ -108,6 +108,22 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   // Settings drawer state
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Add new state for chart customization
+  const [chartConfig, setChartConfig] = useState({
+    showGrid: true,
+    showPoints: true,
+    showLines: true,
+    animation: true
+  });
+
+  // Add new state for alert thresholds
+  const [alertThresholds, setAlertThresholds] = useState({
+    temperature: { min: 10, max: 30 },
+    humidity: { min: 30, max: 70 },
+    battery: { min: 20 },
+    signal: { min: 30 }
+  });
+
   const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
 
@@ -320,8 +336,50 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: "top", labels: { color: theme.palette.text.primary } },
-      title: { display: true, text: "Real-time IoT Data", color: theme.palette.text.primary },
+      legend: { 
+        position: "top", 
+        labels: { color: theme.palette.text.primary },
+        display: true
+      },
+      title: { 
+        display: true, 
+        text: "Real-time IoT Data", 
+        color: theme.palette.text.primary,
+        font: {
+          size: 16,
+          weight: 'bold'
+        }
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        backgroundColor: theme.palette.background.paper,
+        titleColor: theme.palette.text.primary,
+        bodyColor: theme.palette.text.primary,
+        borderColor: theme.palette.divider,
+        borderWidth: 1,
+        padding: 10,
+        displayColors: true,
+        callbacks: {
+          label: function(context) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y.toFixed(1);
+              if (label.includes('Temperature')) {
+                label += '°C';
+              } else if (label.includes('Humidity') || 
+                       label.includes('Battery') || 
+                       label.includes('Signal')) {
+                label += '%';
+              }
+            }
+            return label;
+          }
+        }
+      }
     },
     scales: {
       x: {
@@ -330,16 +388,53 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           unit: timeRange === '1h' ? 'minute' : timeRange === '24h' ? 'hour' : 'day',
           tooltipFormat: "yyyy-MM-dd HH:mm:ss" 
         },
-        title: { display: true, text: "Time", color: theme.palette.text.primary },
-        ticks: { color: theme.palette.text.primary },
-        grid: { color: "rgba(255,255,255,0.3)" },
+        title: { 
+          display: true, 
+          text: "Time", 
+          color: theme.palette.text.primary,
+          font: { weight: 'bold' }
+        },
+        ticks: { 
+          color: theme.palette.text.primary,
+          maxRotation: 45,
+          minRotation: 45
+        },
+        grid: { 
+          color: chartConfig.showGrid ? "rgba(255,255,255,0.1)" : "transparent",
+          drawBorder: false
+        },
       },
       y: {
         beginAtZero: true,
-        ticks: { color: theme.palette.text.primary },
-        grid: { color: "rgba(255,255,255,0.3)" },
+        ticks: { 
+          color: theme.palette.text.primary
+        },
+        grid: { 
+          color: chartConfig.showGrid ? "rgba(255,255,255,0.1)" : "transparent",
+          drawBorder: false
+        },
       },
     },
+    elements: {
+      point: {
+        radius: chartConfig.showPoints ? 4 : 0,
+        hoverRadius: 6,
+        backgroundColor: theme.palette.primary.main,
+        borderColor: theme.palette.primary.main,
+        borderWidth: 2,
+      },
+      line: {
+        tension: 0.4,
+        borderWidth: 2,
+        borderColor: theme.palette.primary.main,
+        fill: true,
+        backgroundColor: `${theme.palette.primary.main}20`,
+      },
+    },
+    animation: {
+      duration: chartConfig.animation ? 1000 : 0,
+      easing: 'easeInOutQuart'
+    }
   };
 
   const renderChart = (data, label, color) => {
@@ -356,10 +451,36 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       ],
     };
 
+    // Create a copy of chartOptions for this specific chart
+    const chartSpecificOptions = {
+      ...chartOptions,
+      plugins: {
+        ...chartOptions.plugins,
+        title: {
+          ...chartOptions.plugins.title,
+          text: label // Use the label as the chart title
+        }
+      },
+      scales: {
+        ...chartOptions.scales,
+        y: {
+          ...chartOptions.scales.y,
+          ticks: {
+            ...chartOptions.scales.y.ticks,
+            callback: function(value) {
+              // Check if this is the temperature chart by looking at the label
+              const isTemperature = label.includes('Temperature');
+              return value + (isTemperature ? '°C' : '%');
+            }
+          }
+        }
+      }
+    };
+
     if (chartType === 'line') {
-      return <Line data={chartData} options={chartOptions} />;
+      return <Line data={chartData} options={chartSpecificOptions} />;
     } else if (chartType === 'bar') {
-      return <Bar data={chartData} options={chartOptions} />;
+      return <Bar data={chartData} options={chartSpecificOptions} />;
     }
     return null;
   };
@@ -431,7 +552,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       </AppBar>
 
       {/* Main Content */}
-      <Box sx={{ maxWidth: 1200, mx: "auto" }}>
+      <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
         <DeviceInfoCard
           clientID={clientID}
           device={deviceName}
@@ -444,54 +565,134 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         <Tabs
           value={tabValue}
           onChange={(e, newValue) => setTabValue(newValue)}
-          sx={{ mb: 3 }}
+          sx={{ 
+            mb: 3,
+            borderBottom: 1,
+            borderColor: 'divider',
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              minWidth: 120,
+              '&.Mui-selected': {
+                color: theme.palette.primary.main,
+              }
+            }
+          }}
         >
-          <Tab label="Overview" />
-          <Tab label="Commands" />
-          <Tab label="History" />
+          <Tab label="Overview" icon={<FaChartLine />} iconPosition="start" />
+          <Tab label="Commands" icon={<FaCog />} iconPosition="start" />
+          <Tab label="History" icon={<FaHistory />} iconPosition="start" />
         </Tabs>
 
         {/* Overview Tab */}
         {tabValue === 0 && (
           <>
-            {/* Module toggles & indicators row */}
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-              <Box sx={{ display: "flex", gap: 1 }}>
+            {/* Controls Bar */}
+            <Paper sx={{ p: 2, mb: 3, bgcolor: theme.palette.background.paper }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
                 <Button
-                  variant="contained"
-                  onClick={() => setShowCommands((prev) => !prev)}
-                  sx={{ bgcolor: theme.palette.primary.main, "&:hover": { bgcolor: theme.palette.primary.dark } }}
+                  variant="outlined"
+                  startIcon={<MdRefresh />}
+                  onClick={handleRefresh}
+                  disabled={isLoading}
                 >
-                  {showCommands ? "Hide Commands" : "Show Commands"}
+                  Refresh Data
                 </Button>
                 <Button
-                  variant="contained"
-                  onClick={() => setShowCharts((prev) => !prev)}
-                  sx={{ bgcolor: theme.palette.primary.main, "&:hover": { bgcolor: theme.palette.primary.dark } }}
-                >
-                  {showCharts ? "Hide Charts" : "Show Charts"}
-                </Button>
-                <Button
-                  variant="contained"
+                  variant="outlined"
                   onClick={() => setTimeRange(prev => prev === '1h' ? '24h' : prev === '24h' ? '7d' : '1h')}
-                  sx={{ bgcolor: theme.palette.primary.main, "&:hover": { bgcolor: theme.palette.primary.dark } }}
                 >
                   {timeRange === '1h' ? '1 Hour' : timeRange === '24h' ? '24 Hours' : '7 Days'}
                 </Button>
+                <Button
+                  variant="outlined"
+                  onClick={(e) => setChartMenuAnchor(e.currentTarget)}
+                >
+                  Chart Options
+                </Button>
+                <Menu
+                  anchorEl={chartMenuAnchor}
+                  open={Boolean(chartMenuAnchor)}
+                  onClose={() => setChartMenuAnchor(null)}
+                >
+                  <MenuItem>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={chartConfig.showGrid}
+                          onChange={(e) => setChartConfig(prev => ({ ...prev, showGrid: e.target.checked }))}
+                        />
+                      }
+                      label="Show Grid"
+                    />
+                  </MenuItem>
+                  <MenuItem>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={chartConfig.showPoints}
+                          onChange={(e) => setChartConfig(prev => ({ ...prev, showPoints: e.target.checked }))}
+                        />
+                      }
+                      label="Show Points"
+                    />
+                  </MenuItem>
+                  <MenuItem>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={chartConfig.animation}
+                          onChange={(e) => setChartConfig(prev => ({ ...prev, animation: e.target.checked }))}
+                        />
+                      }
+                      label="Enable Animation"
+                    />
+                  </MenuItem>
+                </Menu>
               </Box>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <BatteryIndicator value={batteryData.length ? batteryData[batteryData.length - 1] : 0} />
-                <SignalIndicator value={signalQualityData.length ? signalQualityData[signalQualityData.length - 1] : 0} />
-              </Box>
-            </Box>
+            </Paper>
 
             {/* Summary Statistics */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                  <Typography variant="h6" gutterBottom>Temperature</Typography>
-                  <Typography variant="h4">{summary.avg_temperature.toFixed(1)}°C</Typography>
-                  <Typography variant="body2" color="textSecondary">Average</Typography>
+                <Paper 
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: theme.palette.background.paper,
+                    transition: 'transform 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 3
+                    }
+                  }}
+                >
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Temperature
+                  </Typography>
+                  <Typography variant="h4" sx={{ mb: 1 }}>
+                    {summary.avg_temperature.toFixed(1)}°C
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Average
+                  </Typography>
+                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        bgcolor: summary.avg_temperature > alertThresholds.temperature.max ? 'error.main' :
+                                summary.avg_temperature < alertThresholds.temperature.min ? 'warning.main' :
+                                'success.main'
+                      }}
+                    />
+                    <Typography variant="caption" color="textSecondary">
+                      {summary.avg_temperature > alertThresholds.temperature.max ? 'High' :
+                       summary.avg_temperature < alertThresholds.temperature.min ? 'Low' :
+                       'Normal'}
+                    </Typography>
+                  </Box>
                 </Paper>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
@@ -518,116 +719,214 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             </Grid>
 
             {/* Charts */}
-            {showCharts && (
-              <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                    {renderChart(temperatureData, "Temperature (°C)", "red")}
-                  </Paper>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                    {renderChart(humidityData, "Humidity (%)", "blue")}
-                  </Paper>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                    {renderChart(batteryData, "Battery Level (%)", "green")}
-                  </Paper>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                    {renderChart(signalQualityData, "Signal Quality (%)", "purple")}
-                  </Paper>
-                </Grid>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: theme.palette.background.paper,
+                    height: 400,
+                    transition: 'transform 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 3
+                    }
+                  }}
+                >
+                  {renderChart(temperatureData, "Temperature (°C)", theme.palette.error.main)}
+                </Paper>
               </Grid>
-            )}
-
-            {/* Commands */}
-            {showCommands && (
-              <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={toggle1}
-                        onChange={handleToggle1}
-                        sx={{
-                          "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
-                          "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
-                        }}
-                      />
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: theme.palette.background.paper,
+                    height: 400,
+                    transition: 'transform 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 3
                     }
-                    label="Toggle 1"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={toggle2}
-                        onChange={handleToggle2}
-                        sx={{
-                          "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
-                          "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
-                        }}
-                      />
+                  }}
+                >
+                  {renderChart(humidityData, "Humidity (%)", theme.palette.info.main)}
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: theme.palette.background.paper,
+                    height: 400,
+                    transition: 'transform 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 3
                     }
-                    label="Toggle 2"
-                  />
-                  <Button variant="contained" onClick={handleRestart} sx={{ bgcolor: theme.palette.secondary.main, "&:hover": { bgcolor: theme.palette.secondary.dark } }}>
-                    <MdRefresh size={24} />
-                  </Button>
-                  <Box sx={{ display: "flex", gap: 1 }}>
-                    <TextField
-                      variant="outlined"
-                      size="small"
-                      placeholder="Set Speed"
-                      value={speedInput}
-                      onChange={(e) => setSpeedInput(e.target.value)}
-                      sx={{
-                        bgcolor: theme.palette.background.default,
-                        input: { color: theme.palette.text.primary },
-                        "& .MuiOutlinedInput-notchedOutline": { borderColor: "#555" },
-                      }}
-                    />
-                    <Button variant="contained" onClick={handleSendSpeed} sx={{ bgcolor: theme.palette.primary.main, "&:hover": { bgcolor: theme.palette.primary.dark } }}>
-                      Send
-                    </Button>
-                  </Box>
-                </Box>
-              </Paper>
-            )}
+                  }}
+                >
+                  {renderChart(batteryData, "Battery Level (%)", theme.palette.success.main)}
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: theme.palette.background.paper,
+                    height: 400,
+                    transition: 'transform 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 3
+                    }
+                  }}
+                >
+                  {renderChart(signalQualityData, "Signal Quality (%)", theme.palette.warning.main)}
+                </Paper>
+              </Grid>
+            </Grid>
           </>
         )}
 
         {/* Commands Tab */}
         {tabValue === 1 && (
-          <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-            <Typography variant="h6" gutterBottom>Command History</Typography>
-            <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-              {commandHistory.map((cmd, index) => (
-                <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-                  <Box>
-                    <Typography variant="body2">{cmd.action}</Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {cmd.timestamp.toLocaleString()}
-                    </Typography>
-                  </Box>
-                  <Typography 
-                    variant="caption" 
+          <>
+            {/* Device Controls */}
+            <Paper sx={{ p: 2, mb: 3, bgcolor: theme.palette.background.paper }}>
+              <Typography variant="h6" gutterBottom>Device Controls</Typography>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center" }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={toggle1}
+                      onChange={handleToggle1}
+                      sx={{
+                        "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
+                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
+                      }}
+                    />
+                  }
+                  label="Toggle 1"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={toggle2}
+                      onChange={handleToggle2}
+                      sx={{
+                        "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
+                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
+                      }}
+                    />
+                  }
+                  label="Toggle 2"
+                />
+                <Button 
+                  variant="contained" 
+                  onClick={handleRestart}
+                  startIcon={<MdRefresh />}
+                  sx={{ 
+                    bgcolor: theme.palette.secondary.main,
+                    "&:hover": { bgcolor: theme.palette.secondary.dark }
+                  }}
+                >
+                  Restart Device
+                </Button>
+                <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                  <TextField
+                    variant="outlined"
+                    size="small"
+                    placeholder="Set Speed"
+                    value={speedInput}
+                    onChange={(e) => setSpeedInput(e.target.value)}
+                    sx={{
+                      width: 120,
+                      bgcolor: theme.palette.background.default,
+                      input: { color: theme.palette.text.primary },
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "#555" },
+                    }}
+                  />
+                  <Button 
+                    variant="contained" 
+                    onClick={handleSendSpeed}
+                    disabled={!speedInput.trim()}
                     sx={{ 
-                      color: cmd.status === 'success' ? 'success.main' : 'error.main',
-                      bgcolor: cmd.status === 'success' ? 'success.light' : 'error.light',
-                      px: 1,
-                      py: 0.5,
-                      borderRadius: 1
+                      bgcolor: theme.palette.primary.main,
+                      "&:hover": { bgcolor: theme.palette.primary.dark }
                     }}
                   >
-                    {cmd.status}
-                  </Typography>
+                    Send
+                  </Button>
                 </Box>
-              ))}
-            </Box>
-          </Paper>
+              </Box>
+            </Paper>
+
+            {/* Command History */}
+            <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">Command History</Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setCommandHistory([])}
+                >
+                  Clear History
+                </Button>
+              </Box>
+              <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                {commandHistory.length === 0 ? (
+                  <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
+                    No commands sent yet
+                  </Typography>
+                ) : (
+                  commandHistory.map((cmd, index) => (
+                    <Box 
+                      key={index} 
+                      sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        py: 1.5, 
+                        px: 2,
+                        borderBottom: '1px solid', 
+                        borderColor: 'divider',
+                        '&:hover': {
+                          bgcolor: 'action.hover'
+                        }
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                          {cmd.action}
+                        </Typography>
+                        {cmd.data && Object.keys(cmd.data).length > 0 && (
+                          <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                            {JSON.stringify(cmd.data)}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                          {cmd.timestamp.toLocaleString()}
+                        </Typography>
+                      </Box>
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          color: cmd.status === 'success' ? 'success.main' : 'error.main',
+                          bgcolor: cmd.status === 'success' ? 'success.light' : 'error.light',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1,
+                          fontWeight: 'medium'
+                        }}
+                      >
+                        {cmd.status}
+                      </Typography>
+                    </Box>
+                  ))
+                )}
+              </Box>
+            </Paper>
+          </>
         )}
 
         {/* History Tab */}
