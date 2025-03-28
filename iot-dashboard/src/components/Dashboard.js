@@ -244,18 +244,23 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       }
 
       const data = result.data;
+      console.log('Received data:', data);
+
       if (Array.isArray(data) && data.length > 0) {
         const timestamps = data.map((entry) => new Date(entry.timestamp));
         setLabels(timestamps);
 
         // Dynamically create metrics config from the first data point
         const firstDataPoint = data[0];
+        console.log('First data point:', firstDataPoint);
+        
         const newMetricsConfig = {};
         Object.keys(firstDataPoint).forEach(key => {
           if (key !== 'timestamp') {
             newMetricsConfig[key] = generateMetricConfig(key);
           }
         });
+        console.log('Generated metrics config:', newMetricsConfig);
         setMetricsConfig(newMetricsConfig);
 
         // Process each metric dynamically
@@ -263,6 +268,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         Object.keys(newMetricsConfig).forEach(key => {
           newMetricsData[key] = data.map(entry => parseFloat(entry[key]));
         });
+        console.log('Processed metrics data:', newMetricsData);
         setMetricsData(newMetricsData);
 
         setClientID(device.device_id);
@@ -284,14 +290,18 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             calculatedSummary[`max_${key}`] = Math.max(...values);
           }
         });
+        console.log('Calculated summary:', calculatedSummary);
 
         // Use API summary if available, otherwise use calculated summary
         const finalSummary = result.summary || {};
+        console.log('API summary:', finalSummary);
+        
         // Merge API summary with calculated summary, preferring API values
         const mergedSummary = {
           ...calculatedSummary,
           ...finalSummary
         };
+        console.log('Final merged summary:', mergedSummary);
         setSummary(mergedSummary);
 
         // Check alerts for all metrics
@@ -608,63 +618,77 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     });
   };
 
-  // Update the renderSummaryCards function
-  const renderSummaryCards = () => (
-    <Grid container spacing={3} sx={{ mb: 3 }}>
-      {Object.entries(metricsConfig).map(([key, config]) => {
-        // Get the value from summary based on the current summary type
-        const value = summary[`${summaryType}_${key}`] || summary[key];
-        const displayValue = value !== undefined && !isNaN(value) ? value.toFixed(1) : 'N/A';
-        
-        return (
-          <Grid item xs={12} sm={6} md={3} key={key}>
-            <Paper 
-              sx={{ 
-                p: 2, 
-                bgcolor: theme.palette.background.paper,
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              <Typography variant="h6" gutterBottom color="primary">
-                {config.label}
-              </Typography>
-              <Typography variant="h4" sx={{ mb: 1 }}>
-                {displayValue}{value !== undefined && !isNaN(value) ? config.unit : ''}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                {summaryType === 'avg' ? 'Average' : summaryType === 'min' ? 'Minimum' : 'Maximum'}
-              </Typography>
-              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    bgcolor: value !== undefined && !isNaN(value) ? (
-                      config.alertThresholds.max && value > config.alertThresholds.max ? 'error.main' :
-                      config.alertThresholds.min && value < config.alertThresholds.min ? 'warning.main' :
-                      'success.main'
-                    ) : 'grey.500'
-                  }}
-                />
-                <Typography variant="caption" color="textSecondary">
-                  {value !== undefined && !isNaN(value) ? (
-                    config.alertThresholds.max && value > config.alertThresholds.max ? 'High' :
-                    config.alertThresholds.min && value < config.alertThresholds.min ? 'Low' :
-                    'Normal'
-                  ) : 'No Data'}
+  // Update the renderSummaryCards function to better handle the data
+  const renderSummaryCards = () => {
+    console.log('Rendering summary cards with:', {
+      metricsConfig,
+      summary,
+      summaryType
+    });
+
+    return (
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        {Object.entries(metricsConfig).map(([key, config]) => {
+          // Get the value from summary based on the current summary type
+          const value = summary[`${summaryType}_${key}`] || summary[key];
+          console.log(`Metric ${key}:`, {
+            value,
+            summaryKey: `${summaryType}_${key}`,
+            rawValue: summary[key]
+          });
+          
+          const displayValue = value !== undefined && !isNaN(value) ? value.toFixed(1) : 'N/A';
+          
+          return (
+            <Grid item xs={12} sm={6} md={3} key={key}>
+              <Paper 
+                sx={{ 
+                  p: 2, 
+                  bgcolor: theme.palette.background.paper,
+                  transition: 'transform 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 3
+                  }
+                }}
+              >
+                <Typography variant="h6" gutterBottom color="primary">
+                  {config.label}
                 </Typography>
-              </Box>
-            </Paper>
-          </Grid>
-        );
-      })}
-    </Grid>
-  );
+                <Typography variant="h4" sx={{ mb: 1 }}>
+                  {displayValue}{value !== undefined && !isNaN(value) ? config.unit : ''}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {summaryType === 'avg' ? 'Average' : summaryType === 'min' ? 'Minimum' : 'Maximum'}
+                </Typography>
+                <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      bgcolor: value !== undefined && !isNaN(value) ? (
+                        config.alertThresholds.max && value > config.alertThresholds.max ? 'error.main' :
+                        config.alertThresholds.min && value < config.alertThresholds.min ? 'warning.main' :
+                        'success.main'
+                      ) : 'grey.500'
+                    }}
+                  />
+                  <Typography variant="caption" color="textSecondary">
+                    {value !== undefined && !isNaN(value) ? (
+                      config.alertThresholds.max && value > config.alertThresholds.max ? 'High' :
+                      config.alertThresholds.min && value < config.alertThresholds.min ? 'Low' :
+                      'Normal'
+                    ) : 'No Data'}
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
+          );
+        })}
+      </Grid>
+    );
+  };
 
   // Modify the Charts section to be dynamic
   const renderCharts = () => (
