@@ -31,7 +31,11 @@ import {
   FaHistory,
   FaChartLine,
   FaChartBar,
-  FaChartPie
+  FaChartPie,
+  FaThermometerHalf,
+  FaTint,
+  FaBatteryThreeQuarters,
+  FaSignal
 } from "react-icons/fa";
 import { MdRefresh, MdSettings } from "react-icons/md";
 import { Logout as LogoutIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
@@ -73,31 +77,36 @@ const generateMetricConfig = (key) => {
   const defaultConfigs = {
     temperature: {
       label: "Temperature",
-      unit: "°C",
+      unit: "\u00B0C",
       color: "#FF6B6B",
-      icon: "thermostat",
-      alertThresholds: { min: 10, max: 30 }
+      icon: <FaThermometerHalf />,
+      alertThresholds: { min: 10, max: 30 },
+      summaryKey: 'temperature'
     },
     humidity: {
       label: "Humidity",
       unit: "%",
       color: "#4ECDC4",
-      icon: "water_drop",
-      alertThresholds: { min: 30, max: 70 }
+      icon: <FaTint />,
+      alertThresholds: { min: 30, max: 70 },
+      summaryKey: 'humidity'
     },
     battery: {
       label: "Battery",
       unit: "%",
-      color: "#45B7D1",
-      icon: "battery_full",
-      alertThresholds: { min: 20 }
+      color: "#FFD93D",
+      icon: <FaBatteryThreeQuarters />,
+      alertThresholds: { min: 20 },
+      summaryKey: 'battery_level'
     },
     signal: {
-      label: "Signal Quality",
+      label: "Signal",
       unit: "%",
-      color: "#96CEB4",
-      icon: "signal_cellular_alt",
-      alertThresholds: { min: 30 }
+      color: "#6C5CE7",
+      icon: <FaSignal />,
+      alertThresholds: { min: 30 },
+      summaryKey: 'signal_quality',
+      dataKey: 'signal_quality'
     },
     signal_quality: {
       label: "Signal Quality",
@@ -112,7 +121,6 @@ const generateMetricConfig = (key) => {
   if (defaultConfigs[key]) {
     return {
       ...defaultConfigs[key],
-      summaryKey: key === 'signal' ? 'avg_signal' : `avg_${key}`,
       dataKey: key
     };
   }
@@ -482,7 +490,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             if (context.parsed.y !== null) {
               label += context.parsed.y.toFixed(1);
               if (label.includes('Temperature')) {
-                label += '°C';
+                label += '\u00B0C';
               } else if (label.includes('Humidity') || 
                        label.includes('Battery') || 
                        label.includes('Signal')) {
