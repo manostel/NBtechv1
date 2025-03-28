@@ -1,216 +1,195 @@
 import json
 import boto3
-from boto3.dynamodb.conditions import Key
-from datetime import datetime
+from datetime import datetime, timedelta
+import logging
+from decimal import Decimal
+from statistics import mean
+
+# Configure logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Initialize DynamoDB
 dynamodb = boto3.resource('dynamodb')
-devices_table = dynamodb.Table('Devices')
+device_data_table = dynamodb.Table('IoT_DeviceData')
 
-def cors_response(status_code, body):
+def create_cors_response(status_code, body):
+    """Create a response with CORS headers"""
     return {
         'statusCode': status_code,
         'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',  # Allow all origins during development
-            'Access-Control-Allow-Headers': '*',  # Allow all headers
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
             'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
-            'Access-Control-Allow-Credentials': 'true'
+            'Content-Type': 'application/json'
         },
         'body': json.dumps(body)
     }
 
+def get_time_range_and_points(time_range, target_points=100):
+    """Get start time and calculate interval for consistent points"""
+    now = datetime.utcnow()
+    if time_range == 'live':
+        # For live data, return exactly 2 minutes of data with 20 points
+        return now - timedelta(minutes=2), 20
+    elif time_range == '15m':
+        return now - timedelta(minutes=15), target_points
+    elif time_range == '1h':
+        return now - timedelta(hours=1), target_points
+    elif time_range == '24h':
+        return now - timedelta(days=1), target_points
+    else:  # Default case
+        return now - timedelta(hours=1), target_points
+
+def aggregate_data(items, target_points):
+    """Aggregate data to achieve consistent number of points"""
+    if not items:
+        return []
+
+    # Sort items by timestamp
+    sorted_items = sorted(items, key=lambda x: x['timestamp'])
+    
+    # Calculate number of items per group
+    items_per_group = max(1, len(sorted_items) // target_points)
+    
+    processed_data = []
+    current_group = []
+    
+    for item in sorted_items:
+        current_group.append({
+            'temperature': float(item.get('temperature', 0)),
+            'humidity': float(item.get('humidity', 0)),
+            'battery': float(item.get('battery', 0)),
+            'signal_quality': float(item.get('signal_quality', 0))
+        })
+        
+        if len(current_group) >= items_per_group:
+            # Calculate averages for the group and round to 2 decimal places
+            avg_point = {
+                'timestamp': item['timestamp'],
+                'temperature': round(mean([p['temperature'] for p in current_group]), 2),
+                'humidity': round(mean([p['humidity'] for p in current_group]), 2),
+                'battery': round(mean([p['battery'] for p in current_group]), 2),
+                'signal_quality': round(mean([p['signal_quality'] for p in current_group]), 2)
+            }
+            processed_data.append(avg_point)
+            current_group = []
+    
+    # Handle any remaining items
+    if current_group:
+        avg_point = {
+            'timestamp': sorted_items[-1]['timestamp'],
+            'temperature': round(mean([p['temperature'] for p in current_group]), 2),
+            'humidity': round(mean([p['humidity'] for p in current_group]), 2),
+            'battery': round(mean([p['battery'] for p in current_group]), 2),
+            'signal_quality': round(mean([p['signal_quality'] for p in current_group]), 2)
+        }
+        processed_data.append(avg_point)
+
+    return processed_data
+
 def lambda_handler(event, context):
-    debug_logs = []
-    debug_logs.append(f"Received event: {json.dumps(event)}")
-    
-    # Handle OPTIONS request for CORS
-    if event.get('httpMethod') == 'OPTIONS':
-        return cors_response(200, {})
-    
+    """Main Lambda handler function"""
     try:
-        # Parse body
-        body = json.loads(event.get('body', '{}'))
-        debug_logs.append(f"Parsed body: {json.dumps(body)}")
-        
-        # Get action from body instead of query parameters
-        action = body.get('action')
-        
-        if action == 'add_device':
-            # Validate required fields
-            required_fields = ['user_email', 'client_id', 'device_name']
-            for field in required_fields:
-                if field not in body:
-                    return cors_response(400, {
-                        'error': f'Missing required field: {field}',
-                        'debug_logs': debug_logs
-                    })
-            
-            # Check if device already exists
-            existing_device = devices_table.get_item(
-                Key={
-                    'user_email': body['user_email'],
-                    'client_id': body['client_id']
-                }
-            ).get('Item')
-            
-            if existing_device:
-                return cors_response(409, {
-                    'error': 'Device already exists',
-                    'debug_logs': debug_logs
-                })
-            
-            # Create new device
-            new_device = {
-                'user_email': body['user_email'],
-                'client_id': body['client_id'],
-                'device_name': body['device_name'],
-                'status': 'Active',
-                'last_seen': datetime.utcnow().isoformat(),
-                'created_at': datetime.utcnow().isoformat()
-            }
-            
-            # Save to DynamoDB
-            devices_table.put_item(Item=new_device)
-            
-            return cors_response(200, {
-                'message': 'Device added successfully',
-                'device': new_device
-            })
-            
-        elif action == 'delete_device':
-            # Validate required fields
-            required_fields = ['user_email', 'client_id']
-            for field in required_fields:
-                if field not in body:
-                    return cors_response(400, {
-                        'error': f'Missing required field: {field}',
-                        'debug_logs': debug_logs
-                    })
-            
-            # Delete the device
-            try:
-                devices_table.delete_item(
-                    Key={
-                        'user_email': body['user_email'],
-                        'client_id': body['client_id']
-                    }
-                )
-                return cors_response(200, {
-                    'message': 'Device deleted successfully'
-                })
-            except Exception as e:
-                return cors_response(500, {
-                    'error': f'Failed to delete device: {str(e)}',
-                    'debug_logs': debug_logs
-                })
-            
-        elif action == 'get_devices':
-            # Get user_email from body
-            user_email = body.get('user_email')
-            if not user_email:
-                return cors_response(400, {
-                    'error': 'Missing user_email in request body',
-                    'debug_logs': debug_logs
-                })
-            
-            # Get all devices for the user
-            response = devices_table.query(
-                KeyConditionExpression='user_email = :email',
-                ExpressionAttributeValues={
-                    ':email': user_email
-                }
-            )
-            
-            return cors_response(200, {
-                'devices': response.get('Items', [])
-            })
+        # Log the received event for debugging
+        logger.info(f"Received event: {json.dumps(event)}")
 
-        elif action == 'update_device':
-            # Validate required fields
-            required_fields = ['user_email', 'old_client_id', 'new_client_id', 'device_name']
-            for field in required_fields:
-                if field not in body:
-                    return cors_response(400, {
-                        'error': f'Missing required field: {field}',
-                        'debug_logs': debug_logs
-                    })
-
-            # Check if the new client_id already exists (if it's different from the old one)
-            if body['old_client_id'] != body['new_client_id']:
-                existing_device = devices_table.get_item(
-                    Key={
-                        'user_email': body['user_email'],
-                        'client_id': body['new_client_id']
-                    }
-                ).get('Item')
-                
-                if existing_device:
-                    return cors_response(409, {
-                        'error': 'A device with the new client ID already exists',
-                        'debug_logs': debug_logs
-                    })
-
-            # Get the existing device
-            existing_device = devices_table.get_item(
-                Key={
-                    'user_email': body['user_email'],
-                    'client_id': body['old_client_id']
-                }
-            ).get('Item')
-
-            if not existing_device:
-                return cors_response(404, {
-                    'error': 'Device not found',
-                    'debug_logs': debug_logs
-                })
-
-            # Update the device
-            updated_device = {
-                'user_email': body['user_email'],
-                'client_id': body['new_client_id'],
-                'device_name': body['device_name'],
-                'status': existing_device.get('status', 'Active'),
-                'last_seen': existing_device.get('last_seen', datetime.utcnow().isoformat()),
-                'created_at': existing_device.get('created_at', datetime.utcnow().isoformat())
-            }
-
-            # If the client_id is changing, we need to delete the old record and create a new one
-            if body['old_client_id'] != body['new_client_id']:
-                devices_table.delete_item(
-                    Key={
-                        'user_email': body['user_email'],
-                        'client_id': body['old_client_id']
-                    }
-                )
-                devices_table.put_item(Item=updated_device)
-            else:
-                # If only the device name is changing, we can update in place
-                devices_table.update_item(
-                    Key={
-                        'user_email': body['user_email'],
-                        'client_id': body['old_client_id']
-                    },
-                    UpdateExpression='SET device_name = :name',
-                    ExpressionAttributeValues={
-                        ':name': body['device_name']
-                    }
-                )
-
-            return cors_response(200, {
-                'message': 'Device updated successfully',
-                'device': updated_device
-            })
-            
+        # Parse the request body
+        if 'body' in event:
+            body = json.loads(event['body'])
         else:
-            return cors_response(400, {
-                'error': 'Invalid action',
-                'debug_logs': debug_logs
-            })
+            body = event
+
+        # Log the parsed body
+        logger.info(f"Parsed body: {json.dumps(body)}")
+
+        # Validate required fields
+        if 'action' not in body:
+            return create_cors_response(400, {'error': 'Missing action in request body'})
         
+        if body['action'] != 'get_dashboard_data':
+            return create_cors_response(400, {'error': f'Invalid action: {body["action"]}'})
+        
+        if 'client_id' not in body:
+            return create_cors_response(400, {'error': 'Missing client_id in request body'})
+        
+        if 'user_email' not in body:
+            return create_cors_response(400, {'error': 'Missing user_email in request body'})
+
+        # Get time range and target points
+        time_range = body.get('time_range', '1h')
+        target_points = body.get('points', 100)  # Get points from request if specified
+        start_time, points = get_time_range_and_points(time_range, target_points)
+        
+        # For live data, override target_points
+        if time_range == 'live':
+            target_points = 20  # Force 20 points for 2-minute window
+        
+        # Log the query parameters
+        logger.info(f"Querying for device_id: {body['client_id']}")
+        logger.info(f"Start time: {start_time.isoformat()}")
+        logger.info(f"Time range: {time_range}")
+        logger.info(f"Target points: {target_points}")
+
+        # Get the device data from DynamoDB
+        response = device_data_table.query(
+            KeyConditionExpression='device_id = :device_id AND #ts >= :start_time',
+            ExpressionAttributeValues={
+                ':device_id': body['client_id'],
+                ':start_time': start_time.isoformat()
+            },
+            ExpressionAttributeNames={
+                '#ts': 'timestamp'
+            },
+            ScanIndexForward=True  # Get data in chronological order
+        )
+
+        # Check if we got any data
+        if 'Items' not in response or not response['Items']:
+            logger.info("No data found for the specified criteria")
+            return create_cors_response(200, {
+                'data': [],
+                'summary': {
+                    'avg_temperature': 0,
+                    'avg_humidity': 0,
+                    'min_battery': 0,
+                    'avg_signal': 0,
+                    'data_points': 0,
+                    'original_points': 0,
+                    'target_points': target_points
+                }
+            })
+
+        # Aggregate the data to target points
+        processed_data = aggregate_data(response['Items'], target_points)
+        
+        # Calculate summary statistics from aggregated data
+        temperatures = [item['temperature'] for item in processed_data]
+        humidities = [item['humidity'] for item in processed_data]
+        batteries = [item['battery'] for item in processed_data]
+        signals = [item['signal_quality'] for item in processed_data]
+
+        # Calculate summary with rounded values
+        data_points = len(processed_data)
+        summary = {
+            'avg_temperature': round(mean(temperatures) if temperatures else 0, 2),
+            'avg_humidity': round(mean(humidities) if humidities else 0, 2),
+            'min_battery': round(min(batteries) if batteries else 0, 2),
+            'avg_signal': round(mean(signals) if signals else 0, 2),
+            'data_points': data_points,
+            'original_points': len(response['Items']),
+            'target_points': target_points
+        }
+
+        # Log the processed data and summary
+        logger.info(f"Processed {data_points} points from {summary['original_points']} original points")
+        logger.info(f"Summary statistics: {json.dumps(summary)}")
+
+        return create_cors_response(200, {
+            'data': processed_data,
+            'summary': summary
+        })
+
     except Exception as e:
-        debug_logs.append(f"Error: {str(e)}")
-        return cors_response(500, {
-            'error': str(e),
-            'debug_logs': debug_logs
-        }) 
+        logger.error(f"Error processing request: {str(e)}")
+        return create_cors_response(500, {'error': f'Internal server error: {str(e)}'}) 

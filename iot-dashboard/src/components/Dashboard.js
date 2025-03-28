@@ -38,7 +38,7 @@ import {
   FaSignal
 } from "react-icons/fa";
 import { MdRefresh, MdSettings } from "react-icons/md";
-import { Logout as LogoutIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { Logout as LogoutIcon, ArrowBack as ArrowBackIcon, Visibility, VisibilityOff } from '@mui/icons-material';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -170,7 +170,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const [commandHistory, setCommandHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [showAlerts, setShowAlerts] = useState(false);
-  const [timeRange, setTimeRange] = useState('1h');
+  const [timeRange, setTimeRange] = useState('15m');
   const [chartType, setChartType] = useState('line');
   const [tabValue, setTabValue] = useState(0);
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
@@ -181,7 +181,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     avg_humidity: 0,
     min_battery: 0,
     avg_signal: 0,
-    data_points: 0
+    data_points: 0,
+    original_points: 0,
+    interval_seconds: 0
   });
 
   // Module toggles for commands and charts
@@ -214,10 +216,19 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const [metricsConfig, setMetricsConfig] = useState({});
 
   // Add this state near the other state declarations
-  const [summaryType, setSummaryType] = useState('avg'); // 'avg', 'min', or 'max'
+  const [summaryType, setSummaryType] = useState('latest'); // 'latest', 'avg', 'min', or 'max'
 
   // Add new state for showing/hiding battery and signal
   const [showBatterySignal, setShowBatterySignal] = useState(false);
+
+  // Add new state for clientID visibility
+  const [showClientId, setShowClientId] = useState(false);
+
+  // Add the new state for time range menu
+  const [timeRangeAnchor, setTimeRangeAnchor] = useState(null);
+
+  // Add this near your other state declarations
+  const [dataRangeWarning, setDataRangeWarning] = useState(null);
 
   const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
@@ -230,15 +241,22 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       return;
     }
 
-    setIsLoading(true);
     try {
       console.log('Fetching dashboard data for device:', device);
       const requestBody = {
         action: 'get_dashboard_data',
         client_id: device.device_id,
         user_email: user.email,
-        time_range: timeRange
+        time_range: timeRange,
+        points: timeRange === 'live' ? 20 : 100,  // 20 points for live (1 per 6 seconds over 2 minutes)
+        live_seconds: timeRange === 'live' ? 120 : null  // Specify 2-minute range for live data
       };
+
+      // Adjust timeout for live data to match publication rate
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 
+        timeRange === 'live' ? 8000 : 8000  // Use same timeout for both since data rate is the same
+      );
 
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -246,15 +264,11 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
       });
 
-      // If we get a 502 or CORS error with 24h data, fallback to 1h
-      if (!response.ok && timeRange === '24h') {
-        console.log('24h data fetch failed, falling back to 1h data');
-        setTimeRange('1h');
-        return;
-      }
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -262,48 +276,89 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
 
       const result = await response.json();
       
-      if (!result.data) {
+      if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
         throw new Error('No data received from server');
       }
 
       const data = result.data;
       console.log('Received data:', data);
 
+      // Check data time range
+      const firstTimestamp = new Date(data[0].timestamp);
+      const lastTimestamp = new Date(data[data.length - 1].timestamp);
+      const dataRangeHours = (lastTimestamp - firstTimestamp) / (1000 * 60 * 60);
+
+      // Show more informative warning
+      if (timeRange === '30d' || timeRange === '7d') {
+        const requestedDays = timeRange === '30d' ? 30 : 7;
+        const startDate = firstTimestamp.toLocaleDateString();
+        const endDate = lastTimestamp.toLocaleDateString();
+        
+        setDataRangeWarning(
+          `Limited historical data available: Showing data from ${startDate} to ${endDate}. ` +
+          `Expected ${requestedDays} days but received ${Math.round(dataRangeHours)} hours of data. ` +
+          `Data points: ${summary.data_points} (aggregated from ${summary.original_points} readings)`
+        );
+        
+        showSnackbar(`Limited historical data: ${Math.round(dataRangeHours)} hours available`, 'warning');
+      } else {
+        setDataRangeWarning(null);
+      }
+
       if (Array.isArray(data) && data.length > 0) {
         const timestamps = data.map((entry) => new Date(entry.timestamp));
         setLabels(timestamps);
 
-        // Dynamically create metrics config from the first data point
+        // Process data in the background
         const firstDataPoint = data[0];
-        console.log('First data point:', firstDataPoint);
-        
         const newMetricsConfig = {};
         Object.keys(firstDataPoint).forEach(key => {
           if (key !== 'timestamp') {
             newMetricsConfig[key] = generateMetricConfig(key);
           }
         });
-        console.log('Generated metrics config:', newMetricsConfig);
         setMetricsConfig(newMetricsConfig);
 
-        // Process each metric dynamically
         const newMetricsData = {};
         Object.keys(newMetricsConfig).forEach(key => {
           newMetricsData[key] = data.map(entry => parseFloat(entry[key]));
         });
-        console.log('Processed metrics data:', newMetricsData);
         setMetricsData(newMetricsData);
 
+        // Update basic info
         setClientID(device.device_id);
         setDeviceName(device.device_name || "Unknown");
 
+        // Update last seen and status with time range consideration
         const lastTimestamp = timestamps[timestamps.length - 1];
         setLastSeen(lastTimestamp);
         const now = new Date();
         const timeDiff = (now - lastTimestamp) / 1000;
-        setDeviceStatus(timeDiff <= 60 ? "Active" : "Inactive");
 
-        // Calculate summary statistics for all metrics
+        // Update status threshold based on time range
+        let statusThreshold;
+        switch(timeRange) {
+          case '3d':  // Changed from 7d to 3d
+            statusThreshold = 24 * 60 * 60; // 24 hours threshold
+            break;
+          case '24h':
+            statusThreshold = 2 * 60 * 60; // 2 hours threshold
+            break;
+          default:
+            statusThreshold = 120; // 2 minutes threshold for shorter ranges
+        }
+
+        // Only update status for recent time ranges
+        if (timeRange === '15m' || timeRange === '1h') {
+          setDeviceStatus(timeDiff <= statusThreshold ? "Active" : "Inactive");
+        } else {
+          // For longer time ranges, use the last known status
+          const lastDataPoint = data[data.length - 1];
+          const lastTimeDiff = (now - new Date(lastDataPoint.timestamp)) / 1000;
+          setDeviceStatus(lastTimeDiff <= statusThreshold ? "Active" : "Inactive");
+        }
+
+        // Calculate summary statistics
         const calculatedSummary = {};
         Object.keys(newMetricsConfig).forEach(key => {
           const values = newMetricsData[key].filter(v => !isNaN(v));
@@ -313,21 +368,16 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             calculatedSummary[`max_${key}`] = Math.max(...values);
           }
         });
-        console.log('Calculated summary:', calculatedSummary);
 
-        // Use API summary if available, otherwise use calculated summary
+        // Merge summaries
         const finalSummary = result.summary || {};
-        console.log('API summary:', finalSummary);
-        
-        // Merge API summary with calculated summary, preferring API values
         const mergedSummary = {
           ...calculatedSummary,
           ...finalSummary
         };
-        console.log('Final merged summary:', mergedSummary);
         setSummary(mergedSummary);
 
-        // Check alerts for all metrics
+        // Check alerts
         Object.keys(newMetricsConfig).forEach(key => {
           const value = newMetricsData[key][newMetricsData[key].length - 1];
           const config = newMetricsConfig[key];
@@ -337,15 +387,16 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     } catch (error) {
       console.error("Error fetching data:", error);
       setDeviceStatus("Error");
-      showSnackbar('Error fetching data. Please try again.', 'error');
       
-      // If we get a CORS error with 24h data, fallback to 1h
-      if (timeRange === '24h' && error.message.includes('CORS')) {
-        console.log('CORS error with 24h data, falling back to 1h');
-        setTimeRange('1h');
+      if (error.name === 'AbortError') {
+        if (timeRange === 'live') {
+          console.log('Live data fetch timeout - will retry on next interval');
+        } else {
+          showSnackbar('Request timeout - try a shorter time range', 'error');
+        }
+      } else {
+        showSnackbar('Error fetching data. Please try again.', 'error');
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -457,23 +508,114 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     window.URL.revokeObjectURL(url);
   };
 
-  // Add this function to handle manual refresh
+  // Modify the refresh handler to not set loading state
   const handleRefresh = () => {
-    setIsLoading(true);
     fetchData();
   };
 
-  // Modify the useEffect to ensure immediate fetch
+  // Update the useEffect for live data interval
   useEffect(() => {
     console.log('Dashboard mounted with device:', device);
     if (device && device.device_id) {
       console.log('Fetching initial data...');
       fetchData();
-      const interval = setInterval(fetchData, 60000);
-      return () => clearInterval(interval);
+      
+      // Set up intervals for data fetching
+      const liveInterval = setInterval(() => {
+        if (timeRange === 'live') {
+          fetchData();
+        }
+      }, 60000); // Keep minute interval since that's when new data is published
+      
+      const historicalInterval = setInterval(() => {
+        if (timeRange !== 'live') {
+          fetchData();
+        }
+      }, 60000);
+
+      return () => {
+        clearInterval(liveInterval);
+        clearInterval(historicalInterval);
+      };
     }
   }, [device, timeRange]);
 
+  // Update the getTimeRangeLabel function
+  const getTimeRangeLabel = (range) => {
+    switch(range) {
+      case 'live': return 'Live (30s)';  // Updated to show time range
+      case '15m': return '15 Minutes';
+      case '1h': return '1 Hour';
+      case '24h': return '24 Hours';
+      default: return 'Live (30s)';
+    }
+  };
+
+  // Update the renderTimeRangeMenu function
+  const renderTimeRangeMenu = () => (
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', borderRight: 1, borderColor: 'divider', pr: 2 }}>
+      <Button
+        variant="outlined"
+        startIcon={<MdRefresh />}
+        onClick={handleRefresh}
+        disabled={isLoading}
+        sx={{ minWidth: 120 }}
+      >
+        Refresh Data
+      </Button>
+      <Button
+        variant="outlined"
+        onClick={(e) => setTimeRangeAnchor(e.currentTarget)}
+        sx={{ minWidth: 120 }}
+      >
+        {getTimeRangeLabel(timeRange)}
+      </Button>
+      <Menu
+        anchorEl={timeRangeAnchor}
+        open={Boolean(timeRangeAnchor)}
+        onClose={() => setTimeRangeAnchor(null)}
+      >
+        <MenuItem 
+          onClick={() => {
+            setTimeRange('live');
+            setTimeRangeAnchor(null);
+          }}
+          selected={timeRange === 'live'}
+        >
+          Live (30s)
+        </MenuItem>
+        <MenuItem 
+          onClick={() => {
+            setTimeRange('15m');
+            setTimeRangeAnchor(null);
+          }}
+          selected={timeRange === '15m'}
+        >
+          15 Minutes
+        </MenuItem>
+        <MenuItem 
+          onClick={() => {
+            setTimeRange('1h');
+            setTimeRangeAnchor(null);
+          }}
+          selected={timeRange === '1h'}
+        >
+          1 Hour
+        </MenuItem>
+        <MenuItem 
+          onClick={() => {
+            setTimeRange('24h');
+            setTimeRangeAnchor(null);
+          }}
+          selected={timeRange === '24h'}
+        >
+          24 Hours
+        </MenuItem>
+      </Menu>
+    </Box>
+  );
+
+  // Update the chart options to properly handle 2-minute window and last point animation
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -527,8 +669,20 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       x: {
         type: "time",
         time: { 
-          unit: timeRange === '1h' ? 'minute' : 'hour',
-          tooltipFormat: "yyyy-MM-dd HH:mm:ss" 
+          unit: timeRange === 'live' ? 'second' :
+                timeRange === '15m' ? 'minute' :
+                timeRange === '1h' ? 'minute' :
+                timeRange === '24h' ? 'hour' : 'minute',
+          tooltipFormat: timeRange === 'live' ? "HH:mm:ss" : "HH:mm",
+          displayFormats: {
+            second: 'HH:mm:ss',
+            minute: 'HH:mm',
+            hour: 'HH:mm'
+          },
+          // Force the exact time range for live mode
+          min: timeRange === 'live' ? new Date(Date.now() - 120 * 1000) : undefined,
+          max: timeRange === 'live' ? new Date() : undefined,
+          bounds: 'ticks'
         },
         title: { 
           display: true, 
@@ -536,15 +690,14 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           color: theme.palette.text.primary,
           font: { weight: 'bold' }
         },
-        ticks: { 
-          color: theme.palette.text.primary,
+        ticks: {
           maxRotation: 45,
-          minRotation: 45
+          autoSkip: true,
+          maxTicksLimit: 8
         },
-        grid: { 
-          color: chartConfig.showGrid ? "rgba(255,255,255,0.1)" : "transparent",
-          drawBorder: false
-        },
+        grid: {
+          display: timeRange === 'live' ? true : chartConfig.showGrid
+        }
       },
       y: {
         beginAtZero: true,
@@ -559,27 +712,39 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     },
     elements: {
       point: {
-        radius: chartConfig.showPoints ? 4 : 0,
-        hoverRadius: 6,
-        backgroundColor: theme.palette.primary.main,
-        borderColor: theme.palette.primary.main,
-        borderWidth: 2,
+        radius: timeRange === 'live' ? 3 : 0,
+        hoverRadius: 6
       },
       line: {
-        tension: 0.4,
-        borderWidth: 2,
-        borderColor: theme.palette.primary.main,
-        fill: true,
-        backgroundColor: `${theme.palette.primary.main}20`,
-      },
+        tension: 0.4
+      }
     },
     animation: {
-      duration: chartConfig.animation ? 1000 : 0,
-      easing: 'easeInOutQuart'
+      duration: 750,
+      animations: {
+        y: {
+          from: (ctx) => {
+            // Only animate the last point
+            if (ctx.type === 'data' && ctx.dataIndex === ctx.dataset.data.length - 1) {
+              return ctx.chart.scales.y.getPixelForValue(0);
+            }
+            return ctx.chart.scales.y.getPixelForValue(ctx.dataset.data[ctx.dataIndex]);
+          },
+          duration: 1000
+        }
+      }
+    },
+    transitions: {
+      active: {
+        animation: {
+          duration: 1000,
+          easing: 'easeInOutQuart'
+        }
+      }
     }
   };
 
-  // Modify the renderChart function to handle dynamic metrics
+  // Update the renderChart function to handle animations for the last point
   const renderChart = (data, metricKey) => {
     const config = metricsConfig[metricKey];
     if (!config) return null;
@@ -595,13 +760,13 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           fill: true,
           tension: 0.4,
           borderWidth: 2,
-          pointRadius: chartConfig.showPoints ? 4 : 0,
+          pointRadius: timeRange === 'live' ? 3 : 0,
           pointHoverRadius: 6,
           pointBackgroundColor: config.color,
           pointBorderColor: config.color,
-          pointBorderWidth: 2,
-        },
-      ],
+          pointBorderWidth: 2
+        }
+      ]
     };
 
     const chartSpecificOptions = {
@@ -635,19 +800,20 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     return null;
   };
 
-  // Add this function to cycle through summary types
+  // Modify the cycleSummaryType function
   const cycleSummaryType = () => {
     setSummaryType(prev => {
       switch(prev) {
+        case 'latest': return 'avg';
         case 'avg': return 'min';
         case 'min': return 'max';
-        case 'max': return 'avg';
-        default: return 'avg';
+        case 'max': return 'latest';
+        default: return 'latest';
       }
     });
   };
 
-  // Modify the renderSummaryCards function to show just the number for battery and signal
+  // Update the renderSummaryCards function to handle 'latest' type
   const renderSummaryCards = () => {
     console.log('Rendering summary cards with:', {
       metricsConfig,
@@ -661,10 +827,18 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           // Skip signal and battery metrics unless showBatterySignal is true
           if ((key === 'signal' || key === 'battery' || key === 'signal_quality') && !showBatterySignal) return null;
 
-          const value = summary[`${summaryType}_${key}`] || summary[key];
+          // Get the appropriate value based on summaryType
+          let value;
+          if (summaryType === 'latest') {
+            // Get the last value from the metrics data
+            value = metricsData[key]?.[metricsData[key].length - 1];
+          } else {
+            value = summary[`${summaryType}_${key}`] || summary[key];
+          }
+
           console.log(`Metric ${key}:`, {
             value,
-            summaryKey: `${summaryType}_${key}`,
+            summaryKey: summaryType === 'latest' ? 'latest' : `${summaryType}_${key}`,
             rawValue: summary[key]
           });
           
@@ -693,7 +867,10 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                   {displayValue}{value !== undefined && !isNaN(value) ? config.unit : ''}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
-                  {summaryType === 'avg' ? 'Average' : summaryType === 'min' ? 'Minimum' : 'Maximum'}
+                  {summaryType === 'latest' ? 'Latest' :
+                   summaryType === 'avg' ? 'Average' :
+                   summaryType === 'min' ? 'Minimum' :
+                   'Maximum'}
                 </Typography>
                 <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box
@@ -775,11 +952,13 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           >
             <ArrowBackIcon />
           </IconButton>
+          
+          {/* Updated Title Section - removed clientID visibility toggle */}
           <Typography variant="h6" sx={{ fontWeight: "bold", textAlign: "center" }}>
-            {isLoading ? "Loading..." : clientID}
+            {deviceName || "Unknown Device"}
           </Typography>
+
           <Box sx={{ position: "absolute", right: 16, display: "flex", alignItems: "center", gap: 1 }}>
-            {/* Add Refresh Button */}
             <IconButton 
               onClick={handleRefresh}
               disabled={isLoading}
@@ -826,9 +1005,10 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           device={deviceName}
           status={deviceStatus}
           lastOnline={lastSeen ? lastSeen.toLocaleString() : "N/A"}
-          isLoading={isLoading}
           batteryLevel={metricsData.battery?.[metricsData.battery.length - 1]}
           signalStrength={metricsData.signal_quality?.[metricsData.signal_quality.length - 1]}
+          showClientId={showClientId}
+          onToggleClientId={() => setShowClientId(!showClientId)}
         />
 
         {/* Tabs for different views */}
@@ -862,24 +1042,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             <Paper sx={{ p: 2, mb: 3, bgcolor: theme.palette.background.paper }}>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
                 {/* Group 1: Data Controls */}
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', borderRight: 1, borderColor: 'divider', pr: 2 }}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<MdRefresh />}
-                    onClick={handleRefresh}
-                    disabled={isLoading}
-                    sx={{ minWidth: 120 }}
-                  >
-                    Refresh Data
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setTimeRange(prev => prev === '1h' ? '24h' : '1h')}
-                    sx={{ minWidth: 100 }}
-                  >
-                    {timeRange === '1h' ? '1 Hour' : '24 Hours'}
-                  </Button>
-                </Box>
+                {renderTimeRangeMenu()}
 
                 {/* Group 2: Chart Controls */}
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', borderRight: 1, borderColor: 'divider', pr: 2 }}>
@@ -955,8 +1118,21 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                       textTransform: 'capitalize'
                     }}
                   >
-                    {summaryType === 'avg' ? 'Average' : summaryType === 'min' ? 'Minimum' : 'Maximum'}
+                    {summaryType === 'latest' ? 'Latest' :
+                     summaryType === 'avg' ? 'Average' :
+                     summaryType === 'min' ? 'Minimum' :
+                     'Maximum'}
                   </Button>
+                </Box>
+
+                {/* Additional Controls */}
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Typography variant="caption" color="textSecondary">
+                    {`${summary.data_points} points shown (from ${summary.original_points} readings)`}
+                    {summary.interval_seconds > 60 && (
+                      <span> • {Math.floor(summary.interval_seconds / 60)} minute intervals</span>
+                    )}
+                  </Typography>
                 </Box>
               </Box>
             </Paper>
@@ -1166,6 +1342,17 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Add this after your existing Controls Bar */}
+      {dataRangeWarning && (
+        <Alert 
+          severity="warning" 
+          sx={{ mb: 2 }}
+          onClose={() => setDataRangeWarning(null)}
+        >
+          {dataRangeWarning}
+        </Alert>
+      )}
     </Box>
   );
 }

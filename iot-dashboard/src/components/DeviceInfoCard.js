@@ -1,10 +1,21 @@
 import React from "react";
-import { Card, CardContent, Typography, Box, CircularProgress } from "@mui/material";
+import { Card, CardContent, Typography, Box, CircularProgress, IconButton } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
 
-export default function DeviceInfoCard({ clientID, device, status, lastOnline, isLoading, batteryLevel, signalStrength }) {
+export default function DeviceInfoCard({ 
+  clientID, 
+  device, 
+  status, 
+  lastOnline, 
+  isLoading, 
+  batteryLevel, 
+  signalStrength,
+  showClientId,
+  onToggleClientId 
+}) {
   const theme = useTheme();
 
   const getStatusColor = (status) => {
@@ -28,9 +39,21 @@ export default function DeviceInfoCard({ clientID, device, status, lastOnline, i
             <Typography variant="h6" gutterBottom>
               {isLoading ? "Loading..." : device}
             </Typography>
-            <Typography variant="body2" color="textSecondary">
-              ID: {isLoading ? "..." : clientID}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" color="textSecondary">
+                ID: {isLoading ? "..." : (showClientId ? clientID : '••••••••••')}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={onToggleClientId}
+                sx={{ 
+                  color: theme.palette.text.secondary,
+                  padding: 0.5
+                }}
+              >
+                {showClientId ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+              </IconButton>
+            </Box>
           </Box>
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
             {isLoading ? (
