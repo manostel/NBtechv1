@@ -109,10 +109,10 @@ const generateMetricConfig = (key) => {
       dataKey: 'signal_quality'
     },
     signal_quality: {
-      label: "Signal Quality",
+      label: "Signal",
       unit: "%",
-      color: "#96CEB4",
-      icon: "signal_cellular_alt",
+      color: "#6C5CE7",
+      icon: <FaSignal />,
       alertThresholds: { min: 30 }
     }
   };
@@ -216,6 +216,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   // Add this state near the other state declarations
   const [summaryType, setSummaryType] = useState('avg'); // 'avg', 'min', or 'max'
 
+  // Add new state for showing/hiding battery and signal
+  const [showBatterySignal, setShowBatterySignal] = useState(false);
+
   const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
 
@@ -241,9 +244,21 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(requestBody)
       });
+
+      // If we get a 502 or CORS error with 24h data, fallback to 1h
+      if (!response.ok && timeRange === '24h') {
+        console.log('24h data fetch failed, falling back to 1h data');
+        setTimeRange('1h');
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const result = await response.json();
       
@@ -322,7 +337,13 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     } catch (error) {
       console.error("Error fetching data:", error);
       setDeviceStatus("Error");
-      showSnackbar('Error fetching data', 'error');
+      showSnackbar('Error fetching data. Please try again.', 'error');
+      
+      // If we get a CORS error with 24h data, fallback to 1h
+      if (timeRange === '24h' && error.message.includes('CORS')) {
+        console.log('CORS error with 24h data, falling back to 1h');
+        setTimeRange('1h');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -626,7 +647,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     });
   };
 
-  // Update the renderSummaryCards function to better handle the data
+  // Modify the renderSummaryCards function to show just the number for battery and signal
   const renderSummaryCards = () => {
     console.log('Rendering summary cards with:', {
       metricsConfig,
@@ -637,7 +658,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     return (
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {Object.entries(metricsConfig).map(([key, config]) => {
-          // Get the value from summary based on the current summary type
+          // Skip signal and battery metrics unless showBatterySignal is true
+          if ((key === 'signal' || key === 'battery' || key === 'signal_quality') && !showBatterySignal) return null;
+
           const value = summary[`${summaryType}_${key}`] || summary[key];
           console.log(`Metric ${key}:`, {
             value,
@@ -660,9 +683,12 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                   }
                 }}
               >
-                <Typography variant="h6" gutterBottom color="primary">
-                  {config.label}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  {config.icon}
+                  <Typography variant="h6" color="primary">
+                    {config.label}
+                  </Typography>
+                </Box>
                 <Typography variant="h4" sx={{ mb: 1 }}>
                   {displayValue}{value !== undefined && !isNaN(value) ? config.unit : ''}
                 </Typography>
@@ -698,27 +724,32 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     );
   };
 
-  // Modify the Charts section to be dynamic
+  // Update the renderCharts function to also check for signal_quality
   const renderCharts = () => (
     <Grid container spacing={3}>
-      {Object.entries(metricsConfig).map(([key, config]) => (
-        <Grid item xs={12} md={6} key={key}>
-          <Paper 
-            sx={{ 
-              p: 2, 
-              bgcolor: theme.palette.background.paper,
-              height: 400,
-              transition: 'transform 0.2s',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: 3
-              }
-            }}
-          >
-            {renderChart(metricsData[key], key)}
-          </Paper>
-        </Grid>
-      ))}
+      {Object.entries(metricsConfig).map(([key, config]) => {
+        // Skip signal and battery metrics unless showBatterySignal is true
+        if ((key === 'signal' || key === 'battery' || key === 'signal_quality') && !showBatterySignal) return null;
+        
+        return (
+          <Grid item xs={12} md={6} key={key}>
+            <Paper 
+              sx={{ 
+                p: 2, 
+                bgcolor: theme.palette.background.paper,
+                height: 400,
+                transition: 'transform 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: 3
+                }
+              }}
+            >
+              {renderChart(metricsData[key], key)}
+            </Paper>
+          </Grid>
+        );
+      })}
     </Grid>
   );
 
@@ -796,6 +827,8 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           status={deviceStatus}
           lastOnline={lastSeen ? lastSeen.toLocaleString() : "N/A"}
           isLoading={isLoading}
+          batteryLevel={metricsData.battery?.[metricsData.battery.length - 1]}
+          signalStrength={metricsData.signal_quality?.[metricsData.signal_quality.length - 1]}
         />
 
         {/* Tabs for different views */}
@@ -894,6 +927,18 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                           />
                         }
                         label="Enable Animation"
+                      />
+                    </MenuItem>
+                    <Divider />
+                    <MenuItem>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={showBatterySignal}
+                            onChange={(e) => setShowBatterySignal(e.target.checked)}
+                          />
+                        }
+                        label="Show Battery & Signal"
                       />
                     </MenuItem>
                   </Menu>
