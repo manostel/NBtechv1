@@ -23,6 +23,7 @@ import {
   Tooltip,
   Alert,
   Snackbar,
+  CircularProgress,
 } from "@mui/material";
 import { 
   FaCog, 
@@ -57,6 +58,9 @@ import DeviceInfoCard from "./DeviceInfoCard";
 import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
 import SettingsDrawer from "./SettingsDrawer";
+import { App } from '@capacitor/app';
+import { StatusBar } from '@capacitor/status-bar';
+import { Capacitor } from '@capacitor/core';
 
 ChartJS.register(
   CategoryScale,
@@ -150,6 +154,13 @@ const generateMetricConfig = (key) => {
   };
 };
 
+// Replace console.log with this function
+const log = (message, data) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(message, data);
+  }
+};
+
 export default function Dashboard({ user, device, onLogout, onBack }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -229,6 +240,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
 
   // Add this near your other state declarations
   const [dataRangeWarning, setDataRangeWarning] = useState(null);
+
+  // Add this near your other state declarations
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
@@ -515,10 +529,10 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
 
   // Update the useEffect for live data interval
   useEffect(() => {
-    console.log('Dashboard mounted with device:', device);
+    log('Dashboard mounted with device:', device);
     if (device && device.device_id) {
-      console.log('Fetching initial data...');
-      fetchData();
+      log('Fetching initial data...');
+      fetchData().finally(() => setIsInitializing(false));
       
       // Set up intervals for data fetching
       const liveInterval = setInterval(() => {
@@ -553,13 +567,22 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
 
   // Update the renderTimeRangeMenu function
   const renderTimeRangeMenu = () => (
-    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', borderRight: 1, borderColor: 'divider', pr: 2 }}>
+    <Box sx={{ 
+      display: 'flex', 
+      gap: 1, 
+      alignItems: 'center',
+      flexDirection: { xs: 'column', md: 'row' }  // Stack vertically on mobile
+    }}>
       <Button
         variant="outlined"
-        startIcon={<MdRefresh />}
         onClick={handleRefresh}
-        disabled={isLoading}
-        sx={{ minWidth: 120 }}
+        sx={{ 
+          minWidth: 120,
+          '&:active': {  // Touch feedback
+            transform: 'scale(0.98)',
+            transition: 'transform 0.1s'
+          }
+        }}
       >
         Refresh Data
       </Button>
@@ -692,8 +715,10 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         },
         ticks: {
           maxRotation: 45,
-          autoSkip: true,
-          maxTicksLimit: 8
+          minRotation: 45,
+          font: {
+            size: 10  // Smaller font on mobile
+          }
         },
         grid: {
           display: timeRange === 'live' ? true : chartConfig.showGrid
@@ -930,8 +955,43 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     </Grid>
   );
 
+  // Add mobile-specific initialization
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      // Set status bar style
+      StatusBar.setBackgroundColor({ color: '#000000' });
+      
+      // Handle back button
+      App.addListener('backButton', (data) => {
+        if (onBack) {
+          onBack();
+        }
+      });
+    }
+  }, []);
+
+  // Add this at the start of your render
+  if (isInitializing) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh' 
+      }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ backgroundColor: theme.palette.background.default, color: theme.palette.text.primary, minHeight: "100vh", p: 4 }}>
+    <Box sx={{ 
+      backgroundColor: theme.palette.background.default, 
+      color: theme.palette.text.primary, 
+      minHeight: "100vh", 
+      p: { xs: 2, md: 4 },  // Smaller padding on mobile
+      overflowX: 'hidden'   // Prevent horizontal scroll
+    }}>
       <Helmet>
         <title>IoT Dashboard</title>
         <meta name="description" content="IoT Dashboard with Dark Mode" />

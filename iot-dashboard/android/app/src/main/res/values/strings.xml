@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">IoT Dashboard</string>
+    <string name="title_activity_main">IoT Dashboard</string>
+    <string name="package_name">com.nbtech.iotdashboard</string>
+    <string name="custom_url_scheme">com.nbtech.iotdashboard</string>
+</resources>

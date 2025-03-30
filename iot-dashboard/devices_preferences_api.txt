@@ -1,0 +1,84 @@
+Device Preferences API Documentation
+
+Endpoint: /fetch/devices-preferences
+
+Actions:
+1. get_preferences
+   Input:
+   {
+     "action": "get_preferences",
+     "user_email": "string"
+   }
+   Response:
+   {
+     "preferences": [
+       {
+         "user_email": "string",
+         "client_id": "string",
+         "device_name": "string",
+         "metrics_visibility": {
+           "temperature": boolean,
+           "humidity": boolean,
+           "created_at": boolean,
+           "last_seen": boolean,
+           "status": boolean
+         },
+         "display_order": number
+       }
+     ]
+   }
+
+2. get_device_preferences
+   Input:
+   {
+     "action": "get_device_preferences",
+     "user_email": "string",
+     "client_id": "string"
+   }
+   Response:
+   {
+     "preferences": {
+       "metrics_visibility": {
+         "temperature": boolean,
+         "humidity": boolean,
+         "created_at": boolean,
+         "last_seen": boolean,
+         "status": boolean
+       },
+       "display_order": number
+     }
+   }
+
+3. update_preferences
+   Input:
+   {
+     "action": "update_preferences",
+     "user_email": "string",
+     "client_id": "string",
+     "device_name": "string",
+     "metrics_visibility": {
+       "temperature": boolean,
+       "humidity": boolean,
+       "created_at": boolean,
+       "last_seen": boolean,
+       "status": boolean
+     },
+     "display_order": number
+   }
+   Response:
+   {
+     "message": "Device preferences updated successfully",
+     "preferences": {object containing updated preferences}
+   }
+
+4. delete_preferences
+   Input:
+   {
+     "action": "delete_preferences",
+     "user_email": "string",
+     "client_id": "string"
+   }
+   Response:
+   {
+     "message": "Device preferences deleted successfully"
+   } 

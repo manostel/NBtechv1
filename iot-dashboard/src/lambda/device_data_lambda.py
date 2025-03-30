@@ -38,7 +38,6 @@ def lambda_handler(event, context):
         # Parse body
         body = event.get('body')
         if body is None:
-            # If body is None, use the event itself as the body
             body = event
         elif isinstance(body, str):
             body = json.loads(body)
@@ -57,7 +56,7 @@ def lambda_handler(event, context):
         
         if action == 'get_device_data':
             # Validate required fields
-            required_fields = ['client_id']
+            required_fields = ['client_id', 'user_email']
             for field in required_fields:
                 if field not in body:
                     return cors_response(400, {
@@ -72,11 +71,7 @@ def lambda_handler(event, context):
                     ':device_id': body['client_id']
                 },
                 Limit=1,  # Get only the most recent data
-                ScanIndexForward=False,  # Get in descending order (newest first)
-                ProjectionExpression='device_id, #ts, battery, signal_quality, temperature, humidity',  # Use expression attribute name for timestamp
-                ExpressionAttributeNames={
-                    '#ts': 'timestamp'  # Map #ts to timestamp
-                }
+                ScanIndexForward=False  # Get in descending order (newest first)
             )
             
             debug_logs.append(f"DynamoDB response: {json.dumps(response, default=decimal_to_float)}")
@@ -84,32 +79,30 @@ def lambda_handler(event, context):
             if not response.get('Items'):
                 debug_logs.append("No data found for device")
                 return cors_response(200, {
-                    'device_data': {
-                        'battery_level': 0,
-                        'signal_strength': 0,
-                        'temperature': 0,
-                        'humidity': 0,
-                        'last_updated': datetime.utcnow().isoformat()
-                    }
+                    'device_data': {}  # Return empty object if no data found
                 })
             
-            # Get the most recent data
+            # Get the most recent data and convert all Decimal types to float
             device_data = response['Items'][0]
             debug_logs.append(f"Most recent data: {json.dumps(device_data, default=decimal_to_float)}")
             
+            # Convert all values to appropriate types, excluding specific fields
+            processed_data = {}
+            excluded_fields = ['ClientID', 'device_id']  # Fields to exclude
+            for key, value in device_data.items():
+                if key not in excluded_fields:  # Only process non-excluded fields
+                    if isinstance(value, Decimal):
+                        processed_data[key] = float(value)
+                    else:
+                        processed_data[key] = value
+            
             return cors_response(200, {
-                'device_data': {
-                    'battery_level': float(device_data.get('battery', 0)),
-                    'signal_strength': float(device_data.get('signal_quality', 0)),
-                    'temperature': float(device_data.get('temperature', 0)),
-                    'humidity': float(device_data.get('humidity', 0)),
-                    'last_updated': device_data.get('timestamp', datetime.utcnow().isoformat())
-                }
+                'device_data': processed_data
             })
             
         elif action == 'update_device_data':
             # Validate required fields
-            required_fields = ['client_id', 'battery', 'signal_quality', 'temperature', 'humidity']
+            required_fields = ['client_id', 'battery', 'signal_quality', 'temperature', 'humidity', 'user_email']
             for field in required_fields:
                 if field not in body:
                     return cors_response(400, {
@@ -126,7 +119,8 @@ def lambda_handler(event, context):
                 'device': body.get('device_name', 'Unknown'),
                 'signal_quality': float(body['signal_quality']),
                 'temperature': float(body['temperature']),
-                'humidity': float(body['humidity'])
+                'humidity': float(body['humidity']),
+                'user_email': body['user_email']
             }
             
             debug_logs.append(f"Storing new data: {json.dumps(new_data)}")

@@ -1,0 +1,50 @@
+Device Data API Documentation
+
+Endpoint: /fetch/devices-data
+
+Actions:
+1. get_device_data
+   Input:
+   {
+     "action": "get_device_data",
+     "client_id": "string",
+     "user_email": "string"
+   }
+   Response:
+   {
+     "device_data": {
+       "battery_level": float,
+       "signal_strength": float,
+       "temperature": float,
+       "humidity": float,
+       "last_updated": "ISO timestamp string"
+     }
+   }
+
+2. update_device_data
+   Input:
+   {
+     "action": "update_device_data",
+     "client_id": "string",
+     "user_email": "string",
+     "battery": float,
+     "signal_quality": float,
+     "temperature": float,
+     "humidity": float,
+     "device_name": "string" (optional)
+   }
+   Response:
+   {
+     "message": "Device data updated successfully",
+     "device_data": {
+       "device_id": "string",
+       "timestamp": "ISO timestamp string",
+       "battery": float,
+       "ClientID": "string",
+       "device": "string",
+       "signal_quality": float,
+       "temperature": float,
+       "humidity": float,
+       "user_email": "string"
+     }
+   } 

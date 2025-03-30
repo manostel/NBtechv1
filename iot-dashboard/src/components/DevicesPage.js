@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Grid, 
@@ -21,31 +21,88 @@ import {
   useTheme,
   Alert,
   Snackbar,
+  CssBaseline,
+  Skeleton,
+  CircularProgress,
+  Checkbox,
+  FormGroup,
+  FormControlLabel,
+  Collapse,
+  Tooltip,
 } from "@mui/material";
 import { 
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
-  DragIndicator as DragIndicatorIcon
+  DragIndicator as DragIndicatorIcon,
+  Brightness4 as DarkModeIcon,
+  Brightness7 as LightModeIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
 import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
 import { Helmet } from 'react-helmet';
 import SettingsDrawer from "./SettingsDrawer";
 import { FaPlus, FaEdit, FaTrash } from "react-icons/fa";
+import { useCustomTheme } from "./ThemeContext";
 
 const DEVICES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
+const DEVICE_PREFERENCES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-preferences";
+
+const DeviceSkeleton = () => (
+  <Paper sx={{ p: 2, height: '100%' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+      <Skeleton variant="circular" width={24} height={24} sx={{ mr: 1 }} />
+      <Skeleton variant="text" width="60%" height={24} />
+    </Box>
+    <Skeleton variant="text" width="40%" height={20} sx={{ mb: 2 }} />
+    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+      <Skeleton variant="rectangular" width={60} height={20} />
+      <Skeleton variant="rectangular" width={60} height={20} />
+    </Box>
+    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+      <Skeleton variant="text" width="30%" height={20} />
+      <Skeleton variant="text" width="30%" height={20} />
+    </Box>
+    <Skeleton variant="text" width="70%" height={20} />
+  </Paper>
+);
+
+const EditDeviceDialog = ({ device, onClose }) => {
+    const [editedDevice, setEditedDevice] = useState({
+        ...device,
+        metrics_visibility: device.metrics_visibility || {
+            temperature: true,
+            humidity: true,
+            created_at: false,
+            last_seen: true,
+            status: true
+        }
+    });
+
+    // ... rest of the dialog code ...
+};
+
+const saveDeviceOrder = (devices, userEmail) => {
+  localStorage.setItem(`deviceOrder_${userEmail}`, JSON.stringify(devices));
+};
 
 export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { currentTheme, setTheme } = useCustomTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addDeviceOpen, setAddDeviceOpen] = useState(false);
   const [newClientId, setNewClientId] = useState("");
   const [newDeviceName, setNewDeviceName] = useState("");
-  const [devices, setDevices] = useState([]);
+  const [showId, setShowId] = useState({});
+  const [devices, setDevices] = useState(() => {
+    const savedOrder = localStorage.getItem(`deviceOrder_${user.email}`);
+    return savedOrder ? JSON.parse(savedOrder) : [];
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -61,34 +118,58 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [editingDevice, setEditingDevice] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [draggedDevice, setDraggedDevice] = useState(null);
+  const [editDeviceName, setEditDeviceName] = useState("");
+  const [deviceMetrics, setDeviceMetrics] = useState({});
+  const [editClientId, setEditClientId] = useState("");
+  const [clientIdWarningOpen, setClientIdWarningOpen] = useState(false);
+  const [pendingEditData, setPendingEditData] = useState(null);
+  const [tempMetricsVisibility, setTempMetricsVisibility] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOrder, setSortOrder] = useState("asc");
 
   useEffect(() => {
     fetchDevices();
   }, [user.email]);
 
-  useEffect(() => {
-    devices.forEach(device => {
-      fetchDeviceData(device.client_id);
-    });
-  }, [devices]);
+  const fetchDeviceData = async (device) => {
+    try {
+      if (!user.email) {
+        throw new Error('User email not found');
+      }
 
-  // Add new useEffect for periodic updates
-  useEffect(() => {
-    // Initial fetch
-    devices.forEach(device => {
-      fetchDeviceData(device.client_id);
-    });
-
-    // Set up interval to fetch every minute
-    const intervalId = setInterval(() => {
-      devices.forEach(device => {
-        fetchDeviceData(device.client_id);
+      // Fetch device data
+      const dataResponse = await fetch(DEVICE_DATA_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          action: 'get_device_data',
+          client_id: device.client_id,
+          user_email: user.email
+        })
       });
-    }, 60000); // 60000 ms = 1 minute
 
-    // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
-  }, [devices]); // Re-run when devices change
+      if (!dataResponse.ok) {
+        throw new Error(`Failed to fetch device data: ${dataResponse.statusText}`);
+      }
+
+      const dataResult = await dataResponse.json();
+      const deviceData = JSON.parse(dataResult.body).device_data;
+
+      return {
+        ...device,
+        ...deviceData,
+      };
+
+    } catch (error) {
+      console.error(`Error fetching data for device ${device.client_id}:`, error);
+      return {
+        ...device,
+      };
+    }
+  };
 
   const fetchDevices = async () => {
     try {
@@ -100,63 +181,70 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         },
         mode: 'cors',
         body: JSON.stringify({
-          action: 'get_devices',
+          action: "get_devices",
           user_email: user.email
         })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      setDevices(data.devices || []);
+      const fetchedDevices = data.devices || [];
+
+      // Sort devices by display_order and update if needed
+      const sortedDevices = [...fetchedDevices].sort((a, b) => 
+        (a.display_order || 0) - (b.display_order || 0)
+      );
+
+      // Ensure each device has a valid display_order
+      const devicesWithOrder = sortedDevices.map((device, index) => ({
+        ...device,
+        display_order: index
+      }));
+
+      setDevices(devicesWithOrder);
+      saveDeviceOrder(devicesWithOrder, user.email);
+
+      // Fetch preferences for each device after successfully fetching devices
+      const updatedDeviceData = {};
+      for (const device of devicesWithOrder) {
+        const updatedDevice = await fetchDeviceData(device);
+        updatedDeviceData[device.client_id] = updatedDevice;
+
+        // Fetch preferences for the specific device
+        const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            action: 'get_device_preferences',
+            user_email: user.email,
+            client_id: device.client_id // Include client_id to fetch specific preferences
+          })
+        });
+
+        if (preferencesResponse.ok) {
+          const preferencesData = await preferencesResponse.json();
+          const preferences = preferencesData.preferences;
+
+          // Apply preferences to the updated device data
+          if (preferences) {
+            updatedDeviceData[device.client_id].metrics_visibility = preferences.metrics_visibility;
+          }
+        }
+      }
+      setDeviceData(updatedDeviceData); // Update state with preferences applied
+
     } catch (err) {
       console.error('Error fetching devices:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchDeviceData = async (deviceId) => {
-    try {
-      console.log('Fetching data for device:', deviceId);
-      const response = await fetch(DEVICE_DATA_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'get_device_data',
-          client_id: deviceId
-        })
-      });
-
-      console.log('Response status:', response.status);
-      const data = await response.json();
-      console.log('Response data:', data);
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch device data');
-      }
-
-      // Parse the body if it's a string
-      const responseBody = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
-      
-      // Update the device data in state
-      if (responseBody.device_data) {
-        setDeviceData(prev => ({
-          ...prev,
-          [deviceId]: responseBody.device_data
-        }));
-      }
-
-      return responseBody.device_data;
-    } catch (error) {
-      console.error('Error fetching device data:', error);
-      throw error;
     }
   };
 
@@ -203,7 +291,9 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       }
 
       const data = await response.json();
-      setDevices([...devices, data.device]);
+      const newDevices = [...devices, data.device];
+      setDevices(newDevices);
+      saveDeviceOrder(newDevices, user.email);
       setNewClientId("");
       setNewDeviceName("");
       setAddDeviceOpen(false);
@@ -222,32 +312,37 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     if (!deviceToDelete) return;
 
     try {
-      const response = await fetch(DEVICES_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        mode: 'cors',
-        body: JSON.stringify({
-          action: 'delete_device',
-          user_email: user.email,
-          client_id: deviceToDelete.client_id
-        }),
-      });
+        const response = await fetch(DEVICES_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            mode: 'cors',
+            body: JSON.stringify({
+                action: 'delete_device',
+                user_email: user.email,
+                client_id: deviceToDelete.client_id
+            }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
 
-      const data = await response.json();
-      setDevices(devices.filter(device => device.client_id !== deviceToDelete.client_id));
-      setDeleteDialogOpen(false);
-      setDeviceToDelete(null);
+        // Update local state
+        const newDevices = devices.filter(device => device.client_id !== deviceToDelete.client_id);
+        setDevices(newDevices);
+        saveDeviceOrder(newDevices, user.email);
+        
+        setDeleteDialogOpen(false);
+        setDeviceToDelete(null);
+        showSnackbar('Device deleted successfully', 'success');
     } catch (err) {
-      console.error('Error deleting device:', err);
-      setError(err.message);
+        console.error('Error deleting device:', err);
+        setError(err.message);
+        showSnackbar('Failed to delete device: ' + err.message, 'error');
     }
   };
 
@@ -279,37 +374,95 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     e.preventDefault();
   };
 
-  const handleDrop = (e, targetDevice) => {
-    e.preventDefault();
-    if (!draggedDevice || draggedDevice.client_id === targetDevice.client_id) return;
+  const handleDrop = async (result) => {
+    if (!result.destination) return;
 
-    const newDevices = [...devices];
-    const draggedIndex = newDevices.findIndex(d => d.client_id === draggedDevice.client_id);
-    const targetIndex = newDevices.findIndex(d => d.client_id === targetDevice.client_id);
+    const items = Array.from(devices);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
 
-    // Remove dragged device and insert at new position
-    newDevices.splice(draggedIndex, 1);
-    newDevices.splice(targetIndex, 0, draggedDevice);
+    // Update display order for all affected devices
+    const updatedItems = items.map((device, index) => ({
+        ...device,
+        display_order: index
+    }));
 
-    setDevices(newDevices);
-    setDraggedDevice(null);
+    setDevices(updatedItems);
+
+    // Update preferences for each device
+    for (const device of updatedItems) {
+        try {
+            const response = await fetch(DEVICE_PREFERENCES_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    action: 'update_preferences',
+                    user_email: user.email,
+                    client_id: device.client_id,
+                    device_name: device.device_name || 'Unknown',
+                    metrics_visibility: device.metrics_visibility || {},
+                    display_order: device.display_order
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to update preferences');
+            }
+        } catch (error) {
+            console.error(`Failed to update preferences for device ${device.client_id}:`, error);
+            showSnackbar(`Failed to update order for device ${device.device_name}`, 'error');
+        }
+    }
   };
 
   const handleEditClick = (device) => {
     setEditingDevice(device);
-    setNewDevice({
-      device_name: device.device_name,
-      client_id: device.client_id,
-      user_email: user.email,
-    });
+    setEditDeviceName(device.device_name);
+    setEditClientId(device.client_id);
     setOpenEditDialog(true);
   };
 
-  const handleEditConfirm = async () => {
-    if (!editingDevice || !newDevice.device_name.trim()) return;
+  const handleEditDevice = async () => {
+    if (!editingDevice || !editDeviceName.trim()) return;
 
+    // Check if client ID is being changed
+    if (editClientId.trim() && editClientId !== editingDevice.client_id) {
+      setPendingEditData({
+        action: 'update_device',
+        user_email: user.email,
+        old_client_id: editingDevice.client_id,
+        new_client_id: editClientId.trim(),
+        device_name: editDeviceName
+      });
+      setClientIdWarningOpen(true);
+      return;
+    }
+
+    // If no client ID change, proceed with update
+    await performDeviceUpdate({
+      action: 'update_device',
+      user_email: user.email,
+      old_client_id: editingDevice.client_id,
+      new_client_id: editingDevice.client_id,
+      device_name: editDeviceName
+    });
+  };
+
+  const performDeviceUpdate = async (updateData) => {
     try {
-      const response = await fetch(DEVICES_API_URL, {
+        // Get current metrics visibility state, including temporary changes
+        const currentMetrics = {
+            ...(deviceData[editingDevice.client_id]?.metrics_visibility || {}),
+            ...(tempMetricsVisibility[editingDevice.client_id] || {})
+        };
+        const displayOrder = devices.findIndex(d => d.client_id === editingDevice.client_id);
+
+        // First update the device name and client ID if needed
+        const deviceResponse = await fetch(DEVICES_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -319,32 +472,91 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         body: JSON.stringify({
           action: 'update_device',
           user_email: user.email,
-          old_client_id: editingDevice.client_id,
-          new_client_id: newDevice.client_id,
-          device_name: newDevice.device_name
+                old_client_id: updateData.old_client_id,
+                new_client_id: updateData.new_client_id,
+                device_name: editDeviceName
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
+        if (!deviceResponse.ok) {
+            const errorData = await deviceResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP error! status: ${deviceResponse.status}`);
+        }
 
-      const data = await response.json();
-      setDevices(devices.map(device => 
-        device.client_id === editingDevice.client_id ? data.device : device
-      ));
-      setOpenEditDialog(false);
-      setEditingDevice(null);
-      setNewDevice({
-        device_name: "",
-        client_id: "",
+        // Then update the preferences
+        const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            mode: 'cors',
+            body: JSON.stringify({
+                action: 'update_preferences',
         user_email: user.email,
-      });
+                client_id: updateData.new_client_id,
+                device_name: editDeviceName,
+                metrics_visibility: currentMetrics,
+                display_order: displayOrder
+            }),
+        });
+
+        if (!preferencesResponse.ok) {
+            const errorData = await preferencesResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP error! status: ${preferencesResponse.status}`);
+        }
+
+        // Update the device in the local state
+        const newDevices = devices.map(device => 
+            device.client_id === editingDevice.client_id 
+                ? { 
+                    ...device, 
+                    device_name: editDeviceName,
+                    client_id: updateData.new_client_id,
+                    metrics_visibility: currentMetrics,
+                    display_order: displayOrder
+                }
+                : device
+        );
+        
+        setDevices(newDevices);
+        saveDeviceOrder(newDevices, user.email);
+
+        // Update device data state
+        setDeviceData(prev => ({
+            ...prev,
+            [updateData.new_client_id]: {
+                ...prev[editingDevice.client_id],
+                device_name: editDeviceName,
+                metrics_visibility: currentMetrics
+            }
+        }));
+
+        // Clear states
+        setOpenEditDialog(false);
+        setEditingDevice(null);
+        setEditDeviceName("");
+        setEditClientId("");
+        setPendingEditData(null);
+        setTempMetricsVisibility(prev => ({
+            ...prev,
+            [editingDevice.client_id]: {}
+        }));
+
+        // Show success message
       showSnackbar('Device updated successfully', 'success');
+
     } catch (err) {
       console.error('Error updating device:', err);
-      showSnackbar(err.message, 'error');
+        setError(err.message);
+        showSnackbar('Failed to update device: ' + err.message, 'error');
+    }
+  };
+
+  const handleClientIdChangeConfirm = async () => {
+    if (pendingEditData) {
+      await performDeviceUpdate(pendingEditData);
+      setClientIdWarningOpen(false);
     }
   };
 
@@ -356,9 +568,148 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
+  const toggleTheme = () => {
+    setTheme(currentTheme === "dark" ? "light" : "dark");
+  };
+
+  // Modify getAvailableMetrics to exclude signal and battery
+  const getAvailableMetrics = (deviceData) => {
+    if (!deviceData) return [];
+    return Object.keys(deviceData).filter(key => 
+      key !== 'last_updated' && 
+      key !== 'client_id' && 
+      key !== 'device_name' &&
+      key !== 'user_email' &&
+      key !== 'signal_strength' &&
+      key !== 'battery_level' &&
+      key !== 'metrics_visibility' &&
+      key !== 'display_order'
+    );
+  };
+
+  // Add function to toggle metric visibility
+  const toggleMetricVisibility = (deviceId, metric) => {
+    setDeviceMetrics(prev => ({
+      ...prev,
+      [deviceId]: {
+        ...prev[deviceId],
+        [metric]: !prev[deviceId]?.[metric]
+      }
+    }));
+  };
+
+  // Add function to render metric value with unit
+  const renderMetricValue = (value, metric) => {
+    const units = {
+      temperature: '°C',
+      humidity: '%',
+      battery_level: '%',
+      signal_strength: '%',
+      // Add more units as needed
+    };
+
+    const unit = units[metric] || '';
+    return `${value}${unit}`;
+  };
+
+  const handleMetricsVisibilityChange = (device, metric) => {
+    setTempMetricsVisibility(prev => ({
+        ...prev,
+        [device.client_id]: {
+            ...prev[device.client_id],
+            [metric]: !((prev[device.client_id] || {})[metric] ?? deviceData[device.client_id]?.metrics_visibility?.[metric] ?? true)
+        }
+    }));
+  };
+
+  const handleSave = async () => {
+    try {
+      if (!editingDevice) return;
+
+      // Get the current metrics visibility state, including temporary changes
+      const currentMetrics = {
+        ...(deviceData[editingDevice.client_id]?.metrics_visibility || {}),
+        ...(tempMetricsVisibility[editingDevice.client_id] || {})
+      };
+
+      // Send to preferences API
+      const response = await fetch(DEVICE_PREFERENCES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          action: 'update_preferences',
+          user_email: user.email,
+          client_id: editingDevice.client_id,
+          device_name: editDeviceName,
+          metrics_visibility: currentMetrics,
+          display_order: editingDevice.display_order || 0
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update preferences');
+      }
+
+      // Fetch the updated device data to refresh the tile
+      const updatedDevice = await fetchDeviceData(editingDevice);
+      setDeviceData(prev => ({
+        ...prev,
+        [editingDevice.client_id]: updatedDevice // Update the local state with the new data
+      }));
+
+      // Clear temporary changes
+      setTempMetricsVisibility(prev => ({
+        ...prev,
+        [editingDevice.client_id]: {}
+      }));
+
+      // Optionally, you can call fetchDevices() again to ensure all devices are up to date
+      await fetchDevices(); // Fetch devices again to ensure all data is current
+
+      setOpenEditDialog(false);
+      showSnackbar('Preferences updated successfully', 'success');
+
+    } catch (error) {
+      console.error('Error saving metrics configuration:', error);
+      showSnackbar('Failed to save preferences: ' + error.message, 'error');
+    }
+  };
+
+  const handleCloseEditDialog = () => {
+    setOpenEditDialog(false);
+    // Clear temporary changes for this device
+    if (editingDevice) {
+        setTempMetricsVisibility(prev => ({
+            ...prev,
+            [editingDevice.client_id]: {}
+        }));
+    }
+  };
+
+  // Filter devices based on search term
+  const filteredDevices = devices.filter(device =>
+      device.device_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Sort devices based on selected order
+  const sortedDevices = useMemo(() => {
+    return [...devices].sort((a, b) => {
+      const order = sortOrder === "asc" ? 1 : -1;
+      return (a.device_name > b.device_name ? 1 : -1) * order;
+    });
+  }, [devices, sortOrder]);
+
+  const handleSortChange = (order) => {
+    setSortOrder(order);
+  };
+
   return (
     <>
-      <AppBar position="static">
+      <CssBaseline />
+      <AppBar position="static" sx={{ bgcolor: 'background.paper', color: 'text.primary' }}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             IoT Devices Dashboard
@@ -399,26 +750,70 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           </Typography>
         )}
 
+        {/* Sorting Options */}
+        <Box sx={{ mb: 2 }}>
+          <Button onClick={() => handleSortChange("asc")}>Sort Ascending</Button>
+          <Button onClick={() => handleSortChange("desc")}>Sort Descending</Button>
+        </Box>
+
         <Grid container spacing={3}>
-          {devices.map((device) => {
-            const deviceStatus = getDeviceStatus(deviceData[device.client_id]?.last_updated);
+          {isLoading ? (
+            // Show loading skeletons
+            <>
+              {[1, 2, 3].map((index) => (
+                <Grid item xs={12} sm={6} md={4} key={`skeleton-${index}`}>
+                  <DeviceSkeleton />
+                </Grid>
+              ))}
+            </>
+          ) : sortedDevices.length === 0 ? (
+            // Show empty state
+            <Grid item xs={12}>
+              <Paper 
+                sx={{ 
+                  p: 4, 
+                  textAlign: 'center',
+                  bgcolor: 'background.paper',
+                  color: 'text.primary'
+                }}
+              >
+                <AddIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  No Devices Found
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                  Get started by adding your first device
+                </Typography>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  startIcon={<AddIcon />}
+                  onClick={() => setAddDeviceOpen(true)}
+                >
+                  Add New Device
+                </Button>
+              </Paper>
+            </Grid>
+          ) : (
+            // Show devices
+            <>
+          {sortedDevices.map((device) => {
+                // Safely get device data and latest data
+                const currentDeviceData = deviceData[device.client_id] || {};
+                const latestData = currentDeviceData.latest_data || {};
+                const deviceStatus = getDeviceStatus(latestData.timestamp || device.last_seen);
+
             return (
               <Grid item xs={12} sm={6} md={4} key={device.client_id}>
                 <Paper
                   sx={{
                     p: 2,
                     bgcolor: theme.palette.background.paper,
-                    cursor: 'grab',
+                    cursor: 'pointer',
                     transition: 'transform 0.2s ease',
                     '&:hover': {
                       transform: 'translateY(-4px)',
                       boxShadow: 6,
-                    },
-                    '&.dragging': {
-                      cursor: 'grabbing',
-                      transform: 'scale(1.02)',
-                      boxShadow: 'none',
-                      opacity: 0.8,
                     },
                     display: 'flex',
                     flexDirection: 'column',
@@ -436,86 +831,113 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                       transition: 'background-color 0.3s ease',
                     }
                   }}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, device)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, device)}
                   onClick={() => handleDeviceClick(device)}
                 >
-                  {/* Drag Handle */}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: theme.palette.text.secondary,
-                      '&:hover': {
-                        color: theme.palette.primary.main,
-                      },
-                      cursor: 'grab',
-                      '&:active': {
-                        cursor: 'grabbing',
-                      },
-                    }}
-                  >
-                    <DragIndicatorIcon />
-                  </Box>
-
-                  {/* Device Info */}
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="h6">
-                        {device.device_name}
+                  {/* Device Header */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="h6">
+                      {device.device_name || 'Unknown Device'}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor: getStatusColor(deviceStatus)
+                        }}
+                      />
+                      <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus) }}>
+                        {deviceStatus}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            backgroundColor: getStatusColor(deviceStatus),
-                            transition: 'background-color 0.3s ease'
-                          }}
-                        />
-                        <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus) }}>
-                          {deviceStatus}
-                        </Typography>
-                      </Box>
                     </Box>
-                    <Typography variant="body2" color="textSecondary">
-                      ID: {device.client_id}
-                    </Typography>
                   </Box>
 
-                  {/* Device Data */}
-                  <Box sx={{ mt: 1, display: 'flex', gap: 2 }}>
-                    <BatteryIndicator value={deviceData[device.client_id]?.battery_level || 0} />
-                    <SignalIndicator value={deviceData[device.client_id]?.signal_strength || 0} />
-                  </Box>
-                  <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                    <Typography variant="body2">
-                      Temp: {deviceData[device.client_id]?.temperature || 0}°C
+                  {/* Device ID */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography variant="body2" color="textSecondary">
+                      ID: {showId[device.client_id] ? device.client_id : '••••••••••'}
                     </Typography>
-                    <Typography variant="body2">
-                      Hum: {deviceData[device.client_id]?.humidity || 0}%
-                    </Typography>
+                    <IconButton 
+                      size="small" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowId(prev => ({
+                          ...prev,
+                          [device.client_id]: !prev[device.client_id]
+                        }));
+                      }}
+                    >
+                      {showId[device.client_id] ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
                   </Box>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                    Last Updated: {new Date(deviceData[device.client_id]?.last_updated || '').toLocaleString()}
+
+                  {/* Device Type - Updated */}
+                  {latestData.device && (
+                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                      Device Type: {latestData.device}
+                    </Typography>
+                  )}
+
+                  {/* Indicators */}
+                  <Box sx={{ display: 'flex', gap: 2, my: 2 }}>
+                    <BatteryIndicator value={Number(latestData.battery) || 0} />
+                    <SignalIndicator value={Number(latestData.signal_quality) || 0} />
+                  </Box>
+
+                  {/* Metrics */}
+                  <Box sx={{ mt: 1 }}>
+                    {Object.entries(latestData).map(([key, value]) => {
+                      // Check visibility based on preferences
+                      const isVisible = currentDeviceData.metrics_visibility?.[key] ?? true;
+
+                      // Skip non-metric fields or if not visible
+                      if (!isVisible || [
+                        'timestamp',
+                        'client_id',
+                        'device_name',
+                        'user_email',
+                        'signal_quality',
+                        'battery',
+                        'metrics_visibility',
+                        'display_order',
+                        'device',
+                        'device_id',
+                        'ClientID',
+                        'last_seen',
+                        'created_at',
+                        'status'
+                      ].includes(key)) return null;
+
+                      // Skip if value is an object or null
+                      if (value === null || typeof value === 'object') return null;
+
+                      // Format the value
+                      const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
+                      const unit = key === 'temperature' ? '°C' : key === 'humidity' ? '%' : '';
+
+                      return (
+                        <Typography key={key} variant="body2" color="textSecondary">
+                          {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
+                        </Typography>
+                      );
+                    })}
+                  </Box>
+
+                  {/* Last Updated */}
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1 }}>
+                    Last Updated: {new Date(latestData.timestamp || device.last_seen).toLocaleString()}
                   </Typography>
 
-                  {/* Action Buttons */}
-                  <Box 
-                    sx={{ 
-                      display: 'flex', 
-                      gap: 1, 
-                      mt: 1,
-                      pt: 1,
-                      borderTop: '1px solid',
-                      borderColor: 'divider',
-                      justifyContent: 'flex-end'
-                    }}
-                  >
+                  {/* Actions */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'flex-end', 
+                    gap: 1, 
+                    mt: 1,
+                    pt: 1,
+                    borderTop: `1px solid ${theme.palette.divider}`
+                  }}>
                     <IconButton
                       size="small"
                       onClick={(e) => {
@@ -577,62 +999,46 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
               </Box>
             </Paper>
           </Grid>
+            </>
+          )}
         </Grid>
       </Box>
 
       {/* Add Device Dialog */}
-      <Dialog open={addDeviceOpen} onClose={() => setAddDeviceOpen(false)}>
+      <Dialog 
+        open={addDeviceOpen} 
+        onClose={() => setAddDeviceOpen(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            color: 'text.primary'
+          }
+        }}
+      >
         <DialogTitle>Add New Device</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
+            label="Device Name"
+            fullWidth
+            value={newDeviceName}
+            onChange={(e) => setNewDeviceName(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
             label="Client ID"
-            type="text"
             fullWidth
             value={newClientId}
             onChange={(e) => setNewClientId(e.target.value)}
           />
-          <TextField
-            margin="dense"
-            label="Device Name"
-            type="text"
-            fullWidth
-            value={newDeviceName}
-            onChange={(e) => setNewDeviceName(e.target.value)}
-          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAddDeviceOpen(false)}>Cancel</Button>
-          <Button onClick={handleAddDevice} variant="contained">Add Device</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Edit Device Dialog */}
-      <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)}>
-        <DialogTitle>Edit Device</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Client ID"
-            type="text"
-            fullWidth
-            value={newDevice.client_id}
-            onChange={(e) => setNewDevice({ ...newDevice, client_id: e.target.value })}
-          />
-          <TextField
-            margin="dense"
-            label="Device Name"
-            type="text"
-            fullWidth
-            value={newDevice.device_name}
-            onChange={(e) => setNewDevice({ ...newDevice, device_name: e.target.value })}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenEditDialog(false)}>Cancel</Button>
-          <Button onClick={handleEditConfirm} variant="contained">Save Changes</Button>
+          <Button onClick={handleAddDevice} variant="contained" color="primary">
+            Add Device
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -640,15 +1046,17 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
-        aria-labelledby="delete-dialog-title"
-        aria-describedby="delete-dialog-description"
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            color: 'text.primary'
+          }
+        }}
       >
-        <DialogTitle id="delete-dialog-title">
-          Delete Device
-        </DialogTitle>
+        <DialogTitle>Delete Device</DialogTitle>
         <DialogContent>
-          <DialogContentText id="delete-dialog-description">
-            Are you sure you want to delete {deviceToDelete?.device_name}? This action cannot be undone.
+          <DialogContentText>
+            Are you sure you want to delete this device? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -662,6 +1070,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       <SettingsDrawer 
         open={settingsOpen} 
         onClose={() => setSettingsOpen(false)}
+        user={user}
       />
 
       {/* Snackbar for notifications */}
@@ -669,12 +1078,251 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Edit Device Dialog */}
+      <Dialog 
+        open={openEditDialog} 
+        onClose={handleCloseEditDialog}
+      >
+        <DialogTitle>Edit Device</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Update device information. Client ID is optional.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Device Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={editDeviceName}
+            onChange={(e) => setEditDeviceName(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            label="Client ID (Optional)"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={editClientId}
+            onChange={(e) => setEditClientId(e.target.value)}
+            sx={{ mb: 2 }}
+            helperText="Leave empty to keep the current Client ID"
+          />
+          
+          {/* Device Type Display */}
+          {editingDevice && deviceData[editingDevice.client_id]?.latest_data?.device && (
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+              Device Type: {deviceData[editingDevice.client_id].latest_data.device}
+            </Typography>
+          )}
+          
+          {/* Metrics Visibility Section */}
+          {editingDevice && (
+            <>
+                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+                    Visible Metrics
+                </Typography>
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap',
+                    gap: 1,
+                    mb: 2
+                }}>
+                    {Object.entries(deviceData[editingDevice.client_id]?.latest_data || {})
+                        .filter(([key]) => {
+                            // Filter out non-metric fields
+                            const skipFields = [
+                                'timestamp',
+                                'client_id',
+                                'device_name',
+                                'user_email',
+                                'signal_quality',
+                                'battery',
+                                'metrics_visibility',
+                                'display_order',
+                                'device',
+                                'device_id',
+                                'ClientID',
+                                'last_seen',
+                                'created_at',
+                                'status'
+                            ];
+                            return !skipFields.includes(key);
+                        })
+                        .map(([key, value]) => {
+                            // Skip if value is an object or null
+                            if (value === null || typeof value === 'object') return null;
+
+                            // Get the current visibility state
+                            const currentVisibility = deviceData[editingDevice.client_id]?.metrics_visibility?.[key] ?? true;
+
+                            return (
+                                <FormControlLabel
+                                    key={key}
+                                    control={
+                                        <Checkbox
+                                            checked={
+                                                (tempMetricsVisibility[editingDevice.client_id]?.[key] ?? 
+                                                deviceData[editingDevice.client_id]?.metrics_visibility?.[key] ?? 
+                                                true)
+                                            }
+                                            onChange={(e) => {
+                                                e.stopPropagation();
+                                                handleMetricsVisibilityChange(editingDevice, key);
+                                            }}
+                                        />
+                                    }
+                                    label={key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                                />
+                            );
+                        })}
+                </Box>
+
+                {/* Preview Section */}
+                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+                    Preview
+                </Typography>
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    gap: 1,
+                    p: 2,
+                    bgcolor: 'background.default',
+                    borderRadius: 1
+                }}>
+                    {/* Device Type in Preview */}
+                    {deviceData[editingDevice.client_id]?.latest_data?.device && (
+                        <Typography variant="body2" color="textSecondary">
+                            Device Type: {deviceData[editingDevice.client_id].latest_data.device}
+                        </Typography>
+                    )}
+
+                    {/* Battery and Signal Indicators */}
+                    <Box sx={{ display: 'flex', gap: 2, my: 1 }}>
+                        <BatteryIndicator 
+                            value={Number(deviceData[editingDevice.client_id]?.latest_data?.battery) || 0} 
+                        />
+                        <SignalIndicator 
+                            value={Number(deviceData[editingDevice.client_id]?.latest_data?.signal_quality) || 0} 
+                        />
+                    </Box>
+
+                    {/* Metrics Preview */}
+                    {Object.entries(deviceData[editingDevice.client_id]?.latest_data || {})
+                        .filter(([key, value]) => {
+                            const skipFields = [
+                                'timestamp',
+                                'client_id',
+                                'device_name',
+                                'user_email',
+                                'signal_quality',
+                                'battery',
+                                'metrics_visibility',
+                                'display_order',
+                                'device',
+                                'device_id',
+                                'ClientID',
+                                'last_seen',
+                                'created_at',
+                                'status'
+                            ];
+                            return !skipFields.includes(key) && 
+                                   value !== null && 
+                                   typeof value !== 'object';
+                        })
+                        .map(([key, value]) => {
+                            // Check if this metric should be visible using temporary state
+                            const isVisible = tempMetricsVisibility[editingDevice.client_id]?.[key] ?? 
+                                            deviceData[editingDevice.client_id]?.metrics_visibility?.[key] ?? 
+                                            true;
+                            if (!isVisible) return null;
+
+                            // Format the value
+                            const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
+                            const unit = key === 'temperature' ? '°C' : 
+                                       key === 'humidity' ? '%' : '';
+
+                            return (
+                                <Typography key={key} variant="body2">
+                                    {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
+                                </Typography>
+                            );
+                        })}
+
+                    {/* Last Updated */}
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                        Last Updated: {new Date(deviceData[editingDevice.client_id]?.latest_data?.timestamp || editingDevice.last_seen).toLocaleString()}
+                    </Typography>
+                </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditDialog}>Cancel</Button>
+          <Button onClick={handleSave} variant="contained" color="primary">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Client ID Change Warning Dialog */}
+      <Dialog 
+        open={clientIdWarningOpen} 
+        onClose={() => setClientIdWarningOpen(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            color: 'text.primary'
+          }
+        }}
+      >
+        <DialogTitle>Warning: Changing Client ID</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            You are about to change the device's Client ID from "{editingDevice?.client_id}" to "{editClientId}". 
+            This action will:
+          </DialogContentText>
+          <Box component="ul" sx={{ mt: 1, mb: 2 }}>
+            <Box component="li">
+              <DialogContentText>
+                Create a new device entry with the new Client ID
+              </DialogContentText>
+            </Box>
+            <Box component="li">
+              <DialogContentText>
+                Delete the old device entry
+              </DialogContentText>
+            </Box>
+            <Box component="li">
+              <DialogContentText>
+                Potentially affect any existing data or connections
+              </DialogContentText>
+            </Box>
+          </Box>
+          <DialogContentText>
+            Are you sure you want to proceed with this change?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClientIdWarningOpen(false)}>Cancel</Button>
+          <Button onClick={handleClientIdChangeConfirm} color="warning" variant="contained">
+            Proceed with Change
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 } 

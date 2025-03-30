@@ -1,10 +1,18 @@
-import React, { createContext, useMemo, useState } from "react";
+import React, { createContext, useMemo, useState, useContext } from "react";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 
 export const CustomThemeContext = createContext({
   currentTheme: "dark",
   setTheme: () => {},
 });
+
+export const useCustomTheme = () => {
+  const context = useContext(CustomThemeContext);
+  if (!context) {
+    throw new Error('useCustomTheme must be used within a CustomThemeProvider');
+  }
+  return context;
+};
 
 export const CustomThemeProvider = ({ children }) => {
   const [themeMode, setThemeMode] = useState("dark");
