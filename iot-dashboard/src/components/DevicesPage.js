@@ -129,6 +129,13 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
   useEffect(() => {
     fetchDevices();
+
+    // Set up polling to fetch devices every 55 seconds
+    const intervalId = setInterval(() => {
+      fetchDevices();
+    }, 55000); // 55000 ms = 55 seconds
+
+    return () => clearInterval(intervalId); // Clear interval on unmount
   }, [user.email]);
 
   const fetchDeviceData = async (device) => {
