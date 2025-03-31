@@ -35,7 +35,7 @@ import {
   Logout as LogoutIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
-  DragIndicator as DragIndicatorIcon,
+  Edit as EditIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
   Visibility as VisibilityIcon,
@@ -45,7 +45,6 @@ import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
 import { Helmet } from 'react-helmet';
 import SettingsDrawer from "./SettingsDrawer";
-import { FaPlus, FaEdit, FaTrash } from "react-icons/fa";
 import { useCustomTheme } from "./ThemeContext";
 
 const DEVICES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
@@ -127,6 +126,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
   const [openClientIdConfirmDialog, setOpenClientIdConfirmDialog] = useState(false);
+  const [configureDialogOpen, setConfigureDialogOpen] = useState(false);
+  const [configuringDevice, setConfiguringDevice] = useState(null);
 
   useEffect(() => {
     fetchDevices();
@@ -690,7 +691,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     try {
         if (!editingDevice) return;
 
-        // First, update the device name using DEVICES_API_URL
+        // Only update the device name using DEVICES_API_URL
         const updateDeviceResponse = await fetch(DEVICES_API_URL, {
             method: 'POST',
             headers: {
@@ -709,29 +710,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             throw new Error('Failed to update device name');
         }
 
-        // Then, update the preferences
-        const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-                action: 'update_preferences',
-                user_email: user.email,
-                client_id: editingDevice.client_id,
-                metrics_visibility: {
-                    ...(deviceData[editingDevice.client_id]?.metrics_visibility || {}),
-                    ...(tempMetricsVisibility[editingDevice.client_id] || {})
-                },
-                display_order: editingDevice.display_order || 0
-            })
-        });
-
-        if (!preferencesResponse.ok) {
-            throw new Error('Failed to update preferences');
-        }
-
         // Update local state with new device name
         setDevices(prevDevices => 
             prevDevices.map(device => 
@@ -746,11 +724,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             ...prev,
             [editingDevice.client_id]: {
                 ...prev[editingDevice.client_id],
-                device_name: editDeviceName,
-                metrics_visibility: {
-                    ...(prev[editingDevice.client_id]?.metrics_visibility || {}),
-                    ...(tempMetricsVisibility[editingDevice.client_id] || {})
-                }
+                device_name: editDeviceName
             }
         }));
 
@@ -758,16 +732,12 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         setOpenEditDialog(false);
         setEditingDevice(null);
         setEditDeviceName("");
-        setTempMetricsVisibility(prev => ({
-            ...prev,
-            [editingDevice.client_id]: {}
-        }));
 
-        showSnackbar('Device updated successfully', 'success');
+        showSnackbar('Device name updated successfully', 'success');
 
     } catch (error) {
         console.error('Error updating device:', error);
-        showSnackbar('Failed to update device: ' + error.message, 'error');
+        showSnackbar('Failed to update device name: ' + error.message, 'error');
     }
   };
 
@@ -824,6 +794,135 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       </DialogActions>
     </Dialog>
   );
+
+  const handleConfigureClick = (device) => {
+    setConfiguringDevice(device);
+    setConfigureDialogOpen(true);
+  };
+
+  // Add this new dialog component
+  const ConfigureDeviceDialog = ({ device, onClose }) => {
+    const [metricsConfig, setMetricsConfig] = useState({});
+    
+    useEffect(() => {
+        // Initialize metrics config from current device data
+        const currentConfig = deviceData[device.client_id]?.metrics_visibility || {};
+        setMetricsConfig(currentConfig);
+    }, [device.client_id]);
+
+    const handleSaveConfig = async () => {
+        try {
+            const response = await fetch(DEVICE_PREFERENCES_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    action: 'update_preferences',
+                    user_email: user.email,
+                    client_id: device.client_id,
+                    metrics_visibility: metricsConfig
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update metrics configuration');
+            }
+
+            // Update local state
+            setDeviceData(prev => ({
+                ...prev,
+                [device.client_id]: {
+                    ...prev[device.client_id],
+                    metrics_visibility: metricsConfig
+                }
+            }));
+
+            onClose();
+            showSnackbar('Device configuration updated successfully', 'success');
+        } catch (error) {
+            console.error('Error updating metrics configuration:', error);
+            showSnackbar('Failed to update configuration', 'error');
+        }
+    };
+
+    const availableMetrics = Object.entries(deviceData[device.client_id]?.latest_data || {})
+        .filter(([key, value]) => {
+            const skipFields = [
+                'timestamp', 'client_id', 'device_name', 'user_email',
+                'signal_quality', 'battery', 'metrics_visibility', 'display_order',
+                'device', 'device_id', 'ClientID', 'last_seen', 'created_at', 'status'
+            ];
+            return !skipFields.includes(key) && value !== null && typeof value !== 'object';
+        });
+
+    return (
+        <Dialog open={true} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>Configure Device Metrics</DialogTitle>
+            <DialogContent>
+                <DialogContentText sx={{ mb: 2 }}>
+                    Select which metrics you want to display on the device tile.
+                </DialogContentText>
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {availableMetrics.map(([key, value]) => (
+                        <FormControlLabel
+                            key={key}
+                            control={
+                                <Checkbox
+                                    checked={metricsConfig[key] ?? true}
+                                    onChange={(e) => setMetricsConfig(prev => ({
+                                        ...prev,
+                                        [key]: e.target.checked
+                                    }))}
+                                />
+                            }
+                            label={
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                    <Typography>
+                                        {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                                    </Typography>
+                                    <Typography color="text.secondary">
+                                        Current: {typeof value === 'number' ? value.toFixed(1) : value}
+                                        {key === 'temperature' ? '°C' : key === 'humidity' ? '%' : ''}
+                                    </Typography>
+                                </Box>
+                            }
+                        />
+                    ))}
+                </Box>
+
+                {/* Preview Section */}
+                <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
+                    Preview
+                </Typography>
+                <Box sx={{ 
+                    p: 2,
+                    bgcolor: 'background.default',
+                    borderRadius: 1
+                }}>
+                    {availableMetrics
+                        .filter(([key]) => metricsConfig[key] ?? true)
+                        .map(([key, value]) => (
+                            <Typography key={key} variant="body2" sx={{ mb: 0.5 }}>
+                                {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {
+                                    typeof value === 'number' ? value.toFixed(1) : value
+                                }{key === 'temperature' ? '°C' : key === 'humidity' ? '%' : ''}
+                            </Typography>
+                        ))
+                    }
+                </Box>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button onClick={handleSaveConfig} variant="contained" color="primary">
+                    Save Configuration
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+  };
 
   return (
     <>
@@ -1118,24 +1217,39 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                       pt: 1,
                     borderTop: `1px solid ${theme.palette.divider}`
                   }}>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditClick(device);
-                      }}
-                    >
-                      <FaEdit />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClick(device);
-                      }}
-                    >
-                      <FaTrash />
-                    </IconButton>
+                    <Tooltip title="Configure Metrics">
+                        <IconButton
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleConfigureClick(device);
+                            }}
+                        >
+                            <SettingsIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Edit Device">
+                        <IconButton
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(device);
+                            }}
+                        >
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete Device">
+                        <IconButton
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(device);
+                            }}
+                        >
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
                   </Box>
                 </Paper>
               </Grid>
@@ -1273,7 +1387,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         <DialogTitle>Edit Device</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Update device information. Client ID is optional.
+            Update device name or client ID.
           </DialogContentText>
           <TextField
             autoFocus
@@ -1298,154 +1412,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             sx={{ mb: 2 }}
             helperText="Warning: Changing Client ID will create a new device and delete the old one"
           />
-          
-          {/* Device Type Display */}
-          {editingDevice && deviceData[editingDevice.client_id]?.latest_data?.device && (
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              Device Type: {deviceData[editingDevice.client_id].latest_data.device}
-            </Typography>
-          )}
-          
-          {/* Metrics Visibility Section */}
-          {editingDevice && (
-            <>
-                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-                    Visible Metrics
-                </Typography>
-                <Box sx={{ 
-                    display: 'flex', 
-                    flexWrap: 'wrap',
-                    gap: 1,
-                    mb: 2
-                }}>
-                    {Object.entries(deviceData[editingDevice.client_id]?.latest_data || {})
-                        .filter(([key]) => {
-                            // Filter out non-metric fields
-                            const skipFields = [
-                                'timestamp',
-                                'client_id',
-                                'device_name',
-                                'user_email',
-                                'signal_quality',
-                                'battery',
-                                'metrics_visibility',
-                                'display_order',
-                                'device',
-                                'device_id',
-                                'ClientID',
-                                'last_seen',
-                                'created_at',
-                                'status'
-                            ];
-                            return !skipFields.includes(key);
-                        })
-                        .map(([key, value]) => {
-                            // Skip if value is an object or null
-                            if (value === null || typeof value === 'object') return null;
-
-                            // Get the current visibility state
-                            const currentVisibility = deviceData[editingDevice.client_id]?.metrics_visibility?.[key] ?? true;
-
-                            return (
-                                <FormControlLabel
-                                    key={key}
-                                    control={
-                                        <Checkbox
-                                            checked={
-                                                (tempMetricsVisibility[editingDevice.client_id]?.[key] ?? 
-                                                deviceData[editingDevice.client_id]?.metrics_visibility?.[key] ?? 
-                                                true)
-                                            }
-                                            onChange={(e) => {
-                                                e.stopPropagation();
-                                                handleMetricsVisibilityChange(editingDevice, key);
-                                            }}
-                                        />
-                                    }
-                                    label={key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
-                                />
-                            );
-                        })}
-                </Box>
-
-                {/* Preview Section */}
-                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-                    Preview
-                </Typography>
-                <Box sx={{ 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    gap: 1,
-                    p: 2,
-                    bgcolor: 'background.default',
-                    borderRadius: 1
-                }}>
-                    {/* Device Type in Preview */}
-                    {deviceData[editingDevice.client_id]?.latest_data?.device && (
-                        <Typography variant="body2" color="textSecondary">
-                            Device Type: {deviceData[editingDevice.client_id].latest_data.device}
-                        </Typography>
-                    )}
-
-                    {/* Battery and Signal Indicators */}
-                    <Box sx={{ display: 'flex', gap: 2, my: 1 }}>
-                        <BatteryIndicator 
-                            value={Number(deviceData[editingDevice.client_id]?.latest_data?.battery) || 0} 
-                        />
-                        <SignalIndicator 
-                            value={Number(deviceData[editingDevice.client_id]?.latest_data?.signal_quality) || 0} 
-                        />
-                    </Box>
-
-                    {/* Metrics Preview */}
-                    {Object.entries(deviceData[editingDevice.client_id]?.latest_data || {})
-                        .filter(([key, value]) => {
-                            const skipFields = [
-                                'timestamp',
-                                'client_id',
-                                'device_name',
-                                'user_email',
-                                'signal_quality',
-                                'battery',
-                                'metrics_visibility',
-                                'display_order',
-                                'device',
-                                'device_id',
-                                'ClientID',
-                                'last_seen',
-                                'created_at',
-                                'status'
-                            ];
-                            return !skipFields.includes(key) && 
-                                   value !== null && 
-                                   typeof value !== 'object';
-                        })
-                        .map(([key, value]) => {
-                            // Check if this metric should be visible using temporary state
-                            const isVisible = tempMetricsVisibility[editingDevice.client_id]?.[key] ?? 
-                                            deviceData[editingDevice.client_id]?.metrics_visibility?.[key] ?? 
-                                            true;
-                            if (!isVisible) return null;
-
-                            // Format the value
-                            const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
-                            const unit = key === 'temperature' ? '°C' : 
-                                       key === 'humidity' ? '%' : '';
-
-                            return (
-                                <Typography key={key} variant="body2">
-                                    {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
-                                </Typography>
-                            );
-                        })}
-
-                    {/* Last Updated */}
-                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                        Last Updated: {new Date(deviceData[editingDevice.client_id]?.latest_data?.timestamp || editingDevice.last_seen).toLocaleString()}
-                    </Typography>
-                </Box>
-            </>
-          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseEditDialog}>Cancel</Button>
@@ -1502,6 +1468,44 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       </Dialog>
 
       <ClientIdConfirmDialog />
+
+      {/* Configure Device Dialog */}
+      <Dialog
+        open={configureDialogOpen}
+        onClose={() => setConfigureDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            color: 'text.primary'
+          }
+        }}
+      >
+        <DialogTitle>Configure Device</DialogTitle>
+        <DialogContent>
+          {/* Implement the logic to configure the device */}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfigureDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => {
+            // Handle save configuration
+            setConfigureDialogOpen(false);
+            showSnackbar('Device configuration updated successfully', 'success');
+          }} variant="contained" color="primary">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Configure Device Dialog */}
+      {configureDialogOpen && configuringDevice && (
+        <ConfigureDeviceDialog
+            device={configuringDevice}
+            onClose={() => {
+                setConfigureDialogOpen(false);
+                setConfiguringDevice(null);
+            }}
+        />
+      )}
     </>
   );
 } 
