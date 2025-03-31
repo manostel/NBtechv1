@@ -126,6 +126,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [tempMetricsVisibility, setTempMetricsVisibility] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
+  const [openClientIdConfirmDialog, setOpenClientIdConfirmDialog] = useState(false);
 
   useEffect(() => {
     fetchDevices();
@@ -140,11 +141,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
   const fetchDeviceData = async (device) => {
     try {
-      if (!user.email) {
-        throw new Error('User email not found');
-      }
-
-      // Fetch device data
       const dataResponse = await fetch(DEVICE_DATA_API_URL, {
         method: 'POST',
         headers: {
@@ -560,10 +556,71 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     }
   };
 
+  const handleClientIdChange = (e) => {
+    const value = e.target.value;
+    setNewClientId(value); // Just update the value without showing warning
+  };
+
+  const handleClientIdBlur = () => {
+    if (newClientId && newClientId !== editingDevice?.client_id) {
+        setOpenClientIdConfirmDialog(true);
+    }
+  };
+
   const handleClientIdChangeConfirm = async () => {
-    if (pendingEditData) {
-      await performDeviceUpdate(pendingEditData);
-      setClientIdWarningOpen(false);
+    try {
+        // First create a new device with the new client ID
+        const addDeviceResponse = await fetch(DEVICES_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                action: 'add_device',
+                user_email: user.email,
+                client_id: newClientId,
+                device_name: editDeviceName || editingDevice.device_name
+            })
+        });
+
+        if (!addDeviceResponse.ok) {
+            throw new Error('Failed to create new device');
+        }
+
+        // Then delete the old device
+        const deleteResponse = await fetch(DEVICES_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                action: 'delete_device',
+                user_email: user.email,
+                client_id: editingDevice.client_id
+            })
+        });
+
+        if (!deleteResponse.ok) {
+            throw new Error('Failed to delete old device');
+        }
+
+        // Clear states and close dialogs
+        setOpenClientIdConfirmDialog(false);
+        setOpenEditDialog(false);
+        setEditingDevice(null);
+        setNewClientId('');
+        setEditDeviceName('');
+
+        // Refresh devices list
+        await fetchDevices();
+
+        showSnackbar('Device Client ID updated successfully', 'success');
+
+    } catch (error) {
+        console.error('Error updating client ID:', error);
+        showSnackbar('Failed to update Client ID: ' + error.message, 'error');
     }
   };
 
@@ -631,57 +688,86 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
   const handleSave = async () => {
     try {
-      if (!editingDevice) return;
+        if (!editingDevice) return;
 
-      // Get the current metrics visibility state, including temporary changes
-      const currentMetrics = {
-        ...(deviceData[editingDevice.client_id]?.metrics_visibility || {}),
-        ...(tempMetricsVisibility[editingDevice.client_id] || {})
-      };
+        // First, update the device name using DEVICES_API_URL
+        const updateDeviceResponse = await fetch(DEVICES_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                action: 'update_device',
+                user_email: user.email,
+                client_id: editingDevice.client_id,
+                device_name: editDeviceName // Only updating the device name
+            })
+        });
 
-      // Send to preferences API
-      const response = await fetch(DEVICE_PREFERENCES_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          action: 'update_preferences',
-          user_email: user.email,
-          client_id: editingDevice.client_id,
-          device_name: editDeviceName,
-          metrics_visibility: currentMetrics,
-          display_order: editingDevice.display_order || 0
-        })
-      });
+        if (!updateDeviceResponse.ok) {
+            throw new Error('Failed to update device name');
+        }
 
-      if (!response.ok) {
-        throw new Error('Failed to update preferences');
-      }
+        // Then, update the preferences
+        const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                action: 'update_preferences',
+                user_email: user.email,
+                client_id: editingDevice.client_id,
+                metrics_visibility: {
+                    ...(deviceData[editingDevice.client_id]?.metrics_visibility || {}),
+                    ...(tempMetricsVisibility[editingDevice.client_id] || {})
+                },
+                display_order: editingDevice.display_order || 0
+            })
+        });
 
-      // Fetch the updated device data to refresh the tile
-      const updatedDevice = await fetchDeviceData(editingDevice);
-      setDeviceData(prev => ({
-        ...prev,
-        [editingDevice.client_id]: updatedDevice // Update the local state with the new data
-      }));
+        if (!preferencesResponse.ok) {
+            throw new Error('Failed to update preferences');
+        }
 
-      // Clear temporary changes
-      setTempMetricsVisibility(prev => ({
-        ...prev,
-        [editingDevice.client_id]: {}
-      }));
+        // Update local state with new device name
+        setDevices(prevDevices => 
+            prevDevices.map(device => 
+                device.client_id === editingDevice.client_id 
+                    ? { ...device, device_name: editDeviceName }
+                    : device
+            )
+        );
 
-      // Optionally, you can call fetchDevices() again to ensure all devices are up to date
-      await fetchDevices(); // Fetch devices again to ensure all data is current
+        // Update device data state
+        setDeviceData(prev => ({
+            ...prev,
+            [editingDevice.client_id]: {
+                ...prev[editingDevice.client_id],
+                device_name: editDeviceName,
+                metrics_visibility: {
+                    ...(prev[editingDevice.client_id]?.metrics_visibility || {}),
+                    ...(tempMetricsVisibility[editingDevice.client_id] || {})
+                }
+            }
+        }));
 
-      setOpenEditDialog(false);
-      showSnackbar('Preferences updated successfully', 'success');
+        // Clear states
+        setOpenEditDialog(false);
+        setEditingDevice(null);
+        setEditDeviceName("");
+        setTempMetricsVisibility(prev => ({
+            ...prev,
+            [editingDevice.client_id]: {}
+        }));
+
+        showSnackbar('Device updated successfully', 'success');
 
     } catch (error) {
-      console.error('Error saving metrics configuration:', error);
-      showSnackbar('Failed to save preferences: ' + error.message, 'error');
+        console.error('Error updating device:', error);
+        showSnackbar('Failed to update device: ' + error.message, 'error');
     }
   };
 
@@ -712,6 +798,32 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const handleSortChange = (order) => {
     setSortOrder(order);
   };
+
+  // Add the confirmation dialog component
+  const ClientIdConfirmDialog = () => (
+    <Dialog open={openClientIdConfirmDialog} onClose={() => setOpenClientIdConfirmDialog(false)}>
+      <DialogTitle>Warning: Changing Client ID</DialogTitle>
+      <DialogContent>
+        <DialogContentText sx={{ color: 'warning.main', mb: 2 }}>
+          Warning: Changing the Client ID will create a new device and the old device data will no longer be accessible. 
+          This action cannot be undone.
+        </DialogContentText>
+        <DialogContentText>
+          Are you sure you want to change the Client ID from "{editingDevice?.client_id}" to "{newClientId}"?
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setOpenClientIdConfirmDialog(false)}>Cancel</Button>
+        <Button 
+          onClick={handleClientIdChangeConfirm} 
+          variant="contained" 
+          color="warning"
+        >
+          Change Client ID
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   return (
     <>
@@ -1146,13 +1258,9 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
           {snackbar.message}
         </Alert>
       </Snackbar>
@@ -1180,14 +1288,15 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           />
           <TextField
             margin="dense"
-            label="Client ID (Optional)"
+            label="Client ID"
             type="text"
             fullWidth
             variant="outlined"
-            value={editClientId}
-            onChange={(e) => setEditClientId(e.target.value)}
+            value={newClientId || editingDevice?.client_id || ''}
+            onChange={handleClientIdChange}
+            onBlur={handleClientIdBlur}
             sx={{ mb: 2 }}
-            helperText="Leave empty to keep the current Client ID"
+            helperText="Warning: Changing Client ID will create a new device and delete the old one"
           />
           
           {/* Device Type Display */}
@@ -1360,7 +1469,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         <DialogTitle>Warning: Changing Client ID</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            You are about to change the device's Client ID from "{editingDevice?.client_id}" to "{editClientId}". 
+            You are about to change the device's Client ID from "{editingDevice?.client_id}" to "{newClientId}". 
             This action will:
           </DialogContentText>
           <Box component="ul" sx={{ mt: 1, mb: 2 }}>
@@ -1391,6 +1500,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ClientIdConfirmDialog />
     </>
   );
 } 

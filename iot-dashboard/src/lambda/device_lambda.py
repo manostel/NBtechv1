@@ -93,7 +93,9 @@ def lambda_handler(event, context):
                     )
                     
                     # Convert Decimal to float in the latest data
-                    latest_data = decimal_to_float(device_data_response.get('Items', [{}])[0])
+                    latest_data = {}
+                    if device_data_response.get('Items'):
+                        latest_data = decimal_to_float(device_data_response['Items'][0])
                     
                     # Process the device data
                     device = {
@@ -293,9 +295,11 @@ def lambda_handler(event, context):
             if update_parts:
                 update_expr = 'SET ' + ', '.join(update_parts)
                 
+                # Update the Key to include both client_id and user_email
                 devices_table.update_item(
                     Key={
-                        'client_id': body['client_id']
+                        'client_id': body['client_id'],
+                        'user_email': body['user_email']  # Add user_email to the key
                     },
                     UpdateExpression=update_expr,
                     ExpressionAttributeNames=expr_names,
