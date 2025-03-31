@@ -192,12 +192,12 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           user_email: user.email
         })
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
-
+      
       const data = await response.json();
       const fetchedDevices = data.devices || [];
 
@@ -223,17 +223,17 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
         // Fetch preferences for the specific device
         const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({
+        },
+        body: JSON.stringify({
             action: 'get_device_preferences',
             user_email: user.email,
             client_id: device.client_id // Include client_id to fetch specific preferences
-          })
-        });
+        })
+      });
 
         if (preferencesResponse.ok) {
           const preferencesData = await preferencesResponse.json();
@@ -319,36 +319,36 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     if (!deviceToDelete) return;
 
     try {
-        const response = await fetch(DEVICES_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            mode: 'cors',
-            body: JSON.stringify({
-                action: 'delete_device',
-                user_email: user.email,
-                client_id: deviceToDelete.client_id
-            }),
-        });
+      const response = await fetch(DEVICES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        mode: 'cors',
+        body: JSON.stringify({
+          action: 'delete_device',
+          user_email: user.email,
+          client_id: deviceToDelete.client_id
+        }),
+      });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
 
         // Update local state
         const newDevices = devices.filter(device => device.client_id !== deviceToDelete.client_id);
         setDevices(newDevices);
         saveDeviceOrder(newDevices, user.email);
         
-        setDeleteDialogOpen(false);
-        setDeviceToDelete(null);
+      setDeleteDialogOpen(false);
+      setDeviceToDelete(null);
         showSnackbar('Device deleted successfully', 'success');
     } catch (err) {
-        console.error('Error deleting device:', err);
-        setError(err.message);
+      console.error('Error deleting device:', err);
+      setError(err.message);
         showSnackbar('Failed to delete device: ' + err.message, 'error');
     }
   };
@@ -743,24 +743,85 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           <title>Devices | IoT Dashboard</title>
         </Helmet>
         
-        <Typography variant="h4" gutterBottom>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            justifyContent: 'space-between',
+            mb: 4,
+            pb: 2,
+            borderBottom: 1,
+            borderColor: 'divider'
+          }}
+        >
+          <Box>
+            <Typography 
+              variant="h4" 
+              gutterBottom={false}
+              sx={{ 
+                fontWeight: 600,
+                color: 'primary.main',
+                mb: 1
+              }}
+            >
           Your Devices
         </Typography>
-        
-        <Typography variant="subtitle1" gutterBottom>
-          User: {user.email}
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                gap: 1
+              }}
+            >
+              <Typography 
+                variant="subtitle1" 
+                color="text.secondary"
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  gap: 1
+                }}
+              >
+                <Box 
+                  component="span" 
+                  sx={{ 
+                    width: 8, 
+                    height: 8, 
+                    borderRadius: '50%', 
+                    bgcolor: 'success.main',
+                    display: 'inline-block'
+                  }} 
+                />
+                {user.email}
         </Typography>
+            </Box>
+          </Box>
 
-        {error && (
-          <Typography color="error" sx={{ mb: 2 }}>
-            {error}
-          </Typography>
-        )}
-
-        {/* Sorting Options */}
-        <Box sx={{ mb: 2 }}>
-          <Button onClick={() => handleSortChange("asc")}>Sort Ascending</Button>
-          <Button onClick={() => handleSortChange("desc")}>Sort Descending</Button>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              gap: 1,
+              mt: { xs: 2, sm: 0 }
+            }}
+          >
+            <Button 
+              variant={sortOrder === "asc" ? "contained" : "outlined"}
+              size="small"
+              onClick={() => handleSortChange("asc")}
+              sx={{ minWidth: 120 }}
+            >
+              Sort A-Z
+            </Button>
+            <Button 
+              variant={sortOrder === "desc" ? "contained" : "outlined"}
+              size="small"
+              onClick={() => handleSortChange("desc")}
+              sx={{ minWidth: 120 }}
+            >
+              Sort Z-A
+            </Button>
+          </Box>
         </Box>
 
         <Grid container spacing={3}>
@@ -841,24 +902,24 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                   onClick={() => handleDeviceClick(device)}
                 >
                   {/* Device Header */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="h6">
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="h6">
                       {device.device_name || 'Unknown Device'}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          backgroundColor: getStatusColor(deviceStatus)
-                        }}
-                      />
-                      <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus) }}>
-                        {deviceStatus}
                       </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                          backgroundColor: getStatusColor(deviceStatus)
+                          }}
+                        />
+                        <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus) }}>
+                          {deviceStatus}
+                        </Typography>
+                      </Box>
                     </Box>
-                  </Box>
 
                   {/* Device ID */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -926,7 +987,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                       return (
                         <Typography key={key} variant="body2" color="textSecondary">
                           {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
-                        </Typography>
+                    </Typography>
                       );
                     })}
                   </Box>
@@ -938,11 +999,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
                   {/* Actions */}
                   <Box sx={{ 
-                    display: 'flex', 
+                      display: 'flex', 
                     justifyContent: 'flex-end', 
-                    gap: 1, 
-                    mt: 1,
-                    pt: 1,
+                      gap: 1, 
+                      mt: 1,
+                      pt: 1,
                     borderTop: `1px solid ${theme.palette.divider}`
                   }}>
                     <IconButton
