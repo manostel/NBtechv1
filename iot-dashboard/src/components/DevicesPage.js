@@ -265,23 +265,23 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const fetchDevices = async () => {
     try {
         // Fetch basic device information
-        const response = await fetch(DEVICES_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
+      const response = await fetch(DEVICES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
                 action: "get_devices",
-                user_email: user.email
-            })
-        });
-
-        if (!response.ok) {
+          user_email: user.email
+        })
+      });
+      
+      if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
+      }
+      
+      const data = await response.json();
         const fetchedDevices = data.devices || [];
 
         // Sort and set devices
@@ -299,17 +299,17 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             
             // Get preferences
             const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({
+        },
+        body: JSON.stringify({
                     action: 'get_device_preferences',
                     user_email: user.email,
                     client_id: device.client_id
-                })
-            });
+        })
+      });
 
             if (preferencesResponse.ok) {
                 const preferencesData = await preferencesResponse.json();
@@ -325,7 +325,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         console.error('Error fetching devices:', error);
         setError(error.message);
     }
-};
+  };
 
   const handleDeviceClick = (dev) => {
     // Get the device data safely
@@ -334,8 +334,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     
     // Prepare the device data before navigation
     const deviceInfo = {
-        device_id: dev.client_id,
-        device_name: dev.device_name || dev.client_id,
+      device_id: dev.client_id,
+      device_name: dev.device_name || dev.client_id,
         device_type: latestData.device || 'Unknown',
         latest_data: latestData,
         metrics_visibility: currentDeviceData.metrics_visibility || {}
@@ -941,7 +941,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             return !skipFields.includes(key) && value !== null && typeof value !== 'object';
         });
 
-    return (
+  return (
         <Dialog open={true} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>Configure Device Metrics</DialogTitle>
             <DialogContent>
@@ -1076,35 +1076,35 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     }}>
         <CssBaseline />
         <AppBar position="static" sx={{ bgcolor: 'background.paper', color: 'text.primary' }}>
-            <Toolbar>
-                <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                    IoT Devices Dashboard
-                </Typography>
-                <IconButton
-                    color="inherit"
-                    onClick={() => setSettingsOpen(true)}
-                    aria-label="settings"
-                >
-                    <SettingsIcon />
-                </IconButton>
-                <IconButton
-                    color="inherit"
-                    onClick={handleLogout}
-                    aria-label="logout"
-                >
-                    <LogoutIcon />
-                </IconButton>
-            </Toolbar>
-        </AppBar>
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            IoT Devices Dashboard
+          </Typography>
+          <IconButton
+            color="inherit"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="settings"
+          >
+            <SettingsIcon />
+          </IconButton>
+          <IconButton
+            color="inherit"
+            onClick={handleLogout}
+            aria-label="logout"
+          >
+            <LogoutIcon />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
 
         <Box sx={{ 
             p: 3,
             bgcolor: 'background.default'
         }}>
-            <Helmet>
-                <title>Devices | IoT Dashboard</title>
-            </Helmet>
-            
+        <Helmet>
+          <title>Devices | IoT Dashboard</title>
+        </Helmet>
+        
             <Box 
                 sx={{ 
                     display: 'flex', 
@@ -1127,8 +1127,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                             mb: 1
                         }}
                     >
-                        Your Devices
-                    </Typography>
+          Your Devices
+        </Typography>
                     <Box 
                         sx={{ 
                             display: 'flex', 
@@ -1156,7 +1156,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                 }} 
                             />
                             {user.email}
-                        </Typography>
+        </Typography>
                     </Box>
                 </Box>
 
@@ -1186,7 +1186,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                 </Box>
             </Box>
 
-            <Grid container spacing={3}>
+        <Grid container spacing={3}>
                 {isLoading ? (
                     // Show 6 skeleton cards while loading
                     Array.from(new Array(6)).map((_, index) => (
@@ -1229,64 +1229,64 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                             const latestData = currentDeviceData.latest_data || {};
                             const deviceStatus = getDeviceStatus(currentDeviceData);
 
-                            return (
-                                <Grid item xs={12} sm={6} md={4} key={device.client_id}>
-                                    <Paper
-                                        sx={{
-                                            p: 2,
+            return (
+              <Grid item xs={12} sm={6} md={4} key={device.client_id}>
+                <Paper
+                  sx={{
+                    p: 2,
                                             bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
                                             cursor: 'pointer',
-                                            transition: 'transform 0.2s ease',
-                                            '&:hover': {
-                                                transform: 'translateY(-4px)',
+                    transition: 'transform 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
                                                 boxShadow: theme.shadows[6],
                                                 bgcolor: theme.palette.mode === 'dark' 
                                                     ? 'action.hover' 
                                                     : 'background.paper'
-                                            },
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: 1,
-                                            position: 'relative',
-                                            overflow: 'hidden',
-                                            '&::before': {
-                                                content: '""',
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: 0,
-                                                right: 0,
-                                                height: '4px',
-                                                backgroundColor: getStatusColor(deviceStatus),
-                                                transition: 'background-color 0.3s ease',
-                                            }
-                                        }}
-                                        onClick={() => handleDeviceClick(device)}
-                                    >
+                    },
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      backgroundColor: getStatusColor(deviceStatus),
+                      transition: 'background-color 0.3s ease',
+                    }
+                  }}
+                  onClick={() => handleDeviceClick(device)}
+                >
                                         {/* Device Header */}
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                            <Typography variant="h6">
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="h6">
                                                 {device.device_name || 'Unknown Device'}
-                                            </Typography>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                <Box
-                                                    sx={{
-                                                        width: 8,
-                                                        height: 8,
-                                                        borderRadius: '50%',
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
                                                         backgroundColor: getStatusColor(deviceStatus)
-                                                    }}
-                                                />
-                                                <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus) }}>
-                                                    {deviceStatus}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
+                          }}
+                        />
+                        <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus) }}>
+                          {deviceStatus}
+                        </Typography>
+                      </Box>
+                    </Box>
 
                                         {/* Device ID */}
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                            <Typography variant="body2" color="textSecondary">
+                    <Typography variant="body2" color="textSecondary">
                                                 ID: {showId[device.client_id] ? device.client_id : '••••••••••'}
-                                            </Typography>
+                    </Typography>
                                             <IconButton 
                                                 size="small" 
                                                 onClick={(e) => {
@@ -1299,7 +1299,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                             >
                                                 {showId[device.client_id] ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                                             </IconButton>
-                                        </Box>
+                  </Box>
 
                                         {/* Device Type - Updated */}
                                         {latestData.device && (
@@ -1312,7 +1312,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                         <Box sx={{ display: 'flex', gap: 2, my: 2 }}>
                                             <BatteryIndicator value={Number(latestData.battery) || 0} />
                                             <SignalIndicator value={Number(latestData.signal_quality) || 0} />
-                                        </Box>
+                  </Box>
 
                                         {/* Metrics */}
                                         <Box sx={{ mt: 1 }}>
@@ -1348,10 +1348,10 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                                 return (
                                                     <Typography key={key} variant="body2" color="textSecondary">
                                                         {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
-                                                    </Typography>
+                    </Typography>
                                                 );
                                             })}
-                                        </Box>
+                  </Box>
 
                                         {/* Last Updated */}
                                         <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1 }}>
@@ -1359,15 +1359,15 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                                 new Date(deviceData[device.client_id].latest_data.timestamp).toLocaleString() : 
                                                 'Never'
                                             }
-                                        </Typography>
+                  </Typography>
 
                                         {/* Actions */}
                                         <Box sx={{ 
-                                            display: 'flex', 
+                      display: 'flex', 
                                             justifyContent: 'flex-end', 
-                                            gap: 1, 
-                                            mt: 1,
-                                            pt: 1,
+                      gap: 1, 
+                      mt: 1,
+                      pt: 1,
                                             borderTop: `1px solid ${theme.palette.divider}`
                                         }}>
                                             <Tooltip title="Configure Metrics">
@@ -1382,76 +1382,76 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                                 </IconButton>
                                             </Tooltip>
                                             <Tooltip title="Edit Device">
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleEditClick(device);
-                                                    }}
-                                                >
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditClick(device);
+                      }}
+                    >
                                                     <EditIcon fontSize="small" />
-                                                </IconButton>
+                    </IconButton>
                                             </Tooltip>
                                             <Tooltip title="Delete Device">
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteClick(device);
-                                                    }}
-                                                >
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(device);
+                      }}
+                    >
                                                     <DeleteIcon fontSize="small" />
-                                                </IconButton>
+                    </IconButton>
                                             </Tooltip>
-                                        </Box>
-                                    </Paper>
-                                </Grid>
-                            );
-                        })}
+                  </Box>
+                </Paper>
+              </Grid>
+            );
+          })}
 
-                        {/* Add Device Card */}
-                        <Grid item xs={12} sm={6} md={4}>
-                            <Paper
-                                sx={{
-                                    p: 2,
+          {/* Add Device Card */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Paper
+              sx={{
+                p: 2,
                                     bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s ease',
-                                    '&:hover': {
-                                        transform: 'translateY(-4px)',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
                                         boxShadow: theme.shadows[6],
-                                    },
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    minHeight: '300px',
-                                    border: '2px dashed',
-                                    borderColor: 'primary.main',
-                                    '&:hover': {
-                                        borderColor: 'primary.dark',
-                                        bgcolor: 'action.hover'
-                                    }
-                                }}
-                                onClick={() => setAddDeviceOpen(true)}
-                            >
-                                <Box sx={{ textAlign: 'center' }}>
-                                    <AddIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                                    <Typography variant="h6" color="primary">
-                                        Add New Device
-                                    </Typography>
-                                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                                        Click to register a new device
-                                    </Typography>
-                                </Box>
-                            </Paper>
-                        </Grid>
+                },
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '300px',
+                border: '2px dashed',
+                borderColor: 'primary.main',
+                '&:hover': {
+                  borderColor: 'primary.dark',
+                  bgcolor: 'action.hover'
+                }
+              }}
+              onClick={() => setAddDeviceOpen(true)}
+            >
+              <Box sx={{ textAlign: 'center' }}>
+                <AddIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                <Typography variant="h6" color="primary">
+                  Add New Device
+                </Typography>
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                  Click to register a new device
+                </Typography>
+              </Box>
+            </Paper>
+          </Grid>
                     </>
                 )}
-            </Grid>
-        </Box>
+        </Grid>
+      </Box>
 
-        {/* Add Device Dialog */}
+      {/* Add Device Dialog */}
         <Dialog 
             open={addDeviceOpen} 
             onClose={() => setAddDeviceOpen(false)}
@@ -1462,37 +1462,37 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                 }
             }}
         >
-            <DialogTitle>Add New Device</DialogTitle>
-            <DialogContent>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    label="Device Name"
-                    fullWidth
-                    value={newDeviceName}
-                    onChange={(e) => setNewDeviceName(e.target.value)}
+        <DialogTitle>Add New Device</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Device Name"
+            fullWidth
+            value={newDeviceName}
+            onChange={(e) => setNewDeviceName(e.target.value)}
                     sx={{ mb: 2 }}
                 />
-                <TextField
-                    margin="dense"
-                    label="Client ID"
-                    fullWidth
+          <TextField
+            margin="dense"
+            label="Client ID"
+            fullWidth
                     value={newClientId}
                     onChange={(e) => setNewClientId(e.target.value)}
-                />
-            </DialogContent>
-            <DialogActions>
+          />
+        </DialogContent>
+        <DialogActions>
                 <Button onClick={() => setAddDeviceOpen(false)}>Cancel</Button>
                 <Button onClick={handleAddDevice} variant="contained" color="primary">
                     Add Device
                 </Button>
-            </DialogActions>
-        </Dialog>
+        </DialogActions>
+      </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog
-            open={deleteDialogOpen}
-            onClose={() => setDeleteDialogOpen(false)}
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
             PaperProps={{
                 sx: {
                     bgcolor: 'background.paper',
@@ -1501,36 +1501,36 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             }}
         >
             <DialogTitle>Delete Device</DialogTitle>
-            <DialogContent>
+        <DialogContent>
                 <DialogContentText>
                     Are you sure you want to delete this device? This action cannot be undone.
-                </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-                    Delete
-                </Button>
-            </DialogActions>
-        </Dialog>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        <SettingsDrawer 
-            open={settingsOpen} 
-            onClose={() => setSettingsOpen(false)}
+      <SettingsDrawer 
+        open={settingsOpen} 
+        onClose={() => setSettingsOpen(false)}
             user={user}
-        />
+      />
 
-        {/* Snackbar for notifications */}
-        <Snackbar
-            open={snackbar.open}
-            autoHideDuration={6000}
-            onClose={handleCloseSnackbar}
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        >
+      >
             <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
-                {snackbar.message}
-            </Alert>
-        </Snackbar>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
         {/* Edit Device Dialog */}
         <Dialog 

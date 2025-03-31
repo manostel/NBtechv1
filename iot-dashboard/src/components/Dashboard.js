@@ -27,20 +27,25 @@ import {
   Container,
 } from "@mui/material";
 import { 
-  FaCog, 
-  FaDownload, 
-  FaBell, 
-  FaHistory,
-  FaChartLine,
-  FaChartBar,
-  FaChartPie,
-  FaThermometerHalf,
-  FaTint,
-  FaBatteryThreeQuarters,
-  FaSignal
-} from "react-icons/fa";
-import { MdRefresh, MdSettings } from "react-icons/md";
-import { Logout as LogoutIcon, ArrowBack as ArrowBackIcon, Visibility, VisibilityOff } from '@mui/icons-material';
+  Settings as SettingsIcon,
+  Download as DownloadIcon,
+  Notifications as NotificationsIcon,
+  History as HistoryIcon,
+  ShowChart as ShowChartIcon,
+  BarChart as BarChartIcon,
+  PieChart as PieChartIcon,
+  Thermostat as ThermostatIcon,
+  WaterDrop as WaterDropIcon,
+  Battery90 as BatteryIcon,
+  SignalCellular4Bar as SignalIcon,
+  Refresh as RefreshIcon,
+  ArrowDropDown as ArrowDropDownIcon,
+  ZoomOut as ZoomOutIcon,
+  Logout as LogoutIcon,
+  ArrowBack as ArrowBackIcon,
+  Visibility,
+  VisibilityOff
+} from '@mui/icons-material';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -79,6 +84,14 @@ ChartJS.register(
   zoomPlugin
 );
 
+// Add this after your imports and before the component
+const TIME_RANGES = [
+  { value: 'live', label: 'Live (30s)' },
+  { value: '15m', label: '15 Minutes' },
+  { value: '1h', label: '1 Hour' },
+  { value: '24h', label: '24 Hours' }
+];
+
 // Remove the static METRICS_CONFIG and replace with a function to generate config
 const generateMetricConfig = (key) => {
   // Default configurations for known metrics
@@ -87,7 +100,7 @@ const generateMetricConfig = (key) => {
       label: "Temperature",
       unit: "\u00B0C",
       color: "#FF6B6B",
-      icon: <FaThermometerHalf />,
+      icon: <ThermostatIcon />,
       alertThresholds: { min: 10, max: 30 },
       summaryKey: 'temperature'
     },
@@ -95,7 +108,7 @@ const generateMetricConfig = (key) => {
       label: "Humidity",
       unit: "%",
       color: "#4ECDC4",
-      icon: <FaTint />,
+      icon: <WaterDropIcon />,
       alertThresholds: { min: 30, max: 70 },
       summaryKey: 'humidity'
     },
@@ -103,7 +116,7 @@ const generateMetricConfig = (key) => {
       label: "Battery",
       unit: "%",
       color: "#FFD93D",
-      icon: <FaBatteryThreeQuarters />,
+      icon: <BatteryIcon />,
       alertThresholds: { min: 20 },
       summaryKey: 'battery_level'
     },
@@ -111,7 +124,7 @@ const generateMetricConfig = (key) => {
       label: "Signal",
       unit: "%",
       color: "#6C5CE7",
-      icon: <FaSignal />,
+      icon: <SignalIcon />,
       alertThresholds: { min: 30 },
       summaryKey: 'signal_quality',
       dataKey: 'signal_quality'
@@ -120,7 +133,7 @@ const generateMetricConfig = (key) => {
       label: "Signal",
       unit: "%",
       color: "#6C5CE7",
-      icon: <FaSignal />,
+      icon: <SignalIcon />,
       alertThresholds: { min: 30 }
     }
   };
@@ -617,81 +630,126 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const renderTimeRangeMenu = () => (
     <Box sx={{ 
       display: 'flex', 
-      gap: 1, 
+      gap: 1,  // Reduced gap
       alignItems: 'center',
-      flexDirection: { xs: 'column', sm: 'row' }
+      flexWrap: 'wrap',
+      mb: 1  // Reduced margin bottom
     }}>
+      {/* Refresh Button */}
       <Button
+        size="small"
         variant="outlined"
         onClick={handleRefresh}
-        startIcon={<MdRefresh />}
+        startIcon={<RefreshIcon />}
         sx={{ 
-          minWidth: 120,
-          height: { xs: 48, sm: 36 },
-          fontSize: { xs: 16, sm: 14 },
+          minWidth: 'auto',
+          px: 1.5,  // Reduced padding
+          height: 28,  // Smaller height
+          borderRadius: 1,
+          fontSize: '0.75rem',  // Smaller font
+          textTransform: 'none',
           '& .MuiButton-startIcon': {
-            mr: { xs: 1.5, sm: 1 }
+            mr: 0.5,
+            '& svg': {
+              fontSize: '1rem'  // Smaller icon
+            }
           }
         }}
       >
-        Refresh Data
+        Refresh
       </Button>
+
+      {/* Time Range Button */}
       <Button
+        size="small"
         variant="outlined"
         onClick={(e) => setTimeRangeAnchor(e.currentTarget)}
-        sx={{ minWidth: 120 }}
+        endIcon={<ArrowDropDownIcon />}
+        sx={{ 
+          minWidth: 'auto',
+          px: 1.5,
+          height: 28,
+          borderRadius: 1,
+          fontSize: '0.75rem',
+          textTransform: 'none',
+          '& .MuiButton-endIcon': {
+            ml: 0.5,
+            '& svg': {
+              fontSize: '1.2rem'
+            }
+          }
+        }}
       >
         {getTimeRangeLabel(timeRange)}
       </Button>
+
+      {/* Reset Zoom Button */}
       <Button
+        size="small"
         variant="outlined"
         onClick={handleResetZoom}
-        sx={{ minWidth: 120 }}
+        startIcon={<ZoomOutIcon />}
+        sx={{ 
+          minWidth: 'auto',
+          px: 1.5,
+          height: 28,
+          borderRadius: 1,
+          fontSize: '0.75rem',
+          textTransform: 'none',
+          '& .MuiButton-startIcon': {
+            mr: 0.5,
+            '& svg': {
+              fontSize: '1rem'
+            }
+          }
+        }}
       >
-        Reset Zoom
+        Reset
       </Button>
-      <Menu
-        anchorEl={timeRangeAnchor}
-        open={Boolean(timeRangeAnchor)}
-        onClose={() => setTimeRangeAnchor(null)}
+
+      {/* Chart Options Button */}
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={(e) => setChartMenuAnchor(e.currentTarget)}
+        startIcon={<ShowChartIcon />}
+        sx={{ 
+          minWidth: 'auto',
+          px: 1.5,
+          height: 28,
+          borderRadius: 1,
+          fontSize: '0.75rem',
+          textTransform: 'none',
+          '& .MuiButton-startIcon': {
+            mr: 0.5,
+            '& svg': {
+              fontSize: '1rem'
+            }
+          }
+        }}
       >
-        <MenuItem 
-          onClick={() => {
-            setTimeRange('live');
-            setTimeRangeAnchor(null);
-          }}
-          selected={timeRange === 'live'}
-        >
-          Live (30s)
-        </MenuItem>
-        <MenuItem 
-          onClick={() => {
-            setTimeRange('15m');
-            setTimeRangeAnchor(null);
-          }}
-          selected={timeRange === '15m'}
-        >
-          15 Minutes
-        </MenuItem>
-        <MenuItem 
-          onClick={() => {
-            setTimeRange('1h');
-            setTimeRangeAnchor(null);
-          }}
-          selected={timeRange === '1h'}
-        >
-          1 Hour
-        </MenuItem>
-        <MenuItem 
-          onClick={() => {
-            setTimeRange('24h');
-            setTimeRangeAnchor(null);
-          }}
-          selected={timeRange === '24h'}
-        >
-          24 Hours
-        </MenuItem>
-      </Menu>
+        Options
+      </Button>
+
+      {/* Summary Type Button */}
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={cycleSummaryType}
+        sx={{ 
+          minWidth: 'auto',
+          px: 1.5,
+          height: 28,
+          borderRadius: 1,
+          fontSize: '0.75rem',
+          textTransform: 'capitalize'
+        }}
+      >
+        {summaryType === 'latest' ? 'Latest' :
+         summaryType === 'avg' ? 'Average' :
+         summaryType === 'min' ? 'Minimum' :
+         'Maximum'}
+      </Button>
     </Box>
   );
 
@@ -943,29 +1001,53 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       }
     };
 
-    if (chartType === 'line') {
-      return <Line 
-        data={chartData} 
-        options={chartSpecificOptions} 
-        ref={chartEl => {
-          // Legacy way to store chart reference
-          if (chartEl) {
-            chartRef.current = chartEl;
-          }
-        }} 
-      />;
-    } else if (chartType === 'bar') {
-      return <Bar 
-        data={chartData} 
-        options={chartSpecificOptions} 
-        ref={chartEl => {
-          if (chartEl) {
-            chartRef.current = chartEl;
-          }
-        }} 
-      />;
-    }
-    return null;
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          bgcolor: 'background.paper',
+          borderRadius: 2,
+          border: 1,
+          borderColor: 'divider',
+          height: 400,
+          position: 'relative'
+        }}
+      >
+        <Box sx={{ 
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          zIndex: 1,
+          display: 'flex',
+          gap: 1
+        }}>
+          {/* Optional: Add any chart-specific controls here */}
+        </Box>
+        
+        {chartType === 'line' ? (
+          <Line 
+            data={chartData} 
+            options={chartSpecificOptions} 
+            ref={chartEl => {
+              if (chartEl) {
+                chartRef.current = chartEl;
+              }
+            }} 
+          />
+        ) : (
+          <Bar 
+            data={chartData} 
+            options={chartSpecificOptions} 
+            ref={chartEl => {
+              if (chartEl) {
+                chartRef.current = chartEl;
+              }
+            }} 
+          />
+        )}
+      </Paper>
+    );
   };
 
   // Modify the cycleSummaryType function
@@ -1242,7 +1324,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
               {user.email}
             </Typography>
             <IconButton onClick={() => setSettingsOpen(true)} sx={{ color: theme.palette.text.primary }}>
-              <FaCog />
+              <SettingsIcon />
             </IconButton>
             <IconButton
               color="inherit"
@@ -1297,9 +1379,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             }
           }}
         >
-          <Tab label="Overview" icon={<FaChartLine />} iconPosition="start" />
-          <Tab label="Commands" icon={<FaCog />} iconPosition="start" />
-          <Tab label="History" icon={<FaHistory />} iconPosition="start" />
+          <Tab label="Overview" icon={<ShowChartIcon />} iconPosition="start" />
+          <Tab label="Commands" icon={<SettingsIcon />} iconPosition="start" />
+          <Tab label="History" icon={<HistoryIcon />} iconPosition="start" />
         </Tabs>
 
         {/* Overview Tab */}
@@ -1307,116 +1389,27 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           <>
             {/* Controls Bar */}
             <Paper sx={{ 
-              p: 2, 
-              mb: 3, 
+              p: 1.5,  // Reduced padding
+              mb: 2,  // Reduced margin
               bgcolor: theme.palette.background.paper,
               '& .MuiButton-root': {
-                minHeight: { xs: 48, sm: 36 },
-                px: { xs: 2, sm: 1.5 }
+                minHeight: 28,  // Consistent height
+                minWidth: 'auto'
               },
               '& .MuiFormControlLabel-root': {
-                mr: { xs: 0, sm: 2 }
+                mr: { xs: 0, sm: 1 },
+                '& .MuiTypography-root': {
+                  fontSize: '0.75rem'  // Smaller label text
+                }
               }
             }}>
               <Box sx={{ 
                 display: 'flex', 
                 flexWrap: 'wrap', 
-                gap: { xs: 2, sm: 1.5 },
+                gap: 1,  // Reduced gap
                 alignItems: 'center' 
               }}>
-                {/* Group 1: Data Controls */}
                 {renderTimeRangeMenu()}
-
-                {/* Group 2: Chart Controls */}
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', borderRight: 1, borderColor: 'divider', pr: 2 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={(e) => setChartMenuAnchor(e.currentTarget)}
-                    startIcon={<FaChartLine />}
-                    sx={{ minWidth: 120 }}
-                  >
-                    Chart Options
-                  </Button>
-                  <Menu
-                    anchorEl={chartMenuAnchor}
-                    open={Boolean(chartMenuAnchor)}
-                    onClose={() => setChartMenuAnchor(null)}
-                  >
-                    <MenuItem>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={chartConfig.showGrid}
-                            onChange={(e) => setChartConfig(prev => ({ ...prev, showGrid: e.target.checked }))}
-                          />
-                        }
-                        label="Show Grid"
-                      />
-                    </MenuItem>
-                    <MenuItem>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={chartConfig.showPoints}
-                            onChange={(e) => setChartConfig(prev => ({ ...prev, showPoints: e.target.checked }))}
-                          />
-                        }
-                        label="Show Points"
-                      />
-                    </MenuItem>
-                    <MenuItem>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={chartConfig.animation}
-                            onChange={(e) => setChartConfig(prev => ({ ...prev, animation: e.target.checked }))}
-                          />
-                        }
-                        label="Enable Animation"
-                      />
-                    </MenuItem>
-                    <Divider />
-                    <MenuItem>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={showBatterySignal}
-                            onChange={(e) => setShowBatterySignal(e.target.checked)}
-                          />
-                        }
-                        label="Show Battery & Signal"
-                      />
-                    </MenuItem>
-                  </Menu>
-                </Box>
-
-                {/* Group 3: Summary Type Controls */}
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <Button
-                    variant="outlined"
-                    onClick={cycleSummaryType}
-                    startIcon={<FaChartLine />}
-                    sx={{ 
-                      minWidth: 120,
-                      textTransform: 'capitalize'
-                    }}
-                  >
-                    {summaryType === 'latest' ? 'Latest' :
-                     summaryType === 'avg' ? 'Average' :
-                     summaryType === 'min' ? 'Minimum' :
-                     'Maximum'}
-                  </Button>
-                </Box>
-
-                {/* Additional Controls */}
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <Typography variant="caption" color="textSecondary">
-                    {`${summary.data_points} points shown (from ${summary.original_points} readings)`}
-                    {summary.interval_seconds > 60 && (
-                      <span> • {Math.floor(summary.interval_seconds / 60)} minute intervals</span>
-                    )}
-                  </Typography>
-                </Box>
               </Box>
             </Paper>
 
@@ -1464,7 +1457,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                 <Button 
                   variant="contained" 
                   onClick={handleRestart}
-                  startIcon={<MdRefresh />}
+                  startIcon={<RefreshIcon />}
                   sx={{ 
                     bgcolor: theme.palette.secondary.main,
                     "&:hover": { bgcolor: theme.palette.secondary.dark }
@@ -1576,7 +1569,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
               <Typography variant="h6">Data History</Typography>
               <Box>
                 <Button
-                  startIcon={<FaDownload />}
+                  startIcon={<DownloadIcon />}
                   onClick={(e) => setExportMenuAnchor(e.currentTarget)}
                 >
                   Export
@@ -1636,6 +1629,90 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           {dataRangeWarning}
         </Alert>
       )}
+
+      {/* Add these Menu components right after your Controls Bar */}
+      <Box sx={{ 
+        display: 'flex', 
+        gap: 1,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        mb: 1
+      }}>
+        {/* Time Range Menu */}
+        <Menu
+          anchorEl={timeRangeAnchor}
+          open={Boolean(timeRangeAnchor)}
+          onClose={() => setTimeRangeAnchor(null)}
+          PaperProps={{
+            sx: {
+              mt: 0.5,
+              minWidth: 120,
+              boxShadow: theme.shadows[3]
+            }
+          }}
+        >
+          {TIME_RANGES.map((range) => (
+            <MenuItem
+              key={range.value}
+              onClick={() => {
+                setTimeRange(range.value);
+                setTimeRangeAnchor(null);
+                handleRefresh(); // Fetch new data when time range changes
+              }}
+              selected={timeRange === range.value}
+              sx={{ 
+                fontSize: '0.875rem',
+                minHeight: 32,
+                py: 0.5
+              }}
+            >
+              {range.label}
+            </MenuItem>
+          ))}
+        </Menu>
+
+        {/* Chart Options Menu */}
+        <Menu
+          anchorEl={chartMenuAnchor}
+          open={Boolean(chartMenuAnchor)}
+          onClose={() => setChartMenuAnchor(null)}
+          PaperProps={{
+            sx: {
+              mt: 0.5,
+              minWidth: 160,
+              boxShadow: theme.shadows[3]
+            }
+          }}
+        >
+          <MenuItem
+            onClick={() => {
+              setChartType(chartType === 'line' ? 'bar' : 'line');
+              setChartMenuAnchor(null);
+            }}
+            sx={{ fontSize: '0.875rem', minHeight: 32, py: 0.5 }}
+          >
+            {chartType === 'line' ? 'Switch to Bar Chart' : 'Switch to Line Chart'}
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              setChartConfig(prev => ({ ...prev, showGrid: !prev.showGrid }));
+              setChartMenuAnchor(null);
+            }}
+            sx={{ fontSize: '0.875rem', minHeight: 32, py: 0.5 }}
+          >
+            {chartConfig.showGrid ? 'Hide Grid' : 'Show Grid'}
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              setChartConfig(prev => ({ ...prev, showPoints: !prev.showPoints }));
+              setChartMenuAnchor(null);
+            }}
+            sx={{ fontSize: '0.875rem', minHeight: 32, py: 0.5 }}
+          >
+            {chartConfig.showPoints ? 'Hide Points' : 'Show Points'}
+          </MenuItem>
+        </Menu>
+      </Box>
     </Box>
   );
 }
