@@ -24,6 +24,7 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
+  Container,
 } from "@mui/material";
 import { 
   FaCog, 
@@ -51,8 +52,9 @@ import {
   Tooltip as ChartTooltip,
   Legend,
   TimeScale,
-  ArcElement,
+  ArcElement
 } from "chart.js";
+import zoomPlugin from 'chartjs-plugin-zoom';
 import "chartjs-adapter-date-fns";
 import DeviceInfoCard from "./DeviceInfoCard";
 import BatteryIndicator from "./BatteryIndicator";
@@ -61,6 +63,7 @@ import SettingsDrawer from "./SettingsDrawer";
 import { App } from '@capacitor/app';
 import { StatusBar } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
+import DashboardSkeleton from './DashboardSkeleton';
 
 ChartJS.register(
   CategoryScale,
@@ -72,7 +75,8 @@ ChartJS.register(
   ChartTooltip,
   Legend,
   TimeScale,
-  ArcElement
+  ArcElement,
+  zoomPlugin
 );
 
 // Remove the static METRICS_CONFIG and replace with a function to generate config
@@ -230,7 +234,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const [summaryType, setSummaryType] = useState('latest'); // 'latest', 'avg', 'min', or 'max'
 
   // Add new state for showing/hiding battery and signal
-  const [showBatterySignal, setShowBatterySignal] = useState(false);
+  const [showBatterySignal, setShowBatterySignal] = useState(true);
 
   // Add new state for clientID visibility
   const [showClientId, setShowClientId] = useState(false);
@@ -243,6 +247,9 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
 
   // Add this near your other state declarations
   const [isInitializing, setIsInitializing] = useState(true);
+
+  // Add this with your other useRefs or useState declarations
+  const chartRef = React.useRef(null);
 
   const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
@@ -314,7 +321,11 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           `Data points: ${summary.data_points} (aggregated from ${summary.original_points} readings)`
         );
         
-        showSnackbar(`Limited historical data: ${Math.round(dataRangeHours)} hours available`, 'warning');
+        showMobileToast(`Limited historical data: ${Math.round(dataRangeHours)} hours available`).then(shown => {
+          if (!shown) {
+            showSnackbar(`Limited historical data: ${Math.round(dataRangeHours)} hours available`, 'warning');
+          }
+        });
       } else {
         setDataRangeWarning(null);
       }
@@ -406,10 +417,18 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         if (timeRange === 'live') {
           console.log('Live data fetch timeout - will retry on next interval');
         } else {
-          showSnackbar('Request timeout - try a shorter time range', 'error');
+          showMobileToast('Request timeout - try a shorter time range').then(shown => {
+            if (!shown) {
+              showSnackbar('Request timeout - try a shorter time range', 'error');
+            }
+          });
         }
       } else {
-        showSnackbar('Error fetching data. Please try again.', 'error');
+        showMobileToast('Error fetching data. Please try again.').then(shown => {
+          if (!shown) {
+            showSnackbar('Error fetching data. Please try again.', 'error');
+          }
+        });
       }
     }
   };
@@ -427,10 +446,25 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     if (newAlerts.length > 0) {
       setAlerts(prev => [...newAlerts, ...prev]);
       setShowAlerts(true);
-      showSnackbar(newAlerts[0], 'warning');
+      showMobileToast(newAlerts[0]).then(shown => {
+        if (!shown) {
+          showSnackbar(newAlerts[0], 'warning');
+        }
+      });
     }
   };
 
+  // Replace traditional snackbar with native toast for better mobile experience
+  const showMobileToast = async (message, severity = 'info') => {
+    setSnackbar({ 
+      open: true, 
+      message, 
+      severity 
+    });
+    return true;
+  };
+
+  // Update the showSnackbar function
   const showSnackbar = (message, severity = 'success') => {
     setSnackbar({ open: true, message, severity });
   };
@@ -457,10 +491,18 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         status: 'success'
       }, ...prev]);
 
-      showSnackbar(`Command ${action} sent successfully`, 'success');
+      showMobileToast(`Command ${action} sent successfully`).then(shown => {
+        if (!shown) {
+          showSnackbar(`Command ${action} sent successfully`, 'success');
+        }
+      });
     } catch (error) {
       console.error("Error sending command:", error);
-      showSnackbar(`Error sending command ${action}`, 'error');
+      showMobileToast(`Error sending command ${action}`).then(shown => {
+        if (!shown) {
+          showSnackbar(`Error sending command ${action}`, 'error');
+        }
+      });
     }
   };
 
@@ -527,6 +569,12 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     fetchData();
   };
 
+  // Replace haptic feedback with MUI visual feedback
+  const handleRefreshWithHaptics = () => {
+    // Visual feedback using MUI ripple effect is automatic in Button component
+    handleRefresh();
+  };
+
   // Update the useEffect for live data interval
   useEffect(() => {
     log('Dashboard mounted with device:', device);
@@ -571,16 +619,18 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       display: 'flex', 
       gap: 1, 
       alignItems: 'center',
-      flexDirection: { xs: 'column', md: 'row' }  // Stack vertically on mobile
+      flexDirection: { xs: 'column', sm: 'row' }
     }}>
       <Button
         variant="outlined"
         onClick={handleRefresh}
+        startIcon={<MdRefresh />}
         sx={{ 
           minWidth: 120,
-          '&:active': {  // Touch feedback
-            transform: 'scale(0.98)',
-            transition: 'transform 0.1s'
+          height: { xs: 48, sm: 36 },
+          fontSize: { xs: 16, sm: 14 },
+          '& .MuiButton-startIcon': {
+            mr: { xs: 1.5, sm: 1 }
           }
         }}
       >
@@ -592,6 +642,13 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         sx={{ minWidth: 120 }}
       >
         {getTimeRangeLabel(timeRange)}
+      </Button>
+      <Button
+        variant="outlined"
+        onClick={handleResetZoom}
+        sx={{ minWidth: 120 }}
+      >
+        Reset Zoom
       </Button>
       <Menu
         anchorEl={timeRangeAnchor}
@@ -638,14 +695,55 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     </Box>
   );
 
-  // Update the chart options to properly handle 2-minute window and last point animation
+  // Update the handleResetZoom function to use ChartJS instead of Chart
+  const handleResetZoom = () => {
+    try {
+      // Try different approaches to find and reset charts
+      if (chartRef.current) {
+        // For Chart.js v3+
+        if (chartRef.current.chartInstance && typeof chartRef.current.chartInstance.resetZoom === 'function') {
+          chartRef.current.chartInstance.resetZoom();
+        } 
+        // For legacy Chart.js
+        else if (chartRef.current.chart && typeof chartRef.current.chart.resetZoom === 'function') {
+          chartRef.current.chart.resetZoom();
+        }
+        // Direct access to chart
+        else if (typeof chartRef.current.resetZoom === 'function') {
+          chartRef.current.resetZoom();
+        }
+      } else {
+        // Fallback to finding all charts in the document
+        document.querySelectorAll('canvas').forEach(canvas => {
+          const chartInstance = ChartJS.getChart(canvas);
+          if (chartInstance && typeof chartInstance.resetZoom === 'function') {
+            chartInstance.resetZoom();
+          }
+        });
+      }
+      
+      showSnackbar('Chart zoom reset', 'info');
+    } catch (error) {
+      console.error('Error resetting zoom:', error);
+      showSnackbar('Could not reset zoom', 'error');
+    }
+  };
+
+  // Update the chart options for better mobile viewing
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { 
         position: "top", 
-        labels: { color: theme.palette.text.primary },
+        labels: { 
+          color: theme.palette.text.primary,
+          boxWidth: window.innerWidth < 600 ? 10 : 40,
+          padding: window.innerWidth < 600 ? 8 : 10,
+          font: {
+            size: window.innerWidth < 600 ? 10 : 12
+          }
+        },
         display: true
       },
       title: { 
@@ -653,7 +751,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         text: "Real-time IoT Data", 
         color: theme.palette.text.primary,
         font: {
-          size: 16,
+          size: window.innerWidth < 600 ? 14 : 16,
           weight: 'bold'
         }
       },
@@ -684,7 +782,30 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
               }
             }
             return label;
+          },
+          footer: function() {
+            return 'Tip: Use mouse wheel or pinch to zoom, drag to pan';
           }
+        }
+      },
+      zoom: {
+        pan: {
+          enabled: true,
+          mode: 'xy',
+          overScaleMode: 'y'
+        },
+        zoom: {
+          wheel: {
+            enabled: true,
+          },
+          pinch: {
+            enabled: true
+          },
+          mode: 'xy',
+          overScaleMode: 'y'
+        },
+        limits: {
+          y: {min: 'original', max: 'original'}
         }
       }
     },
@@ -714,11 +835,12 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           font: { weight: 'bold' }
         },
         ticks: {
-          maxRotation: 45,
-          minRotation: 45,
+          maxRotation: window.innerWidth < 600 ? 60 : 45,
+          minRotation: window.innerWidth < 600 ? 60 : 45,
           font: {
-            size: 10  // Smaller font on mobile
-          }
+            size: window.innerWidth < 600 ? 8 : 10
+          },
+          maxTicksLimit: window.innerWidth < 600 ? 5 : 10
         },
         grid: {
           display: timeRange === 'live' ? true : chartConfig.showGrid
@@ -727,7 +849,11 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       y: {
         beginAtZero: true,
         ticks: { 
-          color: theme.palette.text.primary
+          color: theme.palette.text.primary,
+          font: {
+            size: window.innerWidth < 600 ? 8 : 10
+          },
+          maxTicksLimit: window.innerWidth < 600 ? 5 : 10
         },
         grid: { 
           color: chartConfig.showGrid ? "rgba(255,255,255,0.1)" : "transparent",
@@ -818,9 +944,26 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     };
 
     if (chartType === 'line') {
-      return <Line data={chartData} options={chartSpecificOptions} />;
+      return <Line 
+        data={chartData} 
+        options={chartSpecificOptions} 
+        ref={chartEl => {
+          // Legacy way to store chart reference
+          if (chartEl) {
+            chartRef.current = chartEl;
+          }
+        }} 
+      />;
     } else if (chartType === 'bar') {
-      return <Bar data={chartData} options={chartSpecificOptions} />;
+      return <Bar 
+        data={chartData} 
+        options={chartSpecificOptions} 
+        ref={chartEl => {
+          if (chartEl) {
+            chartRef.current = chartEl;
+          }
+        }} 
+      />;
     }
     return null;
   };
@@ -838,16 +981,10 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     });
   };
 
-  // Update the renderSummaryCards function to handle 'latest' type
+  // Update the renderSummaryCards function for better mobile display
   const renderSummaryCards = () => {
-    console.log('Rendering summary cards with:', {
-      metricsConfig,
-      summary,
-      summaryType
-    });
-
     return (
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}> {/* Reduced spacing on mobile */}
         {Object.entries(metricsConfig).map(([key, config]) => {
           // Skip signal and battery metrics unless showBatterySignal is true
           if ((key === 'signal' || key === 'battery' || key === 'signal_quality') && !showBatterySignal) return null;
@@ -870,12 +1007,13 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           const displayValue = value !== undefined && !isNaN(value) ? value.toFixed(1) : 'N/A';
           
           return (
-            <Grid item xs={12} sm={6} md={3} key={key}>
+            <Grid item xs={6} sm={6} md={3} key={key}> {/* xs:6 to show 2 cards per row on phones */}
               <Paper 
+                elevation={1}  // Lower elevation for better mobile performance
                 sx={{ 
-                  p: 2, 
+                  p: { xs: 1.5, sm: 2 }, // Less padding on mobile
                   bgcolor: theme.palette.background.paper,
-                  transition: 'transform 0.2s',
+                  transition: 'transform 0.2s ease',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: 3
@@ -884,11 +1022,11 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   {config.icon}
-                  <Typography variant="h6" color="primary">
+                  <Typography variant="subtitle1" color="primary"> {/* Smaller heading on mobile */}
                     {config.label}
                   </Typography>
                 </Box>
-                <Typography variant="h4" sx={{ mb: 1 }}>
+                <Typography variant="h5" sx={{ mb: 1 }}> {/* h5 instead of h4 on mobile */}
                   {displayValue}{value !== undefined && !isNaN(value) ? config.unit : ''}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
@@ -970,28 +1108,34 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     }
   }, []);
 
-  // Add this at the start of your render
+  // Add a useEffect to handle chart resizing
+  useEffect(() => {
+    const handleResize = () => {
+      // Manually trigger chart resize if needed
+      if (chartRef.current && chartRef.current.chartInstance) {
+        chartRef.current.chartInstance.resize();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   if (isInitializing) {
-    return (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
-      }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
-    <Box sx={{ 
-      backgroundColor: theme.palette.background.default, 
-      color: theme.palette.text.primary, 
-      minHeight: "100vh", 
-      p: { xs: 2, md: 4 },  // Smaller padding on mobile
-      overflowX: 'hidden'   // Prevent horizontal scroll
-    }}>
+    <Box 
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        width: '100%',
+        pt: 0 // Remove any top padding
+      }}
+    >
       <Helmet>
         <title>IoT Dashboard</title>
         <meta name="description" content="IoT Dashboard with Dark Mode" />
@@ -1000,32 +1144,77 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       {/* Settings Drawer */}
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
-      {/* Header */}
-      <AppBar position="static" sx={{ mb: 3 }}>
-        <Toolbar sx={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center", px: 2 }}>
+      {/* Updated AppBar with back button and centered title */}
+      <AppBar 
+        position="static" 
+        color="primary" 
+        elevation={0}
+        sx={{
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          width: '100%',
+        }}
+      >
+        <Toolbar 
+          sx={{ 
+            px: { xs: 1.5, sm: 3 },
+            py: { xs: 1, sm: 0.5 },
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+          }}
+        > 
+          {/* Back Button */}
           <IconButton
             edge="start"
             color="inherit"
-            aria-label="back"
-            onClick={onBack}
-            sx={{ position: "absolute", left: 16 }}
+            aria-label="back to devices"
+            onClick={onBack || (() => navigate('/devices'))}
+            sx={{ 
+              mr: 2,
+              display: 'flex',
+              alignItems: 'center',
+              mb: { xs: 1, sm: 0 }
+            }}
           >
             <ArrowBackIcon />
-          </IconButton>
-          
-          {/* Updated Title Section - removed clientID visibility toggle */}
-          <Typography variant="h6" sx={{ fontWeight: "bold", textAlign: "center" }}>
-            {deviceName || "Unknown Device"}
-          </Typography>
-
-          <Box sx={{ position: "absolute", right: 16, display: "flex", alignItems: "center", gap: 1 }}>
-            <IconButton 
-              onClick={handleRefresh}
-              disabled={isLoading}
-              sx={{ color: theme.palette.text.primary }}
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                ml: 0.5, 
+                display: { xs: 'none', sm: 'block' }
+              }}
             >
-              <MdRefresh />
-            </IconButton>
+              Devices
+            </Typography>
+          </IconButton>
+
+          {/* Centered Title with Device Name */}
+          <Typography 
+            variant="h6" 
+            component="div" 
+            sx={{ 
+              flexGrow: 1,
+              mb: { xs: 1, sm: 0 },
+              fontSize: { xs: '1rem', sm: '1.25rem' },
+              textAlign: { xs: 'left', sm: 'center' }, // Center align on larger screens
+              fontWeight: 'medium'
+            }}
+          >
+            Dashboard{device && ` - ${device.device_name}`}
+          </Typography>
+          
+          {/* User Controls - Removed refresh icon */}
+          <Box 
+            sx={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: { xs: 0.5, sm: 1 },
+              flexWrap: 'wrap',
+              justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+              width: { xs: '100%', sm: 'auto' }
+            }}
+          >
+            {/* Removed the refresh IconButton that was here */}
             <Box
               sx={{
                 width: 40,
@@ -1041,7 +1230,17 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                 {user.email[0].toUpperCase()}
               </Typography>
             </Box>
-            <Typography variant="body1">{user.email}</Typography>
+            <Typography 
+              variant="body2" 
+              noWrap 
+              sx={{ 
+                maxWidth: { xs: '100px', sm: '150px', md: '300px' },
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {user.email}
+            </Typography>
             <IconButton onClick={() => setSettingsOpen(true)} sx={{ color: theme.palette.text.primary }}>
               <FaCog />
             </IconButton>
@@ -1058,8 +1257,16 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         </Toolbar>
       </AppBar>
 
-      {/* Main Content */}
-      <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+      {/* Main content area with consistent padding */}
+      <Container 
+        maxWidth={false} 
+        disableGutters 
+        sx={{ 
+          p: { xs: 2, sm: 3 },  // Match padding with other pages
+          flexGrow: 1,
+          width: '100%'
+        }}
+      >
         <DeviceInfoCard
           clientID={clientID}
           device={deviceName}
@@ -1099,8 +1306,24 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         {tabValue === 0 && (
           <>
             {/* Controls Bar */}
-            <Paper sx={{ p: 2, mb: 3, bgcolor: theme.palette.background.paper }}>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+            <Paper sx={{ 
+              p: 2, 
+              mb: 3, 
+              bgcolor: theme.palette.background.paper,
+              '& .MuiButton-root': {
+                minHeight: { xs: 48, sm: 36 },
+                px: { xs: 2, sm: 1.5 }
+              },
+              '& .MuiFormControlLabel-root': {
+                mr: { xs: 0, sm: 2 }
+              }
+            }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: { xs: 2, sm: 1.5 },
+                alignItems: 'center' 
+              }}>
                 {/* Group 1: Data Controls */}
                 {renderTimeRangeMenu()}
 
@@ -1377,7 +1600,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             </Box>
           </Paper>
         )}
-      </Box>
+      </Container>
 
       {/* Alerts */}
       <Snackbar

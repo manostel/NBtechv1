@@ -1,5 +1,38 @@
+html {
+  height: 100%;
+  background-color: #1e1e2f; /* Set default dark theme color */
+}
+
 body {
   margin: 0;
   padding: 0;
   font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  background-color: inherit;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow-x: hidden;
+  background-color: inherit;
+}
+
+/* Set explicit dark mode colors to prevent flashes */
+[data-theme='dark'] {
+  background-color: #1e1e2f !important;
+  color: #f4f4f4 !important;
+}
+
+[data-theme='dark'] body,
+[data-theme='dark'] #root {
+  background-color: #1e1e2f !important;
+}
+
+/* Add a specific style for transitions to ensure smooth theme changes */
+.page-transition {
+  transition: background-color 0.3s ease, color 0.3s ease;
 }

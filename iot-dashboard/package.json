@@ -20,6 +20,7 @@
     "chart.js": "^3.9.1",
     "chartjs-adapter-date-fns": "^3.0.0",
     "chartjs-plugin-colorschemes": "^0.4.0",
+    "chartjs-plugin-zoom": "^1.2.1",
     "cra-template": "1.2.0",
     "date-fns": "^4.1.0",
     "jwt-decode": "^4.0.0",

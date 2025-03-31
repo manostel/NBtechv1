@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
-import { Box, Button, TextField, Typography, Paper } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Box, Button, TextField, Typography, Paper, Checkbox, FormControlLabel, CircularProgress } from "@mui/material";
+import { Link, useNavigate } from "react-router-dom";
 
 // Update the API URL to include /auth
 const API_URL = "https://dv7723iff5.execute-api.eu-central-1.amazonaws.com/default/auth/login";
@@ -14,6 +14,19 @@ const LoginPage = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const navigate = useNavigate();
+
+  // Check for saved credentials on page load
+  useEffect(() => {
+    const savedUser = localStorage.getItem('savedUser');
+    if (savedUser) {
+      const userData = JSON.parse(savedUser);
+      setUsername(userData.email || '');
+      setPassword(userData.password || '');
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,6 +60,15 @@ const LoginPage = ({ onLogin }) => {
         authType: data.auth_type
       });
       
+      // Save credentials if "Remember Me" is checked
+      if (rememberMe) {
+        localStorage.setItem('savedUser', JSON.stringify({ email: username, password: password }));
+      } else {
+        // Clear saved credentials if "Remember Me" is unchecked
+        localStorage.removeItem('savedUser');
+      }
+
+      navigate('/devices');
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message || 'Login failed. Please check your credentials and try again.');
@@ -90,8 +112,19 @@ const LoginPage = ({ onLogin }) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                color="primary"
+              />
+            }
+            label="Remember me"
+            sx={{ mt: 1, mb: 2 }}
+          />
           <Button type="submit" variant="contained" disabled={isLoading}>
-            {isLoading ? 'Logging in...' : 'Login'}
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Login'}
           </Button>
         </Box>
         {error && (
