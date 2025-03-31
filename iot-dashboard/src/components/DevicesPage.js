@@ -89,6 +89,8 @@ const saveDeviceOrder = (devices, userEmail) => {
   localStorage.setItem(`deviceOrder_${userEmail}`, JSON.stringify(devices));
 };
 
+const INACTIVE_TIMEOUT_MINUTES = 1; // Configure timeout period
+
 export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -130,14 +132,28 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [configuringDevice, setConfiguringDevice] = useState(null);
 
   useEffect(() => {
-    fetchDevices();
+    // Initial fetch of all data
+    const initializeDevices = async () => {
+        try {
+            setIsLoading(true);
+            // Fetch devices and preferences only once
+            await fetchDevices();
+            setIsLoading(false);
+        } catch (error) {
+            console.error('Error initializing devices:', error);
+            setError(error.message);
+            setIsLoading(false);
+        }
+    };
 
-    // Set up polling to fetch devices every 55 seconds
+    initializeDevices();
+
+    // Set up polling only for device data
     const intervalId = setInterval(() => {
-      fetchDevices();
-    }, 55000); // 55000 ms = 55 seconds
+        updateDevicesData();
+    }, 55000);
 
-    return () => clearInterval(intervalId); // Clear interval on unmount
+    return () => clearInterval(intervalId);
   }, [user.email]);
 
   const fetchDeviceData = async (device) => {
@@ -156,7 +172,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       });
 
       if (!dataResponse.ok) {
-        throw new Error(`Failed to fetch device data: ${dataResponse.statusText}`);
+        throw new Error(`Failed to fetch data for device ${device.client_id}: ${dataResponse.statusText}`);
       }
 
       const dataResult = await dataResponse.json();
@@ -177,80 +193,68 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
   const fetchDevices = async () => {
     try {
-      const response = await fetch(DEVICES_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        mode: 'cors',
-        body: JSON.stringify({
-          action: "get_devices",
-          user_email: user.email
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      const fetchedDevices = data.devices || [];
+        // Fetch basic device information
+        const response = await fetch(DEVICES_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                action: "get_devices",
+                user_email: user.email
+            })
+        });
 
-      // Sort devices by display_order and update if needed
-      const sortedDevices = [...fetchedDevices].sort((a, b) => 
-        (a.display_order || 0) - (b.display_order || 0)
-      );
-
-      // Ensure each device has a valid display_order
-      const devicesWithOrder = sortedDevices.map((device, index) => ({
-        ...device,
-        display_order: index
-      }));
-
-      setDevices(devicesWithOrder);
-      saveDeviceOrder(devicesWithOrder, user.email);
-
-      // Fetch preferences for each device after successfully fetching devices
-      const updatedDeviceData = {};
-      for (const device of devicesWithOrder) {
-        const updatedDevice = await fetchDeviceData(device);
-        updatedDeviceData[device.client_id] = updatedDevice;
-
-        // Fetch preferences for the specific device
-        const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-            action: 'get_device_preferences',
-            user_email: user.email,
-            client_id: device.client_id // Include client_id to fetch specific preferences
-        })
-      });
-
-        if (preferencesResponse.ok) {
-          const preferencesData = await preferencesResponse.json();
-          const preferences = preferencesData.preferences;
-
-          // Apply preferences to the updated device data
-          if (preferences) {
-            updatedDeviceData[device.client_id].metrics_visibility = preferences.metrics_visibility;
-          }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-      }
-      setDeviceData(updatedDeviceData); // Update state with preferences applied
 
-    } catch (err) {
-      console.error('Error fetching devices:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
+        const data = await response.json();
+        const fetchedDevices = data.devices || [];
+
+        // Sort and set devices
+        const sortedDevices = [...fetchedDevices].sort((a, b) => 
+            (a.display_order || 0) - (b.display_order || 0)
+        );
+        setDevices(sortedDevices);
+        saveDeviceOrder(sortedDevices, user.email);
+
+        // Initialize device data with preferences
+        const initialDeviceData = {};
+        for (const device of sortedDevices) {
+            // Get device data
+            const deviceData = await fetchDeviceData(device);
+            
+            // Get preferences
+            const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    action: 'get_device_preferences',
+                    user_email: user.email,
+                    client_id: device.client_id
+                })
+            });
+
+            if (preferencesResponse.ok) {
+                const preferencesData = await preferencesResponse.json();
+                deviceData.metrics_visibility = preferencesData.preferences?.metrics_visibility || {};
+            }
+
+            initialDeviceData[device.client_id] = deviceData;
+        }
+
+        setDeviceData(initialDeviceData);
+
+    } catch (error) {
+        console.error('Error fetching devices:', error);
+        setError(error.message);
     }
-  };
+};
 
   const handleDeviceClick = (dev) => {
     console.log('Device clicked:', dev);
@@ -350,12 +354,13 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     }
   };
 
-  const getDeviceStatus = (lastUpdated) => {
-    if (!lastUpdated) return 'Inactive';
-    const lastUpdateTime = new Date(lastUpdated);
+  const getDeviceStatus = (deviceData) => {
+    if (!deviceData?.latest_data?.timestamp) return 'Inactive';
+    
+    const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
     const now = new Date();
     const diffInMinutes = (now - lastUpdateTime) / (1000 * 60);
-    return diffInMinutes <= 1 ? 'Active' : 'Inactive';
+    return diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Active' : 'Inactive';
   };
 
   const getStatusColor = (status) => {
@@ -924,6 +929,46 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     );
   };
 
+  // Add new function for updating only device data
+  const updateDevicesData = async () => {
+    try {
+        const updatedDeviceData = { ...deviceData };
+
+        // Fetch latest data for each device
+        for (const device of devices) {
+            const dataResponse = await fetch(DEVICE_DATA_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    action: 'get_device_data',
+                    client_id: device.client_id,
+                    user_email: user.email
+                })
+            });
+
+            if (!dataResponse.ok) {
+                throw new Error(`Failed to fetch data for device ${device.client_id}`);
+            }
+
+            const result = await dataResponse.json();
+            const newData = JSON.parse(result.body).device_data;
+
+            // Update only the latest_data while preserving other device information
+            updatedDeviceData[device.client_id] = {
+                ...updatedDeviceData[device.client_id],
+                latest_data: newData
+            };
+        }
+
+        setDeviceData(updatedDeviceData);
+    } catch (error) {
+        console.error('Error updating device data:', error);
+    }
+};
+
   return (
     <>
       <CssBaseline />
@@ -1080,7 +1125,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                 // Safely get device data and latest data
                 const currentDeviceData = deviceData[device.client_id] || {};
                 const latestData = currentDeviceData.latest_data || {};
-                const deviceStatus = getDeviceStatus(latestData.timestamp || device.last_seen);
+                const deviceStatus = getDeviceStatus(currentDeviceData);
 
             return (
               <Grid item xs={12} sm={6} md={4} key={device.client_id}>
@@ -1205,7 +1250,10 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
                   {/* Last Updated */}
                   <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1 }}>
-                    Last Updated: {new Date(latestData.timestamp || device.last_seen).toLocaleString()}
+                    Last Updated: {deviceData[device.client_id]?.latest_data?.timestamp ? 
+                        new Date(deviceData[device.client_id].latest_data.timestamp).toLocaleString() : 
+                        'Never'
+                    }
                   </Typography>
 
                   {/* Actions */}
