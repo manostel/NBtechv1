@@ -66,9 +66,9 @@ def lambda_handler(event, context):
             
             # Get device data - most recent first
             response = device_data_table.query(
-                KeyConditionExpression='device_id = :device_id',
+                KeyConditionExpression='client_id = :client_id',
                 ExpressionAttributeValues={
-                    ':device_id': body['client_id']
+                    ':client_id': body['client_id']
                 },
                 Limit=1,  # Get only the most recent data
                 ScanIndexForward=False  # Get in descending order (newest first)
@@ -88,7 +88,7 @@ def lambda_handler(event, context):
             
             # Convert all values to appropriate types, excluding specific fields
             processed_data = {}
-            excluded_fields = ['ClientID', 'device_id']  # Fields to exclude
+            excluded_fields = []  # Remove device_id and ClientID since we're not using them anymore
             for key, value in device_data.items():
                 if key not in excluded_fields:  # Only process non-excluded fields
                     if isinstance(value, Decimal):
@@ -112,10 +112,9 @@ def lambda_handler(event, context):
             
             # Create new device data entry
             new_data = {
-                'device_id': body['client_id'],
+                'client_id': body['client_id'],
                 'timestamp': datetime.utcnow().isoformat(),
                 'battery': float(body['battery']),
-                'ClientID': body['client_id'],
                 'device': body.get('device_name', 'Unknown'),
                 'signal_quality': float(body['signal_quality']),
                 'temperature': float(body['temperature']),

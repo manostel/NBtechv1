@@ -84,9 +84,9 @@ def lambda_handler(event, context):
                 for item in response.get('Items', []):
                     # Get the latest data for each device
                     device_data_response = device_data_table.query(
-                        KeyConditionExpression='device_id = :device_id',
+                        KeyConditionExpression='client_id = :client_id',
                         ExpressionAttributeValues={
-                            ':device_id': item['client_id']
+                            ':client_id': item['client_id']
                         },
                         Limit=1,
                         ScanIndexForward=False
@@ -143,9 +143,9 @@ def lambda_handler(event, context):
             
             # Get device data - most recent first
             response = device_data_table.query(
-                KeyConditionExpression='device_id = :device_id',
+                KeyConditionExpression='client_id = :client_id',
                 ExpressionAttributeValues={
-                    ':device_id': body['client_id']
+                    ':client_id': body['client_id']
                 },
                 Limit=1,  # Get only the most recent data
                 ScanIndexForward=False  # Get in descending order (newest first)
@@ -167,7 +167,7 @@ def lambda_handler(event, context):
             
             # Process the data excluding specific fields
             processed_data = {}
-            excluded_fields = ['ClientID', 'device_id']
+            excluded_fields = []
             for key, value in device_data.items():
                 if key not in excluded_fields:
                     processed_data[key] = value
@@ -188,16 +188,14 @@ def lambda_handler(event, context):
             
             # Create new device data entry dynamically
             new_data = {
-                'device_id': body['client_id'],
-                'ClientID': body['client_id'],
+                'client_id': body['client_id'],
                 'timestamp': datetime.utcnow().isoformat(),
                 'user_email': body['user_email']
             }
             
             # Dynamically add all other fields from the request body
             for key, value in body.items():
-                if key not in ['action', 'client_id', 'user_email', 'device_id', 'ClientID', 'timestamp']:
-                    # Convert numeric values to float
+                if key not in ['action', 'client_id', 'user_email', 'timestamp']:
                     if isinstance(value, (int, float, Decimal)):
                         new_data[key] = float(value)
                     else:

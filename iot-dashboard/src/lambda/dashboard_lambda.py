@@ -33,9 +33,17 @@ def get_time_range_and_points(time_range, target_points=100):
         # For live data, return exactly 2 minutes of data with 20 points
         return now - timedelta(minutes=2), 20
     elif time_range == '15m':
-        return now - timedelta(minutes=15), target_points
+        return now - timedelta(minutes=15), 15  # One point per minute for 15m
     elif time_range == '1h':
         return now - timedelta(hours=1), target_points
+    elif time_range == '2h':
+        return now - timedelta(hours=2), target_points
+    elif time_range == '4h':
+        return now - timedelta(hours=4), target_points
+    elif time_range == '8h':
+        return now - timedelta(hours=8), target_points
+    elif time_range == '16h':
+        return now - timedelta(hours=16), target_points
     elif time_range == '24h':
         return now - timedelta(days=1), target_points
     else:  # Default case
@@ -56,7 +64,7 @@ def aggregate_data(items, target_points):
     current_group = []
     
     # Get all possible metrics from the first item, excluding specific fields
-    excluded_fields = {'timestamp', 'ClientID', 'device_id', 'device'}  # Add any other fields to exclude
+    excluded_fields = {'timestamp', 'client_id', 'user_email', 'device'}  # Updated to use client_id
     metrics = [key for key in sorted_items[0].keys() if key not in excluded_fields]
     
     for item in sorted_items:
@@ -171,6 +179,9 @@ def lambda_handler(event, context):
         
         # Calculate summary statistics
         summary = calculate_summary_statistics(processed_data, metrics)
+        
+        # Add the latest complete data point to the summary for easy access
+        summary['latest'] = processed_data[-1] if processed_data else {}
 
         logger.info(f"Processed {len(processed_data)} points from {len(response['Items'])} original points")
         logger.info(f"Summary statistics: {json.dumps(summary)}")

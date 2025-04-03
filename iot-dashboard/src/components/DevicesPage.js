@@ -334,11 +334,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     
     // Prepare the device data before navigation
     const deviceInfo = {
-      device_id: dev.client_id,
+      client_id: dev.client_id,
       device_name: dev.device_name || dev.client_id,
-        device_type: latestData.device || 'Unknown',
-        latest_data: latestData,
-        metrics_visibility: currentDeviceData.metrics_visibility || {}
+      device_type: latestData.device || 'Unknown',
+      latest_data: latestData,
+      metrics_visibility: currentDeviceData.metrics_visibility || {}
     };
     
     // Update the selected device first
