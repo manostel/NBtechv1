@@ -239,6 +239,14 @@ const getTimeRangeLabel = (range) => {
   }
 };
 
+// Add these constants at the top of the file
+const MAX_RETRIES = 2;  // Maximum number of retries
+const RETRY_DELAY = 1500;  // Delay between retries in milliseconds
+const INITIAL_CHECK_DELAY = 4500;  // Initial delay before first check
+
+// Add this helper function
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 export default function Dashboard({ user, device, onLogout, onBack }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -341,6 +349,16 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   // Add this state to track pending verifications
   const [pendingVerifications, setPendingVerifications] = useState(new Map());
 
+  // Add this state at the top with other state declarations
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Add this near your other state declarations
+  const [commandFeedback, setCommandFeedback] = useState({
+    show: false,
+    message: '',
+    loading: false
+  });
+
   const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
 
@@ -353,6 +371,64 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     motor_speed: 0,
     timestamp: null
   });
+
+  // Add the sendCommand function inside the Dashboard component
+  const sendCommand = async (command, params = {}) => {
+    try {
+      if (!device || !device.client_id) {
+        throw new Error('No device or client_id available');
+      }
+
+      const payload = {
+        body: JSON.stringify({
+          client_id: device.client_id,
+          command: command,
+          ...params
+        }),
+        httpMethod: "POST"
+      };
+
+      console.log('Sending command:', command, params);
+
+      const response = await fetch(COMMAND_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send command');
+      }
+
+      const data = await response.json();
+      console.log('Command response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error sending command:', error);
+      throw error;
+    }
+  };
+
+  // Add the sendCommandWithRetry function inside the Dashboard component
+  const sendCommandWithRetry = async (command, params = {}) => {
+    try {
+      // First attempt
+      await sendCommand(command, params);
+      
+      // Wait 500ms before second attempt
+      await delay(500);
+      
+      // Second attempt
+      await sendCommand(command, params);
+      
+      return true;
+    } catch (error) {
+      console.error('Error in sendCommandWithRetry:', error);
+      throw error;
+    }
+  };
 
   const fetchDeviceState = async () => {
     try {
@@ -666,186 +742,50 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
-  const sendCommand = async (command, params = {}) => {
-    try {
-      const payload = {
-        client_id: device.client_id,
-        command: command,
-        ...params
-      };
-      
-      const response = await fetch(COMMAND_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send command');
-      }
-      
-      // Remove the command history update from here
-      // Only show the success snackbar
-      showMobileToast(`Command ${command} sent successfully`).then(shown => {
-        if (!shown) {
-          showSnackbar(`Command ${command} sent successfully`, 'success');
-        }
-      });
-
-      return result; // Return the result for the handlers to use
-    } catch (error) {
-      console.error('Error sending command:', error);
-      showMobileToast(error.message).then(shown => {
-        if (!shown) {
-          showSnackbar(error.message, 'error');
-        }
-      });
-      throw error; // Re-throw the error for the handlers to catch
-    }
-  };
-
-  // Add this helper function to verify command success
+  // Update the verifyCommandSuccess function
   const verifyCommandSuccess = (command, params, deviceState) => {
-    console.log('Starting verification for command:', command);
-    console.log('Current device state:', deviceState);
+    console.log('Verifying command:', command);
+    console.log('Device state:', deviceState);
     
-    let state;
-    try {
-      if (typeof deviceState === 'string') {
-        state = JSON.parse(deviceState);
-      } else if (deviceState.body) {
-        state = JSON.parse(deviceState.body).state;
-      } else {
-        state = deviceState;
-      }
-      
-      console.log('Parsed state for verification:', state);
-      
-      let result;
-      switch (command) {
-        case 'TOGGLE_1_ON':
-          result = Number(state.led1_state) === 1;
-          console.log('TOGGLE_1_ON verification:', {
-            current: Number(state.led1_state),
-            expected: 1,
-            success: result
-          });
-          return result;
-        case 'TOGGLE_1_OFF':
-          result = Number(state.led1_state) === 0;
-          console.log('TOGGLE_1_OFF verification:', {
-            current: Number(state.led1_state),
-            expected: 0,
-            success: result
-          });
-          return result;
-        case 'TOGGLE_2_ON':
-          result = Number(state.led2_state) === 1;
-          console.log('TOGGLE_2_ON verification:', {
-            current: Number(state.led2_state),
-            expected: 1,
-            success: result
-          });
-          return result;
-        case 'TOGGLE_2_OFF':
-          result = Number(state.led2_state) === 0;
-          console.log('TOGGLE_2_OFF verification:', {
-            current: Number(state.led2_state),
-            expected: 0,
-            success: result
-          });
-          return result;
-        case 'SET_SPEED':
-          // Convert both values to numbers and compare
-          const currentSpeed = Number(state.motor_speed);
-          const targetSpeed = Number(params.speed);
-          result = currentSpeed === targetSpeed;
-          console.log('SET_SPEED verification:', {
-            current: currentSpeed,
-            target: targetSpeed,
-            success: result,
-            params: params
-          });
-          return result;
-        case 'RESTART':
-          result = state.timestamp !== null;
-          console.log('RESTART verification:', {
-            current: state.timestamp,
-            expected: null,
-            success: result
-          });
-          return result;
-        default:
-          console.log('Unknown command:', command);
-          return false;
-      }
-    } catch (error) {
-      console.error('Error during verification:', error);
+    if (!deviceState) {
+      console.log('No device state available for verification');
       return false;
     }
+
+    // Ensure we have the correct state object
+    const state = deviceState.state || deviceState;
+    console.log('Parsed state:', state);
+
+    switch (command) {
+      case 'TOGGLE_1_ON':
+        return state.led1_state === 1;
+      case 'TOGGLE_1_OFF':
+        return state.led1_state === 0;
+      case 'TOGGLE_2_ON':
+        return state.led2_state === 1;
+      case 'TOGGLE_2_OFF':
+        return state.led2_state === 0;
+      case 'SET_SPEED':
+        const targetSpeed = Number(params.speed);
+        const currentSpeed = Number(state.motor_speed);
+        return currentSpeed === targetSpeed;
+      case 'RESTART':
+        return true; // Consider restart always successful if we get a state
+      default:
+        return false;
+    }
   };
 
-  // Update the debouncedFetchState function
-  const debouncedFetchState = (commandId, command, params) => {
-    // Add this command to pending verifications
-    setPendingVerifications(prev => {
-      const newMap = new Map(prev);
-      newMap.set(commandId, { command, params });
-      return newMap;
-    });
-
-    // Clear any existing timeout
-    if (fetchTimeout) {
-      clearTimeout(fetchTimeout);
+  // Update the command handlers to include feedback
+  const handleToggle1 = async () => {
+    if (isVerifying) {
+      console.log('Verification in progress, skipping new command');
+      return;
     }
 
-    // Set a new timeout for 3 seconds after the last command
-    const timeout = setTimeout(async () => {
-      console.log('Fetching final state after commands settled');
-      console.log('Current pending verifications:', pendingVerifications);
-      
-      const finalState = await fetchDeviceState();
-      console.log('Final state received:', finalState);
-      
-      // Process all pending verifications with the final state
-      setPendingVerifications(prev => {
-        const currentVerifications = new Map(prev);
-        
-        // Update command history for each pending verification
-        currentVerifications.forEach((verification, cmdId) => {
-          console.log(`Verifying command ${verification.command} with ID ${cmdId}`);
-          
-          setCommandHistory(prevHistory => prevHistory.map(cmd => {
-            if (cmd.id === cmdId) {
-              const success = verifyCommandSuccess(verification.command, verification.params, finalState);
-              console.log(`Command ${verification.command} (${cmdId}) verification result:`, success);
-              return {
-                ...cmd,
-                status: success ? 'success' : 'failed'
-              };
-            }
-            return cmd;
-          }));
-          
-          activeCommands.delete(cmdId);
-        });
-        
-        return new Map(); // Clear all verifications after processing
-      });
-      
-      setFetchTimeout(null);
-    }, 3000);
-
-    setFetchTimeout(timeout);
-  };
-
-  // Update the command handlers to ensure unique IDs
-  const handleToggle1 = async () => {
     const newState = !toggle1;
     const command = newState ? "TOGGLE_1_ON" : "TOGGLE_1_OFF";
-    const commandId = `${command}_${Date.now()}_${Math.random()}`; // Ensure unique ID
+    const commandId = `${command}_${Date.now()}`;
     
     if (activeCommands.has(commandId)) {
       return;
@@ -853,7 +793,14 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     
     activeCommands.add(commandId);
     setToggle1(newState);
+    setIsVerifying(true);
     
+    setCommandFeedback({
+      show: true,
+      message: `Sending ${command} command...`,
+      loading: true
+    });
+
     const commandEntry = {
       id: commandId,
       timestamp: new Date(),
@@ -864,25 +811,90 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     setCommandHistory(prev => [commandEntry, ...prev]);
 
     try {
-      console.log(`Sending command: ${command} with ID: ${commandId}`);
-      await sendCommand(command);
-      debouncedFetchState(commandId, command, {});
+      // Send command twice with delay
+      await sendCommandWithRetry(command);
+      
+      setCommandFeedback({
+        show: true,
+        message: 'Waiting for device confirmation...',
+        loading: true
+      });
+      
+      setTimeout(async () => {
+        try {
+          const finalState = await fetchDeviceState();
+          const success = verifyCommandSuccess(command, {}, finalState);
+          
+          setCommandHistory(prev => prev.map(cmd => {
+            if (cmd.id === commandId) {
+              return { 
+                ...cmd, 
+                status: success ? 'success' : 'failed'
+              };
+            }
+            return cmd;
+          }));
+
+          setCommandFeedback({
+            show: true,
+            message: success ? 'Command confirmed!' : 'Command failed to verify',
+            loading: false
+          });
+
+          setTimeout(async () => {
+            await fetchDeviceState();
+            setCommandFeedback({ show: false, message: '', loading: false });
+          }, 1000);
+
+        } catch (error) {
+          console.error('Verification error:', error);
+          setCommandHistory(prev => prev.map(cmd => {
+            if (cmd.id === commandId) {
+              return { ...cmd, status: 'failed' };
+            }
+            return cmd;
+          }));
+          
+          setCommandFeedback({
+            show: true,
+            message: 'Failed to verify command',
+            loading: false
+          });
+        } finally {
+          setIsVerifying(false);
+          activeCommands.delete(commandId);
+        }
+      }, 4500);
+      
     } catch (error) {
+      console.error('Error in handleToggle1:', error);
       setCommandHistory(prev => prev.map(cmd => {
         if (cmd.id === commandId) {
           return { ...cmd, status: 'failed' };
         }
         return cmd;
       }));
+      setIsVerifying(false);
       activeCommands.delete(commandId);
+      
+      setCommandFeedback({
+        show: true,
+        message: 'Failed to send command',
+        loading: false
+      });
     }
   };
 
-  // Similarly update handleToggle2
+  // Update handleToggle2 similarly
   const handleToggle2 = async () => {
+    if (isVerifying) {
+      console.log('Verification in progress, skipping new command');
+      return;
+    }
+
     const newState = !toggle2;
     const command = newState ? "TOGGLE_2_ON" : "TOGGLE_2_OFF";
-    const commandId = `${command}_${Date.now()}_${Math.random()}`; // Ensure unique ID
+    const commandId = `${command}_${Date.now()}`;
     
     if (activeCommands.has(commandId)) {
       return;
@@ -890,7 +902,14 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     
     activeCommands.add(commandId);
     setToggle2(newState);
+    setIsVerifying(true);
     
+    setCommandFeedback({
+      show: true,
+      message: `Sending ${command} command...`,
+      loading: true
+    });
+
     const commandEntry = {
       id: commandId,
       timestamp: new Date(),
@@ -901,61 +920,193 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     setCommandHistory(prev => [commandEntry, ...prev]);
 
     try {
-      console.log(`Sending command: ${command} with ID: ${commandId}`);
-      await sendCommand(command);
-      debouncedFetchState(commandId, command, {});
+      // Send command twice with delay
+      await sendCommandWithRetry(command);
+      
+      setCommandFeedback({
+        show: true,
+        message: 'Waiting for device confirmation...',
+        loading: true
+      });
+      
+      setTimeout(async () => {
+        try {
+          const finalState = await fetchDeviceState();
+          const success = verifyCommandSuccess(command, {}, finalState);
+          
+          setCommandHistory(prev => prev.map(cmd => {
+            if (cmd.id === commandId) {
+              return { 
+                ...cmd, 
+                status: success ? 'success' : 'failed'
+              };
+            }
+            return cmd;
+          }));
+
+          setCommandFeedback({
+            show: true,
+            message: success ? 'Command confirmed!' : 'Command failed to verify',
+            loading: false
+          });
+
+          setTimeout(async () => {
+            await fetchDeviceState();
+            setCommandFeedback({ show: false, message: '', loading: false });
+          }, 1000);
+
+        } catch (error) {
+          console.error('Verification error:', error);
+          setCommandHistory(prev => prev.map(cmd => {
+            if (cmd.id === commandId) {
+              return { ...cmd, status: 'failed' };
+            }
+            return cmd;
+          }));
+          
+          setCommandFeedback({
+            show: true,
+            message: 'Failed to verify command',
+            loading: false
+          });
+        } finally {
+          setIsVerifying(false);
+          activeCommands.delete(commandId);
+        }
+      }, 4500);
+      
     } catch (error) {
+      console.error('Error in handleToggle2:', error);
       setCommandHistory(prev => prev.map(cmd => {
         if (cmd.id === commandId) {
           return { ...cmd, status: 'failed' };
         }
         return cmd;
       }));
+      setIsVerifying(false);
       activeCommands.delete(commandId);
+      
+      setCommandFeedback({
+        show: true,
+        message: 'Failed to send command',
+        loading: false
+      });
     }
   };
 
-  // And handleSendSpeed
+  // Update handleSendSpeed similarly
   const handleSendSpeed = async () => {
-    if (speedInput.trim() !== "") {
-      const speed = parseInt(speedInput);
-      if (isNaN(speed) || speed < 0 || speed > 100) {
-        showSnackbar('Speed must be a number between 0 and 100', 'error');
-        return;
-      }
+    if (isVerifying) {
+      console.log('Verification in progress, skipping new command');
+      return;
+    }
 
-      const commandId = `SET_SPEED_${speed}_${Date.now()}_${Math.random()}`; // Ensure unique ID
-      
-      if (activeCommands.has(commandId)) {
-        return;
-      }
-      
-      activeCommands.add(commandId);
-      
-      const commandEntry = {
-        id: commandId,
-        timestamp: new Date(),
-        action: "SET_SPEED",
-        data: { speed },
-        status: 'pending'
-      };
+    if (speedInput.trim() === "") return;
+    
+    const speed = parseInt(speedInput);
+    if (isNaN(speed) || speed < 0 || speed > 100) {
+      showSnackbar('Speed must be a number between 0 and 100', 'error');
+      return;
+    }
 
-      setCommandHistory(prev => [commandEntry, ...prev]);
+    const commandId = `SET_SPEED_${speed}_${Date.now()}`;
+    
+    if (activeCommands.has(commandId)) {
+      return;
+    }
+    
+    activeCommands.add(commandId);
+    setIsVerifying(true);
+    
+    setCommandFeedback({
+      show: true,
+      message: `Sending speed command (${speed}%)...`,
+      loading: true
+    });
 
-      try {
-        console.log(`Sending command: SET_SPEED with speed ${speed} and ID: ${commandId}`);
-        await sendCommand("SET_SPEED", { speed });
-        setSpeedInput("");
-        debouncedFetchState(commandId, "SET_SPEED", { speed });
-      } catch (error) {
-        setCommandHistory(prev => prev.map(cmd => {
-          if (cmd.id === commandId) {
-            return { ...cmd, status: 'failed' };
-          }
-          return cmd;
-        }));
-        activeCommands.delete(commandId);
-      }
+    const commandEntry = {
+      id: commandId,
+      timestamp: new Date(),
+      action: "SET_SPEED",
+      data: { speed },
+      status: 'pending'
+    };
+
+    setCommandHistory(prev => [commandEntry, ...prev]);
+
+    try {
+      // Send command twice with delay
+      await sendCommandWithRetry("SET_SPEED", { speed });
+      setSpeedInput("");
+      
+      setCommandFeedback({
+        show: true,
+        message: 'Waiting for device confirmation...',
+        loading: true
+      });
+      
+      setTimeout(async () => {
+        try {
+          const finalState = await fetchDeviceState();
+          const success = verifyCommandSuccess("SET_SPEED", { speed }, finalState);
+          
+          setCommandHistory(prev => prev.map(cmd => {
+            if (cmd.id === commandId) {
+              return { 
+                ...cmd, 
+                status: success ? 'success' : 'failed'
+              };
+            }
+            return cmd;
+          }));
+
+          setCommandFeedback({
+            show: true,
+            message: success ? 'Speed command confirmed!' : 'Speed command failed to verify',
+            loading: false
+          });
+
+          setTimeout(async () => {
+            await fetchDeviceState();
+            setCommandFeedback({ show: false, message: '', loading: false });
+          }, 1000);
+
+        } catch (error) {
+          console.error('Verification error:', error);
+          setCommandHistory(prev => prev.map(cmd => {
+            if (cmd.id === commandId) {
+              return { ...cmd, status: 'failed' };
+            }
+            return cmd;
+          }));
+          
+          setCommandFeedback({
+            show: true,
+            message: 'Failed to verify speed command',
+            loading: false
+          });
+        } finally {
+          setIsVerifying(false);
+          activeCommands.delete(commandId);
+        }
+      }, 4500);
+      
+    } catch (error) {
+      console.error('Error in handleSendSpeed:', error);
+      setCommandHistory(prev => prev.map(cmd => {
+        if (cmd.id === commandId) {
+          return { ...cmd, status: 'failed' };
+        }
+        return cmd;
+      }));
+      setIsVerifying(false);
+      activeCommands.delete(commandId);
+      
+      setCommandFeedback({
+        show: true,
+        message: 'Failed to send speed command',
+        loading: false
+      });
     }
   };
 
@@ -971,7 +1122,8 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     setCommandHistory(prev => [commandEntry, ...prev]);
 
     try {
-      await sendCommand("RESTART");
+      // Send restart command twice with delay
+      await sendCommandWithRetry("RESTART");
       
       const timeout1 = setTimeout(async () => {
         await fetchDeviceState();
@@ -1973,48 +2125,48 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                 {/* Toggle Controls */}
                 <Grid item xs={12} md={6}>
                   <Box sx={{ display: "flex", gap: 3, alignItems: "center" }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={toggle1}
-                          onChange={handleToggle1}
-                          sx={{
-                            "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
-                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
-                          }}
-                        />
-                      }
-                      label="Toggle 1"
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={toggle1}
+                      onChange={handleToggle1}
+                      sx={{
+                        "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
+                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
+                      }}
                     />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={toggle2}
-                          onChange={handleToggle2}
-                          sx={{
-                            "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
-                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
-                          }}
-                        />
-                      }
-                      label="Toggle 2"
+                  }
+                  label="Toggle 1"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={toggle2}
+                      onChange={handleToggle2}
+                      sx={{
+                        "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
+                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
+                      }}
                     />
+                  }
+                  label="Toggle 2"
+                />
                   </Box>
                 </Grid>
 
                 {/* Restart Button */}
                 <Grid item xs={12} md={6}>
-                  <Button 
-                    variant="contained" 
-                    onClick={handleRestart}
+                <Button 
+                  variant="contained" 
+                  onClick={handleRestart}
                     startIcon={<RefreshIcon />}
-                    sx={{ 
-                      bgcolor: theme.palette.secondary.main,
-                      "&:hover": { bgcolor: theme.palette.secondary.dark }
-                    }}
-                  >
-                    Restart Device
-                  </Button>
+                  sx={{ 
+                    bgcolor: theme.palette.secondary.main,
+                    "&:hover": { bgcolor: theme.palette.secondary.dark }
+                  }}
+                >
+                  Restart Device
+                </Button>
                 </Grid>
 
                 {/* Speed Control and Display */}
@@ -2057,35 +2209,35 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                       alignItems: "center",
                       height: 40
                     }}>
-                      <TextField
-                        variant="outlined"
-                        size="small"
+                  <TextField
+                    variant="outlined"
+                    size="small"
                         label="New Speed"
                         placeholder="0-100"
-                        value={speedInput}
-                        onChange={(e) => setSpeedInput(e.target.value)}
-                        sx={{
+                    value={speedInput}
+                    onChange={(e) => setSpeedInput(e.target.value)}
+                    sx={{
                           width: 100,
                           "& .MuiOutlinedInput-root": {
                             height: 40,
-                            bgcolor: theme.palette.background.default,
+                      bgcolor: theme.palette.background.default,
                           }
-                        }}
-                      />
-                      <Button 
-                        variant="contained" 
-                        onClick={handleSendSpeed}
-                        disabled={!speedInput.trim()}
-                        sx={{ 
+                    }}
+                  />
+                  <Button 
+                    variant="contained" 
+                    onClick={handleSendSpeed}
+                    disabled={!speedInput.trim()}
+                    sx={{ 
                           height: 40,
                           minWidth: 'auto',
                           px: 2
-                        }}
-                      >
+                    }}
+                  >
                         Set
-                      </Button>
-                    </Box>
-                  </Box>
+                  </Button>
+                </Box>
+              </Box>
                 </Grid>
               </Grid>
             </Paper>
@@ -2311,6 +2463,40 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           </MenuItem>
         </Menu>
       </Box>
+
+      {/* Add this component near the end of your return statement, just before the closing </Box> */}
+      {/* Add this right after your existing Snackbar components */}
+      <Snackbar
+        open={commandFeedback.show}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{
+          '& .MuiPaper-root': {
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 2,
+            minWidth: 250
+          }
+        }}
+      >
+        <Paper elevation={3}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 2,
+            p: 1.5
+          }}>
+            {commandFeedback.loading && (
+              <CircularProgress size={20} color="primary" />
+            )}
+            <Typography variant="body2">
+              {commandFeedback.message}
+            </Typography>
+          </Box>
+        </Paper>
+      </Snackbar>
     </Box>
   );
 }
