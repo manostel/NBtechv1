@@ -2407,7 +2407,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
               onClick={() => {
                 setTimeRange(range.value);
                 setTimeRangeAnchor(null);
-                handleRefresh(); // Fetch new data when time range changes
+                // Removed handleRefresh() call here since useEffect will handle it
               }}
               selected={timeRange === range.value}
               sx={{ 

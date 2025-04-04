@@ -45,7 +45,8 @@ def get_time_range_and_points(time_range, target_points=100):
     elif time_range == '16h':
         return now - timedelta(hours=16), target_points
     elif time_range == '24h':
-        return now - timedelta(days=1), target_points
+        # For 24h, use a larger sampling interval to reduce data points
+        return now - timedelta(days=1), min(target_points, 200)  # Cap at 200 points for 24h
     else:  # Default case
         return now - timedelta(hours=1), target_points
 
@@ -57,6 +58,12 @@ def aggregate_data(items, target_points):
     # Sort items by timestamp
     sorted_items = sorted(items, key=lambda x: x['timestamp'])
     
+    # For large datasets, implement sampling
+    if len(sorted_items) > target_points * 2:
+        # Calculate sampling interval
+        sample_interval = len(sorted_items) // (target_points * 2)
+        sorted_items = sorted_items[::sample_interval]
+    
     # Calculate number of items per group
     items_per_group = max(1, len(sorted_items) // target_points)
     
@@ -64,7 +71,7 @@ def aggregate_data(items, target_points):
     current_group = []
     
     # Get all possible metrics from the first item, excluding specific fields
-    excluded_fields = {'timestamp', 'client_id', 'user_email', 'device'}  # Updated to use client_id
+    excluded_fields = {'timestamp', 'client_id', 'user_email', 'device'}
     metrics = [key for key in sorted_items[0].keys() if key not in excluded_fields]
     
     for item in sorted_items:
@@ -78,7 +85,7 @@ def aggregate_data(items, target_points):
         
         if len(current_group) >= items_per_group:
             # Calculate averages for all metrics
-            avg_point = {'timestamp': item['timestamp']}  # Keep timestamp
+            avg_point = {'timestamp': item['timestamp']}
             for metric in metrics:
                 values = [p[metric] for p in current_group]
                 avg_point[metric] = round(mean(values), 2)
@@ -146,18 +153,40 @@ def lambda_handler(event, context):
         target_points = body.get('points', 100)
         start_time, points = get_time_range_and_points(time_range, target_points)
         
-        # Query the device data
-        response = device_data_table.query(
-            KeyConditionExpression='client_id = :client_id AND #ts >= :start_time',
-            ExpressionAttributeValues={
-                ':client_id': body['client_id'],
-                ':start_time': start_time.isoformat()
-            },
-            ExpressionAttributeNames={
-                '#ts': 'timestamp'
-            },
-            ScanIndexForward=True
-        )
+        # For 24h range, use a larger sampling interval in the query
+        if time_range == '24h':
+            # Query with a sampling interval of 5 minutes
+            sampling_interval = 300  # 5 minutes in seconds
+            response = device_data_table.query(
+                KeyConditionExpression='client_id = :client_id AND #ts >= :start_time',
+                ExpressionAttributeValues={
+                    ':client_id': body['client_id'],
+                    ':start_time': start_time.isoformat()
+                },
+                ExpressionAttributeNames={
+                    '#ts': 'timestamp'
+                },
+                ScanIndexForward=True,
+                FilterExpression='attribute_not_exists(#ts) OR mod(cast(#ts as number), :interval) = 0',
+                ExpressionAttributeValues={
+                    ':client_id': body['client_id'],
+                    ':start_time': start_time.isoformat(),
+                    ':interval': sampling_interval
+                }
+            )
+        else:
+            # Normal query for other time ranges
+            response = device_data_table.query(
+                KeyConditionExpression='client_id = :client_id AND #ts >= :start_time',
+                ExpressionAttributeValues={
+                    ':client_id': body['client_id'],
+                    ':start_time': start_time.isoformat()
+                },
+                ExpressionAttributeNames={
+                    '#ts': 'timestamp'
+                },
+                ScanIndexForward=True
+            )
 
         if 'Items' not in response or not response['Items']:
             return create_cors_response(200, {
