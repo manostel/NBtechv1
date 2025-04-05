@@ -25,6 +25,13 @@ import {
   Snackbar,
   CircularProgress,
   Container,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select
 } from "@mui/material";
 import { 
   Settings as SettingsIcon,
@@ -358,6 +365,25 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
     message: '',
     loading: false
   });
+
+  // Add these new state variables near your other state declarations
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [timeWindow, setTimeWindow] = useState('8h');
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState(null);
+  const [selectedTimeWindow, setSelectedTimeWindow] = useState(null);
+
+  // Update the state variables for the enhanced date picker
+  const [startDateTime, setStartDateTime] = useState(new Date());
+  const [endDateTime, setEndDateTime] = useState(() => {
+    const date = new Date();
+    date.setHours(23, 59, 59);
+    return date;
+  });
+  const [dateTimeError, setDateTimeError] = useState('');
+
+  // Add this state variable to track previous tab
+  const [prevTabValue, setPrevTabValue] = useState(0);
 
   const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
   const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
@@ -1233,18 +1259,21 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   useEffect(() => {
     log('Dashboard mounted with device:', device);
     if (device && device.client_id) {
+      // Only fetch data when component first mounts or if we're on the Overview tab
+      if (isInitializing || (tabValue === 0 && prevTabValue === 0)) {
       log('Fetching initial data...');
-      fetchData(); // This will now also fetch device status on first load
+        fetchData();
+      }
       
-      // Set up intervals for data fetching
+      // Set up intervals for data fetching, but only activate them on the Overview tab
       const liveInterval = setInterval(() => {
-        if (timeRange === 'live') {
+        if (timeRange === 'live' && tabValue === 0) {
           fetchData();
         }
       }, 10000);
       
       const historicalInterval = setInterval(() => {
-        if (timeRange !== 'live') {
+        if (timeRange !== 'live' && tabValue === 0) {
           fetchData();
         }
       }, 60000);
@@ -1254,7 +1283,24 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         clearInterval(historicalInterval);
       };
     }
-  }, [device, timeRange]);
+  }, [device, timeRange, tabValue]);
+
+  // Add this effect to track tab changes
+  useEffect(() => {
+    setPrevTabValue(tabValue);
+  }, [tabValue]);
+
+  // Modify the time range menu handler to check the current tab
+  const handleTimeRangeChange = (newRange) => {
+    // Only update time range and fetch data if we're on Overview tab
+    setTimeRange(newRange);
+    setTimeRangeAnchor(null);
+    
+    // Only fetch data if we're on the Overview tab
+    if (tabValue === 0) {
+      fetchData();
+    }
+  };
 
   // Update the renderTimeRangeMenu function
   const renderTimeRangeMenu = () => (
@@ -1526,12 +1572,14 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           unit: timeRange === 'live' ? 'second' :
                 timeRange === '15m' ? 'minute' :
                 timeRange === '1h' ? 'minute' :
-                timeRange === '24h' ? 'hour' : 'minute',
-          tooltipFormat: timeRange === 'live' ? "HH:mm:ss" : "HH:mm",
+                timeRange === '24h' || timeRange === '2d' || timeRange === '3d' || selectedTimeWindow === '24h' || selectedTimeWindow === '2d' || selectedTimeWindow === '3d' ? 'hour' : 'minute',
+          tooltipFormat: timeRange === 'live' ? "HH:mm:ss" : 
+                        (timeRange === '24h' || timeRange === '2d' || timeRange === '3d' || selectedTimeWindow === '24h' || selectedTimeWindow === '2d' || selectedTimeWindow === '3d') ? "MMM dd, HH:mm" : "HH:mm",
           displayFormats: {
             second: 'HH:mm:ss',
             minute: 'HH:mm',
-            hour: 'HH:mm'
+            hour: 'MMM dd, HH:mm',
+            day: 'MMM dd'
           },
           // Add specific min/max for time ranges
           min: function() {
@@ -1894,6 +1942,279 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       }
     };
   }, [fetchTimeout]);
+
+  // Add this function before the return statement
+  const handleFetchHistoricalData = async () => {
+    if (!selectedDate) {
+      showSnackbar('Please select a valid date', 'error');
+      return;
+    }
+
+    // Close dialog
+    setDatePickerOpen(false);
+    
+    // Set selected history date for display
+    setSelectedHistoryDate(selectedDate.toISOString());
+    setSelectedTimeWindow(timeWindow);
+    
+    // Show loading
+    setIsLoading(true);
+    
+    try {
+      // Calculate end time as end of the selected day
+      const endTime = new Date(selectedDate);
+      endTime.setHours(23, 59, 59);
+      
+      // Calculate start time based on selected window
+      const startTime = new Date(endTime);
+      
+      // Handle multi-day windows
+      if (timeWindow === '24h') {
+        startTime.setDate(startTime.getDate() - 1); // 1 day back
+      } else if (timeWindow === '2d') {
+        startTime.setDate(startTime.getDate() - 2); // 2 days back
+      } else if (timeWindow === '3d') {
+        startTime.setDate(startTime.getDate() - 3); // 3 days back
+      } else {
+        // Handle hour-based windows as before
+        const hours = parseInt(timeWindow.replace('h', ''));
+        startTime.setHours(endTime.getHours() - hours);
+      }
+      
+      const requestBody = {
+        action: 'get_dashboard_data',
+        client_id: device.client_id,
+        user_email: user.email,
+        time_range: 'custom',
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        points: timeWindow.includes('d') ? 150 : 100 // More points for multi-day views
+      };
+      
+      // Show a loading indicator for longer time ranges
+      if (timeWindow === '2d' || timeWindow === '3d') {
+        setCommandFeedback({
+          show: true,
+          message: `Loading ${timeWindow} of data, please wait...`,
+          loading: true
+        });
+      }
+      
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+      
+      // Hide loading message
+      setCommandFeedback({
+        show: false,
+        message: '',
+        loading: false
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
+        showSnackbar('No data available for the selected date', 'warning');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Process the historical data
+      const data = result.data;
+      const timestamps = data.map((entry) => new Date(entry.timestamp));
+      setLabels(timestamps);
+      
+      // Process metrics data
+      const firstDataPoint = data[0];
+      const newMetricsConfig = {};
+      Object.keys(firstDataPoint).forEach(key => {
+        if (key !== 'timestamp' && key !== 'client_id') {
+          newMetricsConfig[key] = generateMetricConfig(key);
+        }
+      });
+      setMetricsConfig(newMetricsConfig);
+      
+      const newMetricsData = {};
+      Object.keys(newMetricsConfig).forEach(key => {
+        newMetricsData[key] = data.map(entry => parseFloat(entry[key]));
+      });
+      setMetricsData(newMetricsData);
+      
+      // Show warning if one was returned
+      if (result.summary && result.summary.warning) {
+        showSnackbar(result.summary.warning, 'warning');
+      }
+      
+    } catch (error) {
+      console.error('Error fetching historical data:', error);
+      showSnackbar('Error fetching historical data. Please try again.', 'error');
+      setCommandFeedback({
+        show: false,
+        message: '',
+        loading: false
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add these functions to your component:
+
+  // Calculate duration between two dates for display
+  const calculateDuration = (start, end) => {
+    const diffMs = end - start;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    if (diffHours < 0) {
+      return "Invalid time range";
+    } else if (diffHours < 1) {
+      return `${Math.round(diffHours * 60)} minutes`;
+    } else if (diffHours < 24) {
+      return `${Math.floor(diffHours)} hours ${Math.round((diffHours % 1) * 60)} minutes`;
+    } else {
+      const days = Math.floor(diffHours / 24);
+      const hours = Math.floor(diffHours % 24);
+      return `${days} day${days !== 1 ? 's' : ''} ${hours} hour${hours !== 1 ? 's' : ''}`;
+    }
+  };
+
+  // Validates time range and triggers data fetching
+  const validateAndFetchHistoricalData = () => {
+    // Calculate time difference in hours
+    const diffHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
+    
+    // Validation checks
+    if (endDateTime <= startDateTime) {
+      setDateTimeError('End time must be after start time');
+      return;
+    }
+    
+    // Strictly enforce the 24-hour limit
+    if (diffHours > 24) {
+      setDateTimeError('Time range cannot exceed 24 hours (1 day)');
+      return;
+    }
+    
+    // All checks passed, proceed to fetch data
+    setDateTimeError('');
+    setDatePickerOpen(false);
+    fetchPreciseHistoricalData(startDateTime, endDateTime);
+  };
+
+  // New function to fetch data with precise timestamps
+  const fetchPreciseHistoricalData = async (startTime, endTime) => {
+    // Set selected history date for display (we'll keep this for compatibility)
+    setSelectedHistoryDate(startTime.toISOString());
+    setSelectedTimeWindow("custom");
+    
+    // Show loading
+    setIsLoading(true);
+    
+    try {
+      // Calculate appropriate number of data points based on time range
+      const diffHours = (endTime - startTime) / (1000 * 60 * 60);
+      let requestedPoints = 100;
+      
+      if (diffHours > 48) {
+        requestedPoints = 150; // More points for 2-3 day ranges
+      } else if (diffHours > 24) {
+        requestedPoints = 120; // More points for 1-2 day ranges
+      }
+      
+      // Show a loading indicator for longer time ranges
+      if (diffHours > 24) {
+        setCommandFeedback({
+          show: true,
+          message: `Loading ${Math.round(diffHours)} hours of data, please wait...`,
+          loading: true
+        });
+      }
+      
+      const requestBody = {
+        action: 'get_dashboard_data',
+        client_id: device.client_id,
+        user_email: user.email,
+        time_range: 'custom',
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        points: requestedPoints
+      };
+      
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+      
+      // Hide loading message
+      setCommandFeedback({
+        show: false,
+        message: '',
+        loading: false
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
+        showSnackbar('No data available for the selected time range', 'warning');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Process the historical data
+      const data = result.data;
+      const timestamps = data.map((entry) => new Date(entry.timestamp));
+      setLabels(timestamps);
+      
+      // Process metrics data
+      const firstDataPoint = data[0];
+      const newMetricsConfig = {};
+      Object.keys(firstDataPoint).forEach(key => {
+        if (key !== 'timestamp' && key !== 'client_id') {
+          newMetricsConfig[key] = generateMetricConfig(key);
+        }
+      });
+      setMetricsConfig(newMetricsConfig);
+      
+      const newMetricsData = {};
+      Object.keys(newMetricsConfig).forEach(key => {
+        newMetricsData[key] = data.map(entry => parseFloat(entry[key]));
+      });
+      setMetricsData(newMetricsData);
+      
+      // Show warning if one was returned
+      if (result.summary && result.summary.warning) {
+        showSnackbar(result.summary.warning, 'warning');
+      }
+      
+    } catch (error) {
+      console.error('Error fetching historical data:', error);
+      showSnackbar('Error fetching historical data. Please try again.', 'error');
+      setCommandFeedback({
+        show: false,
+        message: '',
+        loading: false
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (isInitializing) {
     return <DashboardSkeleton />;
@@ -2317,7 +2638,17 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
           <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">Data History</Typography>
-              <Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {/* Date Picker Section */}
+                <Button
+                  variant="outlined"
+                  startIcon={<HistoryIcon />}
+                  onClick={() => setDatePickerOpen(true)}
+                >
+                  Select Date
+                </Button>
+                
+                {/* Export Button */}
                 <Button
                   startIcon={<DownloadIcon />}
                   onClick={(e) => setExportMenuAnchor(e.currentTarget)}
@@ -2338,9 +2669,309 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
                 </Menu>
               </Box>
             </Box>
+            
+            {/* Selected Date Display */}
+            {selectedHistoryDate && (
+              <Box sx={{ mb: 2, p: 1, bgcolor: 'background.default', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="body2">
+                    {selectedTimeWindow === "custom" ? (
+                      <>
+                        Viewing data from: <b>{new Date(selectedHistoryDate).toLocaleString()}</b> to <b>{endDateTime.toLocaleString()}</b>
+                      </>
+                    ) : (
+                      <>
+                        Viewing data from: <b>{new Date(selectedHistoryDate).toLocaleDateString()}</b> 
+                        {selectedTimeWindow && selectedTimeWindow === '24h' && ` (1 day window)`}
+                        {selectedTimeWindow && selectedTimeWindow === '2d' && ` (2 day window)`}
+                        {selectedTimeWindow && selectedTimeWindow === '3d' && ` (3 day window)`}
+                        {selectedTimeWindow && !['24h', '2d', '3d', 'custom'].includes(selectedTimeWindow) && ` (${selectedTimeWindow} window)`}
+                      </>
+                    )}
+                  </Typography>
+                  {((selectedTimeWindow === '2d' || selectedTimeWindow === '3d') || 
+                     (selectedTimeWindow === 'custom' && (endDateTime - new Date(selectedHistoryDate)) > 24 * 60 * 60 * 1000)) && (
+                    <Typography variant="caption" color="text.secondary">
+                      Large data ranges are aggregated for performance
+                    </Typography>
+                  )}
+                </Box>
+                <Button 
+                  size="small" 
+                  onClick={() => {
+                    setSelectedHistoryDate(null);
+                    setSelectedTimeWindow(null);
+                    // Reset to current data
+                    fetchData();
+                  }}
+                >
+                  Return to Current
+                </Button>
+              </Box>
+            )}
+            
+            {/* Chart Section */}
             <Box sx={{ height: 400 }}>
-              {renderChart(temperatureData, "Temperature (°C)", "red")}
+              {selectedHistoryDate ? (
+                // Show all metrics in historical view
+                <Grid container spacing={2}>
+                  {Object.entries(metricsConfig).map(([key, config]) => {
+                    if (key === 'client_id' || key === 'ClientID') return null;
+                    return (
+                      <Grid item xs={12} md={6} key={key}>
+                        {renderChart(metricsData[key], key)}
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              ) : (
+                // Default view - temperature chart
+                renderChart(temperatureData, "temperature")
+              )}
             </Box>
+            
+            {/* Date Picker Dialog */}
+            <Dialog 
+              open={datePickerOpen} 
+              onClose={() => setDatePickerOpen(false)}
+              maxWidth="md"
+              PaperProps={{ sx: { borderRadius: 2 } }}
+            >
+              <DialogTitle sx={{ 
+                bgcolor: 'primary.main', 
+                color: 'white',
+                pb: 1
+              }}>
+                Select Historical Time Range
+              </DialogTitle>
+              <DialogContent sx={{ pt: 3 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: { xs: 'column', sm: 'row' }, 
+                  gap: 3, 
+                  width: '100%', 
+                  minWidth: { sm: 500 }
+                }}>
+                  {/* Start Date & Time */}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom color="primary.main" fontWeight="medium">
+                      Start Date & Time
+                    </Typography>
+                    <TextField
+                      label="Date"
+                      type="date"
+                      value={startDateTime.toISOString().split('T')[0]}
+                      onChange={(e) => {
+                        const newDate = new Date(startDateTime);
+                        const [year, month, day] = e.target.value.split('-');
+                        newDate.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        setStartDateTime(newDate);
+                        setDateTimeError('');
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                      margin="dense"
+                    />
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                      <TextField
+                        label="Hour"
+                        type="number"
+                        value={startDateTime.getHours()}
+                        onChange={(e) => {
+                          const newDate = new Date(startDateTime);
+                          newDate.setHours(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)));
+                          setStartDateTime(newDate);
+                          setDateTimeError('');
+                        }}
+                        InputProps={{ 
+                          inputProps: { min: 0, max: 23 }
+                        }}
+                        InputLabelProps={{ shrink: true }}
+                        fullWidth
+                        margin="dense"
+                      />
+                      <TextField
+                        label="Minute"
+                        type="number"
+                        value={startDateTime.getMinutes()}
+                        onChange={(e) => {
+                          const newDate = new Date(startDateTime);
+                          newDate.setMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)));
+                          setStartDateTime(newDate);
+                          setDateTimeError('');
+                        }}
+                        InputProps={{ 
+                          inputProps: { min: 0, max: 59 }
+                        }}
+                        InputLabelProps={{ shrink: true }}
+                        fullWidth
+                        margin="dense"
+                      />
+                    </Box>
+                  </Box>
+
+                  {/* End Date & Time */}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom color="primary.main" fontWeight="medium">
+                      End Date & Time
+                    </Typography>
+                    <TextField
+                      label="Date"
+                      type="date"
+                      value={endDateTime.toISOString().split('T')[0]}
+                      onChange={(e) => {
+                        const newDate = new Date(endDateTime);
+                        const [year, month, day] = e.target.value.split('-');
+                        newDate.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        setEndDateTime(newDate);
+                        setDateTimeError('');
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                      margin="dense"
+                    />
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                      <TextField
+                        label="Hour"
+                        type="number"
+                        value={endDateTime.getHours()}
+                        onChange={(e) => {
+                          const newDate = new Date(endDateTime);
+                          newDate.setHours(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)));
+                          setEndDateTime(newDate);
+                          setDateTimeError('');
+                        }}
+                        InputProps={{ 
+                          inputProps: { min: 0, max: 23 }
+                        }}
+                        InputLabelProps={{ shrink: true }}
+                        fullWidth
+                        margin="dense"
+                      />
+                      <TextField
+                        label="Minute"
+                        type="number"
+                        value={endDateTime.getMinutes()}
+                        onChange={(e) => {
+                          const newDate = new Date(endDateTime);
+                          newDate.setMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)));
+                          setEndDateTime(newDate);
+                          setDateTimeError('');
+                        }}
+                        InputProps={{ 
+                          inputProps: { min: 0, max: 59 }
+                        }}
+                        InputLabelProps={{ shrink: true }}
+                        fullWidth
+                        margin="dense"
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Quick Selection Buttons */}
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom color="primary.main" fontWeight="medium">
+                    Quick Range Selection
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    <Button 
+                      size="small" 
+                      variant="outlined"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(end);
+                        start.setHours(end.getHours() - 4);
+                        setStartDateTime(start);
+                        setEndDateTime(end);
+                      }}
+                    >
+                      Last 4 Hours
+                    </Button>
+                    <Button 
+                      size="small" 
+                      variant="outlined"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(end);
+                        start.setHours(end.getHours() - 8);
+                        setStartDateTime(start);
+                        setEndDateTime(end);
+                      }}
+                    >
+                      Last 8 Hours
+                    </Button>
+                    <Button 
+                      size="small" 
+                      variant="outlined"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(end);
+                        start.setHours(end.getHours() - 16);
+                        setStartDateTime(start);
+                        setEndDateTime(end);
+                      }}
+                    >
+                      Last 16 Hours
+                    </Button>
+                    <Button 
+                      size="small" 
+                      variant="outlined"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(end);
+                        start.setDate(end.getDate() - 1);  // Exactly 24 hours
+                        setStartDateTime(start);
+                        setEndDateTime(end);
+                      }}
+                    >
+                      Last 24 Hours (Max)
+                    </Button>
+                  </Box>
+                </Box>
+
+                {/* Error Message */}
+                {dateTimeError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {dateTimeError}
+                  </Alert>
+                )}
+
+                {/* Duration Display */}
+                <Box sx={{ mt: 3, p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
+                  {/* Calculate diffHours here */}
+                  {(() => {
+                    const diffHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
+                    return (
+                      <>
+                        <Typography variant="body2">
+                          Selected duration: {calculateDuration(startDateTime, endDateTime)}
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          color={diffHours > 24 ? "error.main" : "text.secondary"} 
+                          fontWeight={diffHours > 24 ? "bold" : "normal"}
+                        >
+                          Maximum allowed: 24 hours (1 day)
+                          {diffHours > 24 && " - Current selection exceeds limit"}
+                        </Typography>
+                      </>
+                    );
+                  })()}
+      </Box>
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={() => setDatePickerOpen(false)}>Cancel</Button>
+                <Button 
+                  onClick={validateAndFetchHistoricalData} 
+                  variant="contained" 
+                  color="primary"
+                  startIcon={<HistoryIcon />}
+                >
+                  View Data
+                </Button>
+              </DialogActions>
+            </Dialog>
           </Paper>
         )}
       </Container>
@@ -2405,9 +3036,12 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
             <MenuItem
               key={range.value}
               onClick={() => {
-                setTimeRange(range.value);
-                setTimeRangeAnchor(null);
-                // Removed handleRefresh() call here since useEffect will handle it
+                if (range.value === 'custom') {
+                  setDatePickerOpen(true);  // Using setDatePickerOpen instead of setCustomDateOpen
+                } else {
+                  // Use the handler function instead of directly setting
+                  handleTimeRangeChange(range.value);
+                }
               }}
               selected={timeRange === range.value}
               sx={{ 
