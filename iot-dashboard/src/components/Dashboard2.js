@@ -502,8 +502,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     setSelectedTab(newValue);
   };
 
-  const handleTimeRangeChange = (newTimeRange) => {
-    setTimeRange(newTimeRange);
+  const handleTimeRangeChange = (event) => {
+    setTimeRange(event.target.value);
+    fetchData(event.target.value);
   };
 
   const handleExportData = () => {
@@ -736,6 +737,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             selectedVariables={selectedVariables}
             availableVariables={availableVariables}
             onVariableChange={handleVariableChange}
+            onTimeRangeChange={handleTimeRangeChange}
           />
         );
       case 1:
@@ -748,6 +750,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             selectedVariables={selectedVariables}
             availableVariables={availableVariables}
             onVariableChange={handleVariableChange}
+            onTimeRangeChange={handleTimeRangeChange}
           />
         );
       case 2:
@@ -759,6 +762,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             selectedVariables={selectedVariables}
             availableVariables={availableVariables}
             onVariableChange={handleVariableChange}
+            timeRange={timeRange}
+            onTimeRangeChange={handleTimeRangeChange}
           />
         );
       case 3:

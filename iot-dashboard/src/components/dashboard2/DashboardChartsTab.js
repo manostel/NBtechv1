@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Grid, Typography, useTheme } from '@mui/material';
+import { Box, Grid, Typography, Paper, useTheme } from '@mui/material';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import VariableSelector from './VariableSelector';
+import TimeRangeSelector from './TimeRangeSelector';
 
 ChartJS.register(
   CategoryScale,
@@ -33,7 +34,8 @@ const DashboardChartsTab = ({
   chartConfig,
   selectedVariables,
   availableVariables,
-  onVariableChange
+  onVariableChange,
+  onTimeRangeChange
 }) => {
   const theme = useTheme();
   const chartRef = React.useRef(null);
@@ -195,15 +197,14 @@ const DashboardChartsTab = ({
 
       return (
         <Grid item xs={12} key={key}>
-          <Box sx={{ 
-            height: 300, 
-            backgroundColor: theme.palette.background.paper,
-            borderRadius: 2,
-            p: 2,
-            boxShadow: theme.shadows[1]
-          }}>
-            {renderChart(data, key)}
-          </Box>
+          <Paper sx={{ p: 3, height: '400px', bgcolor: theme.palette.background.paper }}>
+            <Typography variant="h6" gutterBottom>
+              {config.label} ({config.unit})
+            </Typography>
+            <Box sx={{ height: 'calc(100% - 40px)' }}>
+              {renderChart(data, key)}
+            </Box>
+          </Paper>
         </Grid>
       );
     });
@@ -211,11 +212,17 @@ const DashboardChartsTab = ({
 
   return (
     <Box sx={{ p: 3 }}>
-      <VariableSelector
-        variables={availableVariables}
-        selectedVariables={selectedVariables}
-        onVariableChange={onVariableChange}
-      />
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <VariableSelector
+          variables={availableVariables}
+          selectedVariables={selectedVariables}
+          onVariableChange={onVariableChange}
+        />
+        <TimeRangeSelector
+          timeRange={timeRange}
+          onTimeRangeChange={onTimeRangeChange}
+        />
+      </Box>
       <Grid container spacing={3}>
         {renderCharts()}
       </Grid>
