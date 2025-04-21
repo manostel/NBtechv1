@@ -40,6 +40,7 @@ import {
   Brightness7 as LightModeIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
+  ShowChart as ShowChartIcon,
 } from '@mui/icons-material';
 import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
@@ -327,7 +328,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     }
   };
 
-  const handleDeviceClick = (dev) => {
+  const handleDeviceClick = (dev, version = '1') => {
     // Get the device data safely
     const currentDeviceData = deviceData[dev.client_id] || {};
     const latestData = currentDeviceData.latest_data || {};
@@ -344,8 +345,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     // Update the selected device first
     onSelectDevice(deviceInfo);
     
-    // Then navigate
-    navigate("/dashboard");
+    // Then navigate to the appropriate dashboard version
+    navigate(version === '1' ? "/dashboard" : "/dashboard2");
   };
 
   const handleLogout = () => {
@@ -1402,6 +1403,17 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                     >
                                                     <DeleteIcon fontSize="small" />
                     </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="View Dashboard 2">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeviceClick(device, '2');
+                                                    }}
+                                                >
+                                                    <ShowChartIcon fontSize="small" />
+                                                </IconButton>
                                             </Tooltip>
                   </Box>
                 </Paper>

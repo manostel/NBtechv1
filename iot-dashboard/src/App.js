@@ -4,6 +4,7 @@ import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import DevicesPage from "./components/DevicesPage";
 import Dashboard from "./components/Dashboard";
+import Dashboard2 from "./components/Dashboard2";
 import SettingsPage from "./components/SettingsPage"; // if you have one
 import { CustomThemeProvider } from "./components/ThemeContext";
 import "./App.css";
@@ -82,6 +83,16 @@ function App() {
                 element={user && selectedDevice ? (
                   <ErrorBoundary>
                     <Dashboard user={user} device={selectedDevice} onLogout={handleLogout} onBack={() => setSelectedDevice(null)} />
+                  </ErrorBoundary>
+                ) : (
+                  <Navigate to="/devices" />
+                )}
+              />
+              <Route
+                path="/dashboard2"
+                element={user && selectedDevice ? (
+                  <ErrorBoundary>
+                    <Dashboard2 user={user} device={selectedDevice} onLogout={handleLogout} onBack={() => setSelectedDevice(null)} />
                   </ErrorBoundary>
                 ) : (
                   <Navigate to="/devices" />
