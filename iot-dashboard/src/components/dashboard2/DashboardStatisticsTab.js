@@ -6,8 +6,15 @@ import {
   Timeline as TimelineIcon,
   Speed as SpeedIcon
 } from '@mui/icons-material';
+import VariableSelector from './VariableSelector';
 
-const DashboardStatisticsTab = ({ metricsData, metricsConfig }) => {
+const DashboardStatisticsTab = ({ 
+  metricsData, 
+  metricsConfig,
+  selectedVariables,
+  availableVariables,
+  onVariableChange
+}) => {
   const theme = useTheme();
 
   const calculateStatistics = (data, key) => {
@@ -48,11 +55,14 @@ const DashboardStatisticsTab = ({ metricsData, metricsConfig }) => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Statistical Analysis
-      </Typography>
+      <VariableSelector
+        variables={availableVariables}
+        selectedVariables={selectedVariables}
+        onVariableChange={onVariableChange}
+      />
       <Grid container spacing={3}>
-        {Object.entries(metricsConfig).map(([key, config]) => {
+        {selectedVariables.map((key) => {
+          const config = metricsConfig[key];
           const data = metricsData.data;
           const stats = calculateStatistics(data, key);
           if (!stats) return null;

@@ -146,14 +146,14 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [alarms, setAlarms] = useState([]);
   const [alarmHistory, setAlarmHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('1h');
+  const [timeRange, setTimeRange] = useState('15m');
   const [refreshInterval, setRefreshInterval] = useState(5000);
   const [chartType, setChartType] = useState('line');
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
   const [chartMenuAnchor, setChartMenuAnchor] = useState(null);
   const [showCharts, setShowCharts] = useState(true);
   const [showCommands, setShowCommands] = useState(true);
-  const [metricsConfig, setMetricsConfig] = useState({});
+  const [metricsConfig, setMetricsConfig] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [prevTabValue, setPrevTabValue] = useState(0);
   const [variablesLoaded, setVariablesLoaded] = useState(false);
@@ -185,10 +185,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [alerts, setAlerts] = useState([]);
   const [showAlerts, setShowAlerts] = useState(false);
   const [chartConfig, setChartConfig] = useState({
-    showGrid: true,
-    showPoints: false,
-    showLines: true,
-    animation: true
+    showPoints: true,
+    showGrid: true
   });
 
   // Summary type state
@@ -239,6 +237,21 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   // Add cleanup ref for component unmount
   const isMounted = useRef(true);
+
+  const [selectedVariables, setSelectedVariables] = useState([]);
+  const [availableVariables, setAvailableVariables] = useState([]);
+
+  useEffect(() => {
+    if (metricsConfig) {
+      const variables = Object.keys(metricsConfig);
+      setAvailableVariables(variables);
+      setSelectedVariables(variables);
+    }
+  }, [metricsConfig]);
+
+  const handleVariableChange = (event) => {
+    setSelectedVariables(event.target.value);
+  };
 
   useEffect(() => {
     return () => {
@@ -720,6 +733,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             toggle2={toggle2}
             speedInput={speedInput}
             onRefresh={handleRefresh}
+            selectedVariables={selectedVariables}
+            availableVariables={availableVariables}
+            onVariableChange={handleVariableChange}
           />
         );
       case 1:
@@ -729,6 +745,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             metricsConfig={metricsConfig}
             timeRange={timeRange}
             chartConfig={chartConfig}
+            selectedVariables={selectedVariables}
+            availableVariables={availableVariables}
+            onVariableChange={handleVariableChange}
           />
         );
       case 2:
@@ -737,6 +756,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             metricsData={metricsData}
             metricsConfig={metricsConfig}
             deviceState={deviceState}
+            selectedVariables={selectedVariables}
+            availableVariables={availableVariables}
+            onVariableChange={handleVariableChange}
           />
         );
       case 3:

@@ -13,6 +13,7 @@ import {
   TimeScale
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import VariableSelector from './VariableSelector';
 
 ChartJS.register(
   CategoryScale,
@@ -25,7 +26,15 @@ ChartJS.register(
   TimeScale
 );
 
-const DashboardChartsTab = ({ metricsData, metricsConfig, timeRange, chartConfig }) => {
+const DashboardChartsTab = ({ 
+  metricsData, 
+  metricsConfig, 
+  timeRange, 
+  chartConfig,
+  selectedVariables,
+  availableVariables,
+  onVariableChange
+}) => {
   const theme = useTheme();
   const chartRef = React.useRef(null);
 
@@ -179,7 +188,8 @@ const DashboardChartsTab = ({ metricsData, metricsConfig, timeRange, chartConfig
   const renderCharts = () => {
     if (!metricsData || !metricsConfig) return null;
 
-    return Object.entries(metricsConfig).map(([key, config]) => {
+    return selectedVariables.map((key) => {
+      const config = metricsConfig[key];
       const data = metricsData.data;
       if (!data || !Array.isArray(data) || data.length === 0) return null;
 
@@ -201,9 +211,11 @@ const DashboardChartsTab = ({ metricsData, metricsConfig, timeRange, chartConfig
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Device Metrics Charts
-      </Typography>
+      <VariableSelector
+        variables={availableVariables}
+        selectedVariables={selectedVariables}
+        onVariableChange={onVariableChange}
+      />
       <Grid container spacing={3}>
         {renderCharts()}
       </Grid>
