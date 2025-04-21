@@ -2,8 +2,14 @@ import React from 'react';
 import { Card, CardContent, Typography, Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
-export default function MetricCard({ label, value, unit, color, icon: Icon }) {
+const MetricCard = ({ title, value, unit, isText = false }) => {
   const theme = useTheme();
+
+  const displayValue = isText 
+    ? value 
+    : typeof value === 'number' 
+      ? value.toFixed(1) 
+      : value;
 
   return (
     <Card 
@@ -20,33 +26,24 @@ export default function MetricCard({ label, value, unit, color, icon: Icon }) {
     >
       <CardContent sx={{ flexGrow: 1, p: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          {Icon && (
-            <Icon 
-              sx={{ 
-                mr: 1,
-                color: color || theme.palette.primary.main,
-                fontSize: '1.5rem'
-              }} 
-            />
-          )}
           <Typography 
             variant="subtitle2" 
             color="text.secondary"
             sx={{ textTransform: 'uppercase' }}
           >
-            {label}
+            {title}
           </Typography>
         </Box>
         <Typography 
-          variant="h4" 
+          variant="h5" 
           component="div"
           sx={{ 
             fontWeight: 'bold',
-            color: color || theme.palette.primary.main
+            color: theme.palette.primary.main
           }}
         >
-          {value !== undefined && value !== null ? value.toFixed(1) : '--'}
-          {unit && (
+          {displayValue}
+          {!isText && unit && (
             <Typography 
               component="span" 
               variant="body2"
@@ -63,4 +60,6 @@ export default function MetricCard({ label, value, unit, color, icon: Icon }) {
       </CardContent>
     </Card>
   );
-} 
+};
+
+export default MetricCard; 

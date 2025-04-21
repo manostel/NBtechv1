@@ -24,7 +24,7 @@ def create_cors_response(status_code, body):
             'Access-Control-Allow-Methods': 'OPTIONS,POST',
             'Content-Type': 'application/json'
         },
-        'body': json.dumps(body, default=decimal_default)  # Add the default serializer
+        'body': json.dumps(body, default=decimal_default)
     }
 
 def get_latest_state(client_id):
@@ -44,9 +44,9 @@ def get_latest_state(client_id):
         return {
             'client_id': latest_state['client_id'],
             'timestamp': latest_state['timestamp'],
-            'led1_state': int(latest_state['led1_state']),  # Convert to int
-            'led2_state': int(latest_state['led2_state']),  # Convert to int
-            'motor_speed': int(latest_state['motor_speed'])  # Convert to int
+            'led1_state': int(latest_state['led1_state']),
+            'led2_state': int(latest_state['led2_state']),
+            'motor_speed': int(latest_state['motor_speed'])
         }
 
     except Exception as e:
@@ -62,38 +62,28 @@ def lambda_handler(event, context):
         return create_cors_response(200, {"message": "CORS preflight successful"})
 
     try:
-        # Get client_id from either direct event or request body
-        client_id = None
-        
-        # Check if client_id is directly in the event
-        if 'client_id' in event:
-            client_id = event['client_id']
-        else:
-            # Try to get it from the request body
-            if isinstance(event.get('body'), str):
-                body = json.loads(event.get('body', '{}'))
-            else:
-                body = event.get('body', {})
-            client_id = body.get('client_id')
+        # Get client_id directly from the event
+        client_id = event.get('client_id')
         
         if not client_id:
-            return {
-                "error": "Missing client_id parameter"
-            }
+            return create_cors_response(400, {
+                "error": "Missing client_id in request"
+            })
 
         # Get the latest state
         latest_state = get_latest_state(client_id)
         
         if not latest_state:
-            return {
+            return create_cors_response(404, {
                 "error": f"No state found for device {client_id}"
-            }
+            })
 
-        # Return just the state data
-        return latest_state
+        return create_cors_response(200, {
+            "state": latest_state
+        })
 
     except Exception as e:
         print(f"Error processing request: {str(e)}")
-        return {
+        return create_cors_response(500, {
             "error": f"Internal server error: {str(e)}"
-        } 
+        }) 
