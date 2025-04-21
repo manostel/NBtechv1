@@ -89,6 +89,7 @@ ChartJS.register(
 
 const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
 const STATUS_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-status";
+const VARIABLES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-variables";
 
 export default function Dashboard2({ user, device, onLogout, onBack }) {
   const navigate = useNavigate();
@@ -217,6 +218,76 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     timestamp: null
   });
 
+  // Add this near the other state declarations
+  const [variablesLoaded, setVariablesLoaded] = useState(false);
+
+  const fetchVariables = async () => {
+    if (!device || !device.client_id) {
+      console.error('No device or client_id available');
+      return;
+    }
+
+    try {
+      setVariablesLoaded(false);
+      const response = await fetch(VARIABLES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.variables || !Array.isArray(result.variables)) {
+        throw new Error('Invalid response format from variables API');
+      }
+
+      // Create metrics config based on available variables
+      const newMetricsConfig = {};
+      result.variables.forEach(variable => {
+        newMetricsConfig[variable] = {
+          label: variable === 'temperature' ? 'Temperature' :
+                 variable === 'humidity' ? 'Humidity' :
+                 variable === 'battery' ? 'Battery' :
+                 variable === 'signal_quality' ? 'Signal Quality' : variable,
+          color: variable === 'temperature' ? '#FF6B6B' :
+                 variable === 'humidity' ? '#4ECDC4' :
+                 variable === 'battery' ? '#FFD166' :
+                 variable === 'signal_quality' ? '#06D6A0' : theme.palette.primary.main,
+          unit: variable === 'temperature' ? '°C' : 
+                variable === 'humidity' ? '%' : 
+                variable === 'battery' ? '%' : 
+                variable === 'signal_quality' ? '%' : '',
+          alertThresholds: {
+            min: variable === 'temperature' ? 10 : 
+                 variable === 'humidity' ? 30 : 
+                 variable === 'battery' ? 20 : 
+                 variable === 'signal_quality' ? 30 : 0,
+            max: variable === 'temperature' ? 30 : 
+                 variable === 'humidity' ? 70 : 
+                 variable === 'battery' ? 100 : 
+                 variable === 'signal_quality' ? 100 : 100
+          }
+        };
+      });
+
+      setMetricsConfig(newMetricsConfig);
+      setVariablesLoaded(true);
+    } catch (error) {
+      console.error('Error fetching variables:', error);
+      setError(error.message || 'Failed to fetch available variables');
+      setVariablesLoaded(false);
+    }
+  };
+
   const fetchData = async () => {
     if (!device || !device.client_id) {
       console.error('No device or client_id available');
@@ -278,48 +349,15 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       console.log('Received data:', data);
 
       if (Array.isArray(data) && data.length > 0) {
-        // Process data
-        const firstDataPoint = data[0];
-        const newMetricsConfig = {};
+        // Process data based on available metrics from metricsConfig
         const newMetricsData = {};
-
-        // Initialize metrics data structure
-        Object.keys(firstDataPoint).forEach(key => {
-          if (key !== 'timestamp' && key !== 'client_id') {
-            // Map the API field names to our metric names
-            const metricKey = key === 'thermistor_temp' ? 'temperature' : key;
-            newMetricsConfig[metricKey] = {
-              label: metricKey === 'temperature' ? 'Temperature' :
-                    metricKey === 'humidity' ? 'Humidity' :
-                    metricKey === 'battery' ? 'Battery' :
-                    metricKey === 'signal_quality' ? 'Signal Quality' : metricKey,
-              color: metricKey === 'temperature' ? '#FF6B6B' :
-                     metricKey === 'humidity' ? '#4ECDC4' :
-                     metricKey === 'battery' ? '#FFD166' :
-                     metricKey === 'signal_quality' ? '#06D6A0' : theme.palette.primary.main,
-              unit: metricKey === 'temperature' ? '°C' : 
-                    metricKey === 'humidity' ? '%' : 
-                    metricKey === 'battery' ? '%' : 
-                    metricKey === 'signal_quality' ? '%' : '',
-              alertThresholds: {
-                min: metricKey === 'temperature' ? 10 : 
-                     metricKey === 'humidity' ? 30 : 
-                     metricKey === 'battery' ? 20 : 
-                     metricKey === 'signal_quality' ? 30 : 0,
-                max: metricKey === 'temperature' ? 30 : 
-                     metricKey === 'humidity' ? 70 : 
-                     metricKey === 'battery' ? 100 : 
-                     metricKey === 'signal_quality' ? 100 : 100
-              }
-            };
-            newMetricsData[metricKey] = data.map(entry => ({
-              timestamp: entry.timestamp,
-              value: parseFloat(entry[key])
-            }));
-          }
+        Object.keys(metricsConfig).forEach(key => {
+          newMetricsData[key] = data.map(entry => ({
+            timestamp: entry.timestamp,
+            value: parseFloat(entry[key])
+          }));
         });
 
-        setMetricsConfig(newMetricsConfig);
         setMetricsData(newMetricsData);
 
         // Update last seen
@@ -343,21 +381,29 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
-  // Fetch data when component mounts or timeRange changes
+  // Update the useEffect hooks
   useEffect(() => {
-    fetchData();
-  }, [timeRange]);
+    if (device && device.client_id) {
+      fetchVariables();
+    }
+  }, [device]);
 
-  // Set up polling for live updates when timeRange is 'live'
+  useEffect(() => {
+    if (variablesLoaded) {
+      fetchData();
+    }
+  }, [timeRange, variablesLoaded]);
+
+  // Update the live polling useEffect
   useEffect(() => {
     let intervalId;
-    if (timeRange === 'live') {
+    if (timeRange === 'live' && variablesLoaded) {
       intervalId = setInterval(fetchData, 5000);
     }
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [timeRange]);
+  }, [timeRange, variablesLoaded]);
 
   const handleCloseError = () => {
     setError(null);
@@ -500,23 +546,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
-  // Data fetching and processing
-  useEffect(() => {
-    if (device && device.client_id) {
-      fetchData();
-    }
-  }, [device, timeRange]);
-
-  useEffect(() => {
-    let interval;
-    if (timeRange === 'live') {
-      interval = setInterval(fetchData, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [timeRange]);
-
   const renderSummaryCards = () => {
     return (
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -630,7 +659,19 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   const renderChart = (data, metricKey) => {
     const config = metricsConfig[metricKey];
-    if (!config) return null;
+    if (!config || !data || !Array.isArray(data) || data.length === 0) {
+      return (
+        <Box sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          color: theme.palette.text.secondary
+        }}>
+          <Typography variant="body2">No data available</Typography>
+        </Box>
+      );
+    }
 
     const chartData = {
       labels: data.map(d => d.timestamp),
