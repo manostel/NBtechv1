@@ -87,6 +87,7 @@ const DashboardCommands = ({
   };
 
   const handleSwitchChange = async (led, isOn) => {
+    setIsLoading(true);
     try {
       const command = isOn ? `TOGGLE_${led}_ON` : `TOGGLE_${led}_OFF`;
       
@@ -112,6 +113,8 @@ const DashboardCommands = ({
         message: error.message || 'Failed to update switch state',
         severity: 'error'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -247,7 +250,7 @@ const DashboardCommands = ({
           <Switch
             checked={led1State}
             onChange={(e) => handleSwitchChange(1, e.target.checked)}
-            disabled={isVerifying}
+            disabled={isLoading}
           />
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -255,7 +258,7 @@ const DashboardCommands = ({
           <Switch
             checked={led2State}
             onChange={(e) => handleSwitchChange(2, e.target.checked)}
-            disabled={isVerifying}
+            disabled={isLoading}
           />
         </Box>
       </Paper>
@@ -270,13 +273,13 @@ const DashboardCommands = ({
             type="number"
             value={motorSpeed}
             onChange={(e) => setMotorSpeed(e.target.value)}
-            disabled={isVerifying}
+            disabled={isLoading}
             sx={{ flex: 1 }}
           />
           <Button
             type="submit"
             variant="contained"
-            disabled={isVerifying}
+            disabled={isLoading}
           >
             Set Speed
           </Button>
@@ -297,14 +300,25 @@ const DashboardCommands = ({
           color="secondary"
           startIcon={<RestartAltIcon />}
           onClick={handleRestart}
-          disabled={isVerifying}
+          disabled={isLoading}
         >
           Restart Device
         </Button>
       </Paper>
 
-      {isVerifying && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+      {isLoading && (
+        <Box sx={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.1)',
+          zIndex: 1000
+        }}>
           <CircularProgress />
         </Box>
       )}
