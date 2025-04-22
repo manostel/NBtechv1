@@ -90,7 +90,7 @@ def get_last_timestamp(client_id):
         logger.error(f"Error getting last timestamp: {str(e)}")
         return None
 
-def fetch_data_in_chunks(client_id, start_time, end_time=None):
+def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variables=None):
     """Fetch data in smaller chunks to prevent timeouts"""
     all_items = []
     last_evaluated_key = None
@@ -108,6 +108,7 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None):
     
     logger.info(f"Starting data fetch for client_id: {client_id}")
     logger.info(f"Time range: {current_start.isoformat()} to {final_end.isoformat()}")
+    logger.info(f"Selected variables: {selected_variables}")
     
     while current_start < final_end:
         chunk_end = min(current_start + timedelta(hours=chunk_hours), final_end)
@@ -156,7 +157,21 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None):
                 logger.info(f"Query {query_count} returned {items_count} items in {query_time:.2f}s")
                 
                 if 'Items' in response:
-                    chunk_items.extend(response['Items'])
+                    # Filter items based on selected variables if provided
+                    if selected_variables:
+                        filtered_items = []
+                        for item in response['Items']:
+                            filtered_item = {
+                                'timestamp': item['timestamp'],
+                                'client_id': item['client_id']
+                            }
+                            for var in selected_variables:
+                                if var in item:
+                                    filtered_item[var] = item[var]
+                            filtered_items.append(filtered_item)
+                        chunk_items.extend(filtered_items)
+                    else:
+                        chunk_items.extend(response['Items'])
                 
                 last_evaluated_key = response.get('LastEvaluatedKey')
                 if not last_evaluated_key:
@@ -177,7 +192,7 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None):
     
     return all_items
 
-def aggregate_data(items, target_points):
+def aggregate_data(items, target_points, selected_variables=None):
     """Aggregate data to achieve consistent number of points"""
     if not items:
         return []
@@ -193,7 +208,10 @@ def aggregate_data(items, target_points):
     
     # Get all possible metrics from the first item, excluding specific fields
     excluded_fields = {'timestamp', 'client_id', 'user_email', 'device'}
-    metrics = [key for key in sorted_items[0].keys() if key not in excluded_fields]
+    if selected_variables:
+        metrics = selected_variables
+    else:
+        metrics = [key for key in sorted_items[0].keys() if key not in excluded_fields]
     
     for item in sorted_items:
         group_data = {}
@@ -240,32 +258,50 @@ def calculate_summary_statistics(data, metrics):
     return summary
 
 def lambda_handler(event, context):
+    # Handle OPTIONS request for CORS preflight
+    if event.get('httpMethod') == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'POST,OPTIONS',
+                'Content-Type': 'application/json'
+            },
+            'body': ''
+        }
+
     try:
-        # Parse the event body
-        if isinstance(event['body'], str):
-            body = json.loads(event['body'])
+        # Handle both direct input and API Gateway input formats
+        if 'body' in event:
+            # API Gateway format
+            if isinstance(event['body'], str):
+                body = json.loads(event['body'])
+            else:
+                body = event['body']
         else:
-            body = event['body']
+            # Direct input format
+            body = event
             
         # Extract required fields
         action = body.get('action')
         client_id = body.get('client_id')
-        user_email = body.get('user_email')
         time_range = body.get('time_range', '1h')
         points = body.get('points', 100)
         latest_timestamp = body.get('latest_timestamp')
+        selected_variables = body.get('selected_variables', None)
         
         # Validate required fields
-        if not all([action, client_id, user_email]):
+        if not all([action, client_id]):
             return {
                 'statusCode': 400,
                 'headers': {
                     'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Credentials': True,
+                    'Content-Type': 'application/json'
                 },
                 'body': json.dumps({
                     'error': 'Missing required fields',
-                    'message': 'action, client_id, and user_email are required'
+                    'message': 'action and client_id are required'
                 })
             }
             
@@ -295,15 +331,15 @@ def lambda_handler(event, context):
         else:
             end_time = datetime.utcnow()
             
-        # Fetch data from DynamoDB
-        items = fetch_data_in_chunks(client_id, start_time, end_time)
+        # Fetch data from DynamoDB with selected variables
+        items = fetch_data_in_chunks(client_id, start_time, end_time, selected_variables)
         
         if not items:
             return {
                 'statusCode': 200,
                 'headers': {
                     'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Credentials': True,
+                    'Content-Type': 'application/json'
                 },
                 'body': json.dumps({
                     'data': [],
@@ -316,16 +352,18 @@ def lambda_handler(event, context):
             }
             
         # Aggregate data to achieve consistent number of points
-        aggregated_data = aggregate_data(items, target_points)
+        aggregated_data = aggregate_data(items, target_points, selected_variables)
         
         # Calculate summary statistics
-        summary = calculate_summary_statistics(aggregated_data, [key for key in aggregated_data[0].keys() if key != 'timestamp'])
+        metrics_to_summarize = selected_variables if selected_variables else [key for key in aggregated_data[0].keys() if key != 'timestamp']
+        summary = calculate_summary_statistics(aggregated_data, metrics_to_summarize)
         
+        # Return response with CORS headers
         return {
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Credentials': True,
+                'Content-Type': 'application/json'
             },
             'body': json.dumps({
                 'data': aggregated_data,
@@ -339,7 +377,7 @@ def lambda_handler(event, context):
             'statusCode': 500,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Credentials': True,
+                'Content-Type': 'application/json'
             },
             'body': json.dumps({
                 'error': 'Internal server error',
