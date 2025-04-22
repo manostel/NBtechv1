@@ -106,6 +106,7 @@ ChartJS.register(
 );
 
 const DASHBOARD_DATA_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
+const DASHBOARD_LATEST_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-latest";
 const STATUS_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-status";
 const VARIABLES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-variables";
 const COMMAND_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/send-command";
@@ -326,6 +327,55 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
+  const fetchLatestData = async () => {
+    if (!device || !device.client_id) {
+      console.error('No device or client_id available');
+      return;
+    }
+
+    try {
+      const response = await fetch(DASHBOARD_LATEST_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Received latest data:', result);
+
+      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+        // Only update metrics data if we're on the overview tab
+        if (selectedTab === 0) {
+          const newMetricsData = {
+            data: result.data,
+            summary: result.summary || {}
+          };
+          setMetricsData(newMetricsData);
+        }
+
+        // Always update last seen and device status
+        const lastTimestamp = new Date(result.data[0].timestamp);
+        setLastSeen(lastTimestamp);
+        
+        // Update device status
+        const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
+        setDeviceStatus(timeDiffSeconds <= 120 ? "Active" : "Inactive");
+      }
+    } catch (error) {
+      console.error('Error fetching latest data:', error);
+      setError(error.message || 'Failed to connect to the server');
+    }
+  };
+
   const fetchData = async () => {
     if (!device || !device.client_id) {
       console.error('No device or client_id available');
@@ -336,6 +386,13 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       setIsLoading(true);
       setError(null);
       
+      // If we're on the overview tab, use the latest data API
+      if (selectedTab === 0) {
+        await fetchLatestData();
+        return;
+      }
+      
+      // For other tabs, use the regular dashboard data API
       const response = await fetch(DASHBOARD_DATA_URL, {
         method: 'POST',
         headers: {
@@ -377,7 +434,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         setDeviceStatus(timeDiffSeconds <= 120 ? "Active" : "Inactive");
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching dashboard data:', error);
       setError(error.message || 'Failed to connect to the server');
     } finally {
       setIsLoading(false);
@@ -431,13 +488,48 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       // Check if component is still mounted
       if (!isMounted.current) return;
       
-      // 2. Then fetch dashboard data
-      await fetchData();
+      // 2. Fetch latest data for overview tab
+      await fetchLatestData();
       
       // Check if component is still mounted
       if (!isMounted.current) return;
       
-      // 3. Finally fetch device state
+      // 3. Fetch regular dashboard data for other tabs
+      const response = await fetch(DASHBOARD_DATA_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'get_dashboard_data',
+          client_id: device.client_id,
+          user_email: user.email,
+          time_range: timeRange,
+          points: 60,
+          include_state: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Received initial dashboard data:', result);
+
+      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+        const newMetricsData = {
+          data: result.data,
+          summary: result.summary || {}
+        };
+        setMetricsData(newMetricsData);
+      }
+      
+      // Check if component is still mounted
+      if (!isMounted.current) return;
+      
+      // 4. Finally fetch device state
       const state = await fetchDeviceState();
       
       // Check if component is still mounted before updating state

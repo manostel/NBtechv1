@@ -19,7 +19,8 @@ const DashboardOverviewTab = ({
     );
   }
 
-  const latestData = metricsData.data?.[metricsData.data.length - 1] || {};
+  // Get the latest data point from the data array
+  const latestData = metricsData.data?.[0] || {};
   const summary = metricsData.summary || {};
 
   return (
@@ -35,6 +36,7 @@ const DashboardOverviewTab = ({
           const config = metricsConfig[key];
           if (!config) return null;
 
+          // Get value from summary first, then fallback to latest data
           const value = summary[`latest_${key}`] || latestData[key];
           
           return (

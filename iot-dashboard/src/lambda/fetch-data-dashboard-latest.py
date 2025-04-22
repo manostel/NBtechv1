@@ -27,30 +27,34 @@ def get_latest_data(client_id):
         if response.get('Items') and len(response['Items']) > 0:
             latest_item = response['Items'][0]
             
-            # Convert Decimal to float for all numeric values and exclude device, client_id, and timestamp
-            processed_data = []
-            timestamp = None
-            
+            # Convert Decimal to float for all numeric values
+            processed_data = {}
             for key, value in latest_item.items():
-                if key in ['device', 'client_id', 'timestamp']:
-                    if key == 'timestamp':
-                        timestamp = float(value) if isinstance(value, Decimal) else value
+                if key in ['device', 'client_id']:
                     continue
-                    
                 if isinstance(value, Decimal):
-                    processed_data.append({
-                        'name': key,
-                        'value': float(value)
-                    })
+                    processed_data[key] = float(value)
                 else:
-                    processed_data.append({
-                        'name': key,
-                        'value': value
-                    })
+                    processed_data[key] = value
+            
+            # Create summary statistics
+            summary = {
+                'data_points': 1,
+                'original_points': 1,
+                'target_points': 1
+            }
+            
+            # Add latest values to summary
+            for key, value in processed_data.items():
+                if key != 'timestamp':
+                    summary[f'latest_{key}'] = value
+                    summary[f'avg_{key}'] = value
+                    summary[f'min_{key}'] = value
+                    summary[f'max_{key}'] = value
             
             return {
-                'latest_data': processed_data,
-                'timestamp': timestamp
+                'data': [processed_data],
+                'summary': summary
             }
         return None
             
@@ -60,17 +64,24 @@ def get_latest_data(client_id):
 
 def lambda_handler(event, context):
     try:
-        # Get client_id directly from the event
-        client_id = event.get('client_id')
+        # Get client_id from event body if it's an API Gateway request
+        if 'body' in event:
+            body = json.loads(event['body'])
+            client_id = body.get('client_id')
+        else:
+            client_id = event.get('client_id')
+            
         if not client_id:
             return {
                 'statusCode': 400,
                 'headers': {
                     'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Allow-Methods': 'OPTIONS,POST'
+                    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                    'Access-Control-Allow-Methods': 'POST'
                 },
-                'body': json.dumps({'error': 'client_id is required'})
+                'body': json.dumps({
+                    'error': 'client_id is required'
+                })
             }
             
         # Get the latest data
@@ -80,29 +91,34 @@ def lambda_handler(event, context):
                 'statusCode': 404,
                 'headers': {
                     'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Allow-Methods': 'OPTIONS,POST'
+                    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                    'Access-Control-Allow-Methods': 'POST'
                 },
-                'body': json.dumps({'error': 'No data available'})
+                'body': json.dumps({
+                    'error': 'No data available'
+                })
             }
             
         return {
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Methods': 'OPTIONS,POST'
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                'Access-Control-Allow-Methods': 'POST'
             },
             'body': json.dumps(result)
         }
         
     except Exception as e:
+        logger.error(f"Error in lambda_handler: {str(e)}")
         return {
             'statusCode': 500,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Methods': 'OPTIONS,POST'
+                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                'Access-Control-Allow-Methods': 'POST'
             },
-            'body': json.dumps({'error': str(e)})
+            'body': json.dumps({
+                'error': str(e)
+            })
         } 
