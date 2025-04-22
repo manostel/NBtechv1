@@ -56,6 +56,22 @@ const DashboardStatisticsTab = ({
     </Paper>
   );
 
+  if (!metricsData || !metricsConfig) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography>Loading statistics...</Typography>
+      </Box>
+    );
+  }
+
+  if (!metricsData.data || !Array.isArray(metricsData.data) || metricsData.data.length === 0) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography>No data available for statistics.</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
@@ -72,8 +88,9 @@ const DashboardStatisticsTab = ({
       <Grid container spacing={3}>
         {selectedVariables.map((key) => {
           const config = metricsConfig[key];
-          const data = metricsData.data;
-          const stats = calculateStatistics(data, key);
+          if (!config) return null;
+
+          const stats = calculateStatistics(metricsData.data, key);
           if (!stats) return null;
 
           return (
@@ -82,7 +99,7 @@ const DashboardStatisticsTab = ({
                 <Typography variant="h6" gutterBottom>
                   {config.label}
                 </Typography>
-                <Grid container spacing={2}>
+                <Grid container spacing={3}>
                   <Grid item xs={12} sm={6} md={3}>
                     <StatCard
                       title="Average"

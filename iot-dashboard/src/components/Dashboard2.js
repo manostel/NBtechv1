@@ -147,8 +147,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [alarms, setAlarms] = useState([]);
   const [alarmHistory, setAlarmHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [timeRange, setTimeRange] = useState('15m');
-  const [refreshInterval, setRefreshInterval] = useState(5000);
+  const [refreshInterval, setRefreshInterval] = useState(10000);
   const [chartType, setChartType] = useState('line');
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
   const [chartMenuAnchor, setChartMenuAnchor] = useState(null);
@@ -353,16 +354,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       console.log('Received latest data:', result);
 
       if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        // Only update metrics data if we're on the overview tab
-        if (selectedTab === 0) {
-          const newMetricsData = {
-            data: result.data,
-            summary: result.summary || {}
-          };
-          setMetricsData(newMetricsData);
-        }
-
-        // Always update last seen and device status
+        // Only update last seen and device status
         const lastTimestamp = new Date(result.data[0].timestamp);
         setLastSeen(lastTimestamp);
         
@@ -383,16 +375,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
 
     try {
-      setIsLoading(true);
+      // Only set loading state for initial load
+      if (isInitialLoad) {
+        setIsLoading(true);
+      }
       setError(null);
       
-      // If we're on the overview tab, use the latest data API
-      if (selectedTab === 0) {
-        await fetchLatestData();
-        return;
-      }
-      
-      // For other tabs, use the regular dashboard data API
       const response = await fetch(DASHBOARD_DATA_URL, {
         method: 'POST',
         headers: {
@@ -414,30 +402,23 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       }
 
       const result = await response.json();
-      console.log('Received data:', result);
+      console.log('Received dashboard data:', result);
 
       if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        // Process data based on available metrics from metricsConfig
         const newMetricsData = {
           data: result.data,
           summary: result.summary || {}
         };
-
         setMetricsData(newMetricsData);
-
-        // Update last seen
-        const lastTimestamp = new Date(result.data[result.data.length - 1].timestamp);
-        setLastSeen(lastTimestamp);
-        
-        // Update device status
-        const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
-        setDeviceStatus(timeDiffSeconds <= 120 ? "Active" : "Inactive");
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setError(error.message || 'Failed to connect to the server');
     } finally {
-      setIsLoading(false);
+      if (isInitialLoad) {
+        setIsLoading(false);
+        setIsInitialLoad(false);
+      }
     }
   };
 
@@ -553,7 +534,14 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
-  // Update the useEffect to include isMounted check
+  // Update the timeRange useEffect to fetch data only when time range changes
+  useEffect(() => {
+    if (variablesLoaded && isMounted.current) {
+      fetchData();
+    }
+  }, [timeRange]);
+
+  // Update the initial data fetch useEffect
   useEffect(() => {
     if (device && device.client_id) {
       fetchInitialData();
@@ -563,27 +551,25 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     };
   }, [device]);
 
-  // Update the timeRange useEffect
+  // Add new useEffect for periodic data fetching
   useEffect(() => {
-    if (variablesLoaded && (timeRange === '15m' || timeRange !== '1h') && isMounted.current) {
-      fetchData();
-    }
-  }, [timeRange]);
+    if (!device || !device.client_id) return;
 
-  const handleRefresh = async () => {
-    setIsLoading(true);
-    try {
-      await Promise.all([
-        fetchData(),
-        fetchDeviceState()
-      ]);
-    } catch (error) {
-      console.error('Error during refresh:', error);
-      setError(error.message || 'Failed to refresh data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    // Initial fetch
+    fetchLatestData();
+    fetchDeviceState();
+
+    // Set up interval
+    const intervalId = setInterval(() => {
+      fetchLatestData();
+      fetchDeviceState();
+    }, refreshInterval);
+
+    // Cleanup interval on unmount
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [device, refreshInterval]);
 
   const handleCloseError = () => {
     setError(null);
@@ -825,7 +811,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             toggle1={toggle1}
             toggle2={toggle2}
             speedInput={speedInput}
-            onRefresh={handleRefresh}
+            onRefresh={fetchData}
             selectedVariables={selectedVariables}
             availableVariables={availableVariables}
             onVariableChange={handleVariableChange}
@@ -883,7 +869,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
-  if (isLoading) {
+  if (isInitialLoad && isLoading) {
     return <DashboardSkeleton />;
   }
 
@@ -934,13 +920,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           {device?.name || 'Device Dashboard'}
         </Typography>
-        <IconButton 
-          onClick={handleRefresh} 
-          disabled={isLoading}
-          sx={{ mr: 1 }}
-        >
-          <RefreshIcon />
-        </IconButton>
         <IconButton onClick={handleSettingsOpen}>
           <SettingsIcon />
         </IconButton>
