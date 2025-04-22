@@ -393,7 +393,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           user_email: user.email,
           time_range: timeRange,
           points: 60,
-          include_state: true
+          include_state: true,
+          selected_variables: selectedVariables
         })
       });
 
@@ -534,12 +535,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
-  // Update the timeRange useEffect to fetch data only when time range changes
+  // Update the timeRange useEffect to include selectedVariables
   useEffect(() => {
     if (variablesLoaded && isMounted.current) {
       fetchData();
     }
-  }, [timeRange]);
+  }, [timeRange, selectedVariables]);
 
   // Update the initial data fetch useEffect
   useEffect(() => {
