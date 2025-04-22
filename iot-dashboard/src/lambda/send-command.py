@@ -52,7 +52,7 @@ def lambda_handler(event, context):
 
         if not client_id or not command:
             return create_cors_response(400, {
-                "error": "Missing client_id or command/action"
+                "error": "Missing client_id or command"
             })
 
         # Validate the command

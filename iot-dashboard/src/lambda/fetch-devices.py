@@ -307,7 +307,7 @@ def lambda_handler(event, context):
             return cors_response(200, {
                 'message': 'Device updated successfully'
             })
-            
+        
         else:
             return cors_response(400, {
                 'error': f'Invalid action: {action}',
@@ -319,7 +319,7 @@ def lambda_handler(event, context):
         return cors_response(500, {
             'error': str(e),
             'debug_logs': debug_logs
-        }) 
+        })
 
 def create_device_item(body):
     """Helper function to create a standardized device item"""
