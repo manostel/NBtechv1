@@ -193,22 +193,26 @@ const DashboardCommands = ({
         loading: true
       });
 
-      // Send the restart command
+      // Send the command
       await handleCommandSend('RESTART');
-
+      
       setCommandFeedback({
         show: true,
         message: 'Waiting for device confirmation...',
         loading: true
       });
 
-      // Wait for device to restart
+      // Wait for device to process command
       await new Promise(resolve => setTimeout(resolve, 5000));
-
-      // Fetch the latest state
-      const finalState = await fetchDeviceState();
       
-      if (finalState) {
+      // Fetch the latest state
+      const latestState = await fetchDeviceState();
+      
+      // Update the UI with the new state
+      if (latestState) {
+        setLed1State(latestState.led1_state);
+        setLed2State(latestState.led2_state);
+        setMotorSpeed(latestState.motor_speed);
         setCommandFeedback({
           show: true,
           message: 'Restart command confirmed!',
@@ -220,10 +224,6 @@ const DashboardCommands = ({
           message: 'Restart command failed to verify',
           loading: false
         });
-      }
-
-      if (onCommandSend) {
-        onCommandSend();
       }
     } catch (error) {
       console.error('Error in handleRestart:', error);
