@@ -592,8 +592,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     setSelectedTab(newValue);
   };
 
-  const handleTimeRangeChange = (event) => {
-    const newTimeRange = event.target.value;
+  const handleTimeRangeChange = (newTimeRange) => {
     setTimeRange(newTimeRange);
     setPendingChanges(prev => ({
       ...prev,
@@ -821,6 +820,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Clear existing data before fetching new data
+      setMetricsData(null);
 
       const response = await fetch(DASHBOARD_DATA_URL, {
         method: 'POST',

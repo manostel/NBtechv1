@@ -13,7 +13,7 @@ import {
   TimeScale
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import DataControls from './DataControls';
+import SharedControls from './SharedControls';
 
 ChartJS.register(
   CategoryScale,
@@ -43,17 +43,7 @@ const DashboardChartsTab = ({
   const renderChart = (data, metricKey) => {
     const config = metricsConfig[metricKey];
     if (!config || !data || !Array.isArray(data) || data.length === 0) {
-      return (
-        <Box sx={{ 
-          height: '100%', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          color: theme.palette.text.secondary
-        }}>
-          <Typography variant="body2">No data available</Typography>
-        </Box>
-      );
+      return null;
     }
 
     const chartData = {
@@ -188,33 +178,58 @@ const DashboardChartsTab = ({
   };
 
   const renderCharts = () => {
-    if (!metricsData || !metricsConfig) return null;
+    // If we have data, show charts for the selected variables
+    if (metricsData?.data && metricsData.data.length > 0) {
+      // Get the variables that actually exist in the data
+      const dataVariables = Object.keys(metricsData.data[0]).filter(key => key !== 'timestamp');
+      
+      // Only render charts for variables that exist in the data
+      const charts = selectedVariables
+        .filter(key => dataVariables.includes(key))
+        .map((key) => {
+          const config = metricsConfig[key];
+          const data = metricsData.data;
+          if (!data || !Array.isArray(data) || data.length === 0) return null;
 
-    return selectedVariables.map((key) => {
-      const config = metricsConfig[key];
-      const data = metricsData.data;
-      if (!data || !Array.isArray(data) || data.length === 0) return null;
+          const chart = renderChart(data, key);
+          if (!chart) return null;
 
-      return (
-        <Grid item xs={12} key={key}>
-          <Paper sx={{ p: 3, height: '400px', bgcolor: theme.palette.background.paper }}>
-            <Typography variant="h6" gutterBottom>
-              {config.label} ({config.unit})
-            </Typography>
-            <Box sx={{ height: 'calc(100% - 40px)' }}>
-              {renderChart(data, key)}
-            </Box>
-          </Paper>
-        </Grid>
-      );
-    });
+          return (
+            <Grid item xs={12} key={key}>
+              <Paper sx={{ p: 3, height: '400px', bgcolor: theme.palette.background.paper }}>
+                <Typography variant="h6" gutterBottom>
+                  {config.label} ({config.unit})
+                </Typography>
+                <Box sx={{ height: 'calc(100% - 40px)' }}>
+                  {chart}
+                </Box>
+              </Paper>
+            </Grid>
+          );
+        }).filter(Boolean);
+
+      if (charts.length > 0) {
+        return charts;
+      }
+    }
+
+    // If we don't have any data, show the "No data" message
+    return (
+      <Grid item xs={12}>
+        <Paper sx={{ p: 3, textAlign: 'center', bgcolor: theme.palette.background.paper }}>
+          <Typography variant="h6" color="text.secondary">
+            No data available. Please select variables and click Apply to fetch data.
+          </Typography>
+        </Paper>
+      </Grid>
+    );
   };
 
   return (
     <Box sx={{ p: 3 }}>
-      <DataControls
-        variables={availableVariables}
+      <SharedControls
         selectedVariables={selectedVariables}
+        availableVariables={availableVariables}
         onVariableChange={onVariableChange}
         timeRange={timeRange}
         onTimeRangeChange={onTimeRangeChange}

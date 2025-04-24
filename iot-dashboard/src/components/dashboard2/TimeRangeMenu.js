@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import { Button, Menu, MenuItem } from "@mui/material";
-import { ArrowDropDown as ArrowDropDownIcon } from '@mui/icons-material';
+import React from 'react';
+import { Menu, MenuItem, IconButton, Tooltip } from '@mui/material';
+import { AccessTime as AccessTimeIcon } from '@mui/icons-material';
 
-const TimeRangeMenu = ({ timeRange, setTimeRange, timeRanges }) => {
-  const [anchorEl, setAnchorEl] = useState(null);
+export default function TimeRangeMenu({ timeRange, onTimeRangeChange, timeRanges }) {
+  const [anchorEl, setAnchorEl] = React.useState(null);
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -13,8 +13,8 @@ const TimeRangeMenu = ({ timeRange, setTimeRange, timeRanges }) => {
     setAnchorEl(null);
   };
 
-  const handleTimeRangeChange = (newTimeRange) => {
-    setTimeRange(newTimeRange);
+  const handleTimeRangeSelect = (range) => {
+    onTimeRangeChange(range);
     handleClose();
   };
 
@@ -33,13 +33,20 @@ const TimeRangeMenu = ({ timeRange, setTimeRange, timeRanges }) => {
 
   return (
     <>
-      <Button
-        variant="outlined"
-        onClick={handleClick}
-        endIcon={<ArrowDropDownIcon />}
-      >
-        {timeRange === 'live' ? 'Live' : getTimeRangeLabel(timeRange)}
-      </Button>
+      <Tooltip title="Select time range">
+        <IconButton
+          onClick={handleClick}
+          sx={{ 
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            '&:hover': {
+              bgcolor: 'primary.dark'
+            }
+          }}
+        >
+          <AccessTimeIcon />
+        </IconButton>
+      </Tooltip>
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
@@ -48,7 +55,8 @@ const TimeRangeMenu = ({ timeRange, setTimeRange, timeRanges }) => {
         {timeRanges.map((range) => (
           <MenuItem
             key={range.value}
-            onClick={() => handleTimeRangeChange(range.value)}
+            onClick={() => handleTimeRangeSelect(range.value)}
+            selected={timeRange === range.value}
           >
             {range.label}
           </MenuItem>
@@ -56,6 +64,4 @@ const TimeRangeMenu = ({ timeRange, setTimeRange, timeRanges }) => {
       </Menu>
     </>
   );
-};
-
-export default TimeRangeMenu; 
+} 

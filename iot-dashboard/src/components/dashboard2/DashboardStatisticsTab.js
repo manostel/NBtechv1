@@ -1,43 +1,48 @@
 import React from 'react';
 import { Box, Grid, Typography, Paper, useTheme } from '@mui/material';
 import { 
+  Timeline as TimelineIcon,
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
-  Timeline as TimelineIcon,
   Speed as SpeedIcon
 } from '@mui/icons-material';
-import DataControls from './DataControls';
+import SharedControls from './SharedControls';
 
 const DashboardStatisticsTab = ({ 
   metricsData, 
   metricsConfig,
+  timeRange,
   selectedVariables,
   availableVariables,
   onVariableChange,
-  timeRange,
   onTimeRangeChange,
   onApply
 }) => {
   const theme = useTheme();
 
   const calculateStatistics = (data, key) => {
-    if (!data || !Array.isArray(data) || data.length === 0) return null;
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return null;
+    }
 
-    const values = data.map(d => parseFloat(d[key])).filter(v => !isNaN(v));
+    const values = data.map(item => item[key]).filter(val => val !== undefined && val !== null);
     if (values.length === 0) return null;
 
-    const sum = values.reduce((a, b) => a + b, 0);
-    const avg = sum / values.length;
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    const average = sum / values.length;
     const min = Math.min(...values);
     const max = Math.max(...values);
-    const variance = values.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / values.length;
-    const stdDev = Math.sqrt(variance);
+    
+    // Calculate standard deviation
+    const squareDiffs = values.map(val => Math.pow(val - average, 2));
+    const avgSquareDiff = squareDiffs.reduce((acc, val) => acc + val, 0) / values.length;
+    const standardDeviation = Math.sqrt(avgSquareDiff);
 
     return {
-      average: avg,
+      average,
       min,
       max,
-      standardDeviation: stdDev,
+      standardDeviation,
       count: values.length
     };
   };
@@ -56,27 +61,11 @@ const DashboardStatisticsTab = ({
     </Paper>
   );
 
-  if (!metricsData || !metricsConfig) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography>Loading statistics...</Typography>
-      </Box>
-    );
-  }
-
-  if (!metricsData.data || !Array.isArray(metricsData.data) || metricsData.data.length === 0) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography>No data available for statistics.</Typography>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ p: 3 }}>
-      <DataControls
-        variables={availableVariables}
+      <SharedControls
         selectedVariables={selectedVariables}
+        availableVariables={availableVariables}
         onVariableChange={onVariableChange}
         timeRange={timeRange}
         onTimeRangeChange={onTimeRangeChange}

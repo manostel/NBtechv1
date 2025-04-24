@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   FormControl, 
@@ -7,75 +7,79 @@ import {
   MenuItem, 
   Checkbox, 
   ListItemText, 
-  Button
+  OutlinedInput
 } from '@mui/material';
 
-const VariableSelector = ({ variables, selectedVariables, onVariableChange }) => {
+const VariableSelector = ({ 
+  variables, 
+  selectedVariables, 
+  onVariableChange,
+  label = "Select variables",
+  singleSelect = false
+}) => {
   const [tempSelected, setTempSelected] = useState(selectedVariables);
 
-  const handleChange = (event) => {
-    setTempSelected(event.target.value);
-  };
+  // Update tempSelected when selectedVariables prop changes
+  useEffect(() => {
+    setTempSelected(selectedVariables);
+  }, [selectedVariables]);
 
-  const handleApply = () => {
-    onVariableChange({ target: { value: tempSelected } });
+  const handleChange = (event) => {
+    const newValue = event.target.value;
+    setTempSelected(newValue);
+    // Only update the parent's state, don't trigger API calls
+    onVariableChange({ target: { value: newValue } });
   };
 
   return (
     <Box sx={{ mb: 2 }}>
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        <FormControl sx={{ width: 150 }} size="small">
-          <InputLabel>Select variables</InputLabel>
-          <Select
-            multiple
-            value={tempSelected}
-            onChange={handleChange}
-            renderValue={(selected) => `${selected.length} selected`}
-            label="Select variables"
-            size="small"
-            MenuProps={{
-              PaperProps: {
-                style: {
-                  maxHeight: 200,
-                  width: 200,
-                },
+      <FormControl sx={{ width: 150 }} size="small">
+        <InputLabel>{label}</InputLabel>
+        <Select
+          multiple={!singleSelect}
+          value={tempSelected}
+          onChange={handleChange}
+          input={<OutlinedInput label={label} />}
+          renderValue={(selected) => {
+            if (singleSelect) {
+              return selected[0] || '';
+            }
+            return `${selected.length} selected`;
+          }}
+          MenuProps={{
+            PaperProps: {
+              style: {
+                maxHeight: 200,
+                width: 200,
               },
-            }}
-          >
-            {variables.map((variable) => (
-              <MenuItem 
-                key={variable} 
-                value={variable}
+            },
+          }}
+        >
+          {variables.map((variable) => (
+            <MenuItem 
+              key={variable} 
+              value={variable}
+              sx={{ 
+                py: 0.5,
+                '& .MuiListItemText-root': {
+                  margin: 0
+                }
+              }}
+            >
+              {!singleSelect && <Checkbox checked={tempSelected.indexOf(variable) > -1} size="small" />}
+              <ListItemText 
+                primary={variable} 
                 sx={{ 
-                  py: 0.5,
-                  '& .MuiListItemText-root': {
-                    margin: 0
+                  ml: singleSelect ? 0 : 1,
+                  '& .MuiTypography-root': {
+                    fontSize: '0.875rem'
                   }
                 }}
-              >
-                <Checkbox checked={tempSelected.indexOf(variable) > -1} size="small" />
-                <ListItemText 
-                  primary={variable} 
-                  sx={{ 
-                    ml: 1,
-                    '& .MuiTypography-root': {
-                      fontSize: '0.875rem'
-                    }
-                  }}
-                />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button 
-          variant="contained" 
-          onClick={handleApply}
-          size="small"
-          sx={{ minWidth: 80 }}
-        >
-          Apply
-        </Button>
-      </Box>
+              />
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
     </Box>
   );
 };
