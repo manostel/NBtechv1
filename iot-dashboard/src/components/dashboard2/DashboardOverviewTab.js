@@ -5,7 +5,7 @@ import VariableSelector from './VariableSelector';
 
 const DashboardOverviewTab = ({ 
   metricsData, 
-  metricsConfig, 
+  metricsConfig,
   deviceState,
   selectedVariables,
   availableVariables,
@@ -19,9 +19,18 @@ const DashboardOverviewTab = ({
     );
   }
 
-  // Get the latest data point from the data array
-  const latestData = metricsData.data?.[0] || {};
-  const summary = metricsData.summary || {};
+  // Get the latest data point from data_latest array
+  const latestData = metricsData.data_latest?.[0] || {};
+  const summary = metricsData.summary_latest || {};
+
+  // Define the metrics to display in order
+  const metrics = [
+    { key: 'signal_quality', label: 'Signal Quality', unit: '%' },
+    { key: 'thermistor_temp', label: 'Thermistor Temperature', unit: '°C' },
+    { key: 'humidity', label: 'Humidity', unit: '%' },
+    { key: 'temperature', label: 'Temperature', unit: '°C' },
+    { key: 'battery', label: 'Battery', unit: '%' }
+  ];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -32,20 +41,16 @@ const DashboardOverviewTab = ({
       />
       
       <Grid container spacing={3}>
-        {selectedVariables.map((key) => {
-          const config = metricsConfig[key];
-          if (!config) return null;
-
-          // Get value from summary first, then fallback to latest data
-          const value = summary[`latest_${key}`] || latestData[key];
+        {metrics.map(({ key, label, unit }) => {
+          // Get value directly from latestData
+          const value = latestData[key];
           
           return (
             <Grid item xs={12} sm={6} md={3} key={key}>
               <MetricCard
-                title={config.label}
+                title={label}
                 value={value !== undefined ? value : 'N/A'}
-                unit={config.unit}
-                color={config.color}
+                unit={unit}
               />
             </Grid>
           );
@@ -62,23 +67,22 @@ const DashboardOverviewTab = ({
             <Grid item xs={12} sm={6} md={3}>
               <MetricCard
                 title="LED 1"
-                value={deviceState.led1_state === 1 ? 'ON' : 'OFF'}
-                color={deviceState.led1_state === 1 ? '#4CAF50' : '#F44336'}
+                value={deviceState.led1_state === 1 ? "ON" : "OFF"}
+                isText={true}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <MetricCard
                 title="LED 2"
-                value={deviceState.led2_state === 1 ? 'ON' : 'OFF'}
-                color={deviceState.led2_state === 1 ? '#4CAF50' : '#F44336'}
+                value={deviceState.led2_state === 1 ? "ON" : "OFF"}
+                isText={true}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <MetricCard
                 title="Motor Speed"
-                value={deviceState.motor_speed || 0}
+                value={deviceState.motor_speed}
                 unit="%"
-                color="#2196F3"
               />
             </Grid>
           </Grid>

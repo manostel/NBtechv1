@@ -370,9 +370,16 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       const result = await response.json();
       console.log('Received latest data:', result);
 
-      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        // Only update last seen and device status
-        const lastTimestamp = new Date(result.data[0].timestamp);
+      if (result.data_latest && Array.isArray(result.data_latest) && result.data_latest.length > 0) {
+        // Update the metrics data while preserving existing data
+        setMetricsData(prevData => ({
+          ...prevData,
+          data_latest: result.data_latest,
+          summary_latest: result.summary_latest || {}
+        }));
+        
+        // Update last seen and device status
+        const lastTimestamp = new Date(result.data_latest[0].timestamp);
         setLastSeen(lastTimestamp);
         
         // Update device status
@@ -821,9 +828,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       setIsLoading(true);
       setError(null);
       
-      // Clear existing data before fetching new data
-      setMetricsData(null);
-
       const response = await fetch(DASHBOARD_DATA_URL, {
         method: 'POST',
         headers: {
@@ -849,11 +853,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       console.log('Received dashboard data:', result);
 
       if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        const newMetricsData = {
+        // Update the metrics data while preserving latest data
+        setMetricsData(prevData => ({
+          ...prevData,
           data: result.data,
           summary: result.summary || {}
-        };
-        setMetricsData(newMetricsData);
+        }));
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
