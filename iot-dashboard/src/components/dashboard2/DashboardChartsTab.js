@@ -13,8 +13,7 @@ import {
   TimeScale
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import VariableSelector from './VariableSelector';
-import TimeRangeSelector from './TimeRangeSelector';
+import DataControls from './DataControls';
 
 ChartJS.register(
   CategoryScale,
@@ -35,7 +34,8 @@ const DashboardChartsTab = ({
   selectedVariables,
   availableVariables,
   onVariableChange,
-  onTimeRangeChange
+  onTimeRangeChange,
+  onApply
 }) => {
   const theme = useTheme();
   const chartRef = React.useRef(null);
@@ -212,17 +212,14 @@ const DashboardChartsTab = ({
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <VariableSelector
-          variables={availableVariables}
-          selectedVariables={selectedVariables}
-          onVariableChange={onVariableChange}
-        />
-        <TimeRangeSelector
-          timeRange={timeRange}
-          onTimeRangeChange={onTimeRangeChange}
-        />
-      </Box>
+      <DataControls
+        variables={availableVariables}
+        selectedVariables={selectedVariables}
+        onVariableChange={onVariableChange}
+        timeRange={timeRange}
+        onTimeRangeChange={onTimeRangeChange}
+        onApply={onApply}
+      />
       <Grid container spacing={3}>
         {renderCharts()}
       </Grid>

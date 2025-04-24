@@ -6,8 +6,7 @@ import {
   Timeline as TimelineIcon,
   Speed as SpeedIcon
 } from '@mui/icons-material';
-import VariableSelector from './VariableSelector';
-import TimeRangeSelector from './TimeRangeSelector';
+import DataControls from './DataControls';
 
 const DashboardStatisticsTab = ({ 
   metricsData, 
@@ -16,7 +15,8 @@ const DashboardStatisticsTab = ({
   availableVariables,
   onVariableChange,
   timeRange,
-  onTimeRangeChange
+  onTimeRangeChange,
+  onApply
 }) => {
   const theme = useTheme();
 
@@ -74,17 +74,14 @@ const DashboardStatisticsTab = ({
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <VariableSelector
-          variables={availableVariables}
-          selectedVariables={selectedVariables}
-          onVariableChange={onVariableChange}
-        />
-        <TimeRangeSelector
-          timeRange={timeRange}
-          onTimeRangeChange={onTimeRangeChange}
-        />
-      </Box>
+      <DataControls
+        variables={availableVariables}
+        selectedVariables={selectedVariables}
+        onVariableChange={onVariableChange}
+        timeRange={timeRange}
+        onTimeRangeChange={onTimeRangeChange}
+        onApply={onApply}
+      />
       <Grid container spacing={3}>
         {selectedVariables.map((key) => {
           const config = metricsConfig[key];

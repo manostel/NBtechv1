@@ -146,10 +146,10 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [deviceState, setDeviceState] = useState(null);
   const [alarms, setAlarms] = useState([]);
   const [alarmHistory, setAlarmHistory] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [timeRange, setTimeRange] = useState('15m');
-  const [refreshInterval, setRefreshInterval] = useState(10000);
+  const [timeRange, setTimeRange] = useState('1h');
+  const [refreshInterval, setRefreshInterval] = useState(60);
   const [chartType, setChartType] = useState('line');
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
   const [chartMenuAnchor, setChartMenuAnchor] = useState(null);
@@ -182,7 +182,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [deviceName, setDeviceName] = useState("Unknown");
   const [toggle1, setToggle1] = useState(false);
   const [toggle2, setToggle2] = useState(false);
-  const [speedInput, setSpeedInput] = useState("");
+  const [speedInput, setSpeedInput] = useState(0);
   const [commandHistory, setCommandHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [showAlerts, setShowAlerts] = useState(false);
@@ -240,19 +240,36 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   // Add cleanup ref for component unmount
   const isMounted = useRef(true);
 
-  const [selectedVariables, setSelectedVariables] = useState([]);
+  // Separate state for overview tab
+  const [selectedVariablesOverview, setSelectedVariablesOverview] = useState([]);
+  
+  // Shared state for charts and statistics tabs
+  const [selectedVariablesChartsStats, setSelectedVariablesChartsStats] = useState([]);
+  
   const [availableVariables, setAvailableVariables] = useState([]);
+
+  // Add state for tracking pending changes
+  const [pendingChanges, setPendingChanges] = useState({
+    timeRange: null,
+    variables: null
+  });
 
   useEffect(() => {
     if (metricsConfig) {
       const variables = Object.keys(metricsConfig);
       setAvailableVariables(variables);
-      setSelectedVariables(variables);
+      setSelectedVariablesChartsStats(variables);
+      setSelectedVariablesOverview(variables);
     }
   }, [metricsConfig]);
 
-  const handleVariableChange = (event) => {
-    setSelectedVariables(event.target.value);
+  const handleVariableChange = (event, isOverview = false) => {
+    const newVariables = event.target.value;
+    if (isOverview) {
+      setSelectedVariablesOverview(newVariables);
+    } else {
+      setSelectedVariablesChartsStats(newVariables);
+    }
   };
 
   useEffect(() => {
@@ -394,7 +411,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           time_range: timeRange,
           points: 60,
           include_state: true,
-          selected_variables: selectedVariables
+          selected_variables: selectedVariablesChartsStats
         })
       });
 
@@ -476,7 +493,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       // Check if component is still mounted
       if (!isMounted.current) return;
       
-      // 3. Fetch regular dashboard data for other tabs
+      // 3. Fetch regular dashboard data with selected variables
       const response = await fetch(DASHBOARD_DATA_URL, {
         method: 'POST',
         headers: {
@@ -489,7 +506,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           user_email: user.email,
           time_range: timeRange,
           points: 60,
-          include_state: true
+          include_state: true,
+          selected_variables: selectedVariablesChartsStats
         })
       });
 
@@ -535,13 +553,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
-  // Update the timeRange useEffect to include selectedVariables
-  useEffect(() => {
-    if (variablesLoaded && isMounted.current) {
-      fetchData();
-    }
-  }, [timeRange, selectedVariables]);
-
   // Update the initial data fetch useEffect
   useEffect(() => {
     if (device && device.client_id) {
@@ -560,17 +571,17 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     fetchLatestData();
     fetchDeviceState();
 
-    // Set up interval
+    // Set up interval to fetch every 30 seconds regardless of tab
     const intervalId = setInterval(() => {
       fetchLatestData();
       fetchDeviceState();
-    }, refreshInterval);
+    }, 30000);
 
     // Cleanup interval on unmount
     return () => {
       clearInterval(intervalId);
     };
-  }, [device, refreshInterval]);
+  }, [device]); // Removed selectedTab from dependencies
 
   const handleCloseError = () => {
     setError(null);
@@ -582,8 +593,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   };
 
   const handleTimeRangeChange = (event) => {
-    setTimeRange(event.target.value);
-    fetchData(event.target.value);
+    const newTimeRange = event.target.value;
+    setTimeRange(newTimeRange);
+    setPendingChanges(prev => ({
+      ...prev,
+      timeRange: newTimeRange
+    }));
   };
 
   const handleExportData = () => {
@@ -797,6 +812,55 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
+  const handleApply = async () => {
+    if (!device || !device.client_id) {
+      console.error('No device or client_id available');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch(DASHBOARD_DATA_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'get_dashboard_data',
+          client_id: device.client_id,
+          user_email: user.email,
+          time_range: timeRange,
+          points: 60,
+          include_state: true,
+          selected_variables: selectedVariablesChartsStats
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Received dashboard data:', result);
+
+      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+        const newMetricsData = {
+          data: result.data,
+          summary: result.summary || {}
+        };
+        setMetricsData(newMetricsData);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setError(error.message || 'Failed to connect to the server');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const renderTabContent = (tabValue) => {
     switch (tabValue) {
       case 0:
@@ -813,9 +877,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             toggle2={toggle2}
             speedInput={speedInput}
             onRefresh={fetchData}
-            selectedVariables={selectedVariables}
+            selectedVariables={selectedVariablesOverview}
             availableVariables={availableVariables}
-            onVariableChange={handleVariableChange}
+            onVariableChange={(e) => handleVariableChange(e, true)}
             onTimeRangeChange={handleTimeRangeChange}
           />
         );
@@ -826,10 +890,11 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             metricsConfig={metricsConfig}
             timeRange={timeRange}
             chartConfig={chartConfig}
-            selectedVariables={selectedVariables}
+            selectedVariables={selectedVariablesChartsStats}
             availableVariables={availableVariables}
             onVariableChange={handleVariableChange}
             onTimeRangeChange={handleTimeRangeChange}
+            onApply={handleApply}
           />
         );
       case 2:
@@ -838,11 +903,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             metricsData={metricsData}
             metricsConfig={metricsConfig}
             deviceState={deviceState}
-            selectedVariables={selectedVariables}
+            selectedVariables={selectedVariablesChartsStats}
             availableVariables={availableVariables}
             onVariableChange={handleVariableChange}
             timeRange={timeRange}
             onTimeRangeChange={handleTimeRangeChange}
+            onApply={handleApply}
           />
         );
       case 3:
