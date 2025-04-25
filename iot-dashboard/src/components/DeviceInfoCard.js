@@ -4,6 +4,7 @@ import { useTheme } from "@mui/material/styles";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
+import PropTypes from 'prop-types';
 
 export default function DeviceInfoCard({ 
   clientID, 
@@ -21,16 +22,17 @@ export default function DeviceInfoCard({
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "Active":
+      case "Online":
         return theme.palette.success.main;
-      case "Inactive":
-        return theme.palette.error.main;
-      case "Error":
+      case "Offline":
         return theme.palette.error.main;
       default:
         return theme.palette.grey[500];
     }
   };
+
+  // Convert Active/Inactive to Online/Offline for display
+  const displayStatus = status === "Active" ? "Online" : "Offline";
 
   return (
     <Card sx={{ mb: 3, bgcolor: theme.palette.background.paper }}>
@@ -67,11 +69,11 @@ export default function DeviceInfoCard({
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
-                      bgcolor: getStatusColor(status),
+                      bgcolor: getStatusColor(displayStatus)
                     }}
                   />
                   <Typography variant="subtitle1" color="textSecondary" sx={{ fontWeight: 'medium' }}>
-                    {status}
+                    {displayStatus}
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -92,3 +94,29 @@ export default function DeviceInfoCard({
     </Card>
   );
 }
+
+DeviceInfoCard.propTypes = {
+  clientID: PropTypes.string,
+  device: PropTypes.string,
+  status: PropTypes.string,
+  lastOnline: PropTypes.string,
+  isLoading: PropTypes.bool,
+  batteryLevel: PropTypes.number,
+  signalStrength: PropTypes.number,
+  showClientId: PropTypes.bool,
+  onToggleClientId: PropTypes.func,
+  batteryState: PropTypes.string
+};
+
+DeviceInfoCard.defaultProps = {
+  clientID: '',
+  device: '',
+  status: 'Offline',
+  lastOnline: 'Never',
+  isLoading: false,
+  batteryLevel: 0,
+  signalStrength: 0,
+  showClientId: false,
+  onToggleClientId: () => {},
+  batteryState: 'idle'
+};

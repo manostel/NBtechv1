@@ -464,16 +464,16 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   };
 
   const getDeviceStatus = (deviceData) => {
-    if (!deviceData?.latest_data?.timestamp) return 'Inactive';
+    if (!deviceData?.latest_data?.timestamp) return 'Offline';
     
     const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
     const now = new Date();
     const diffInMinutes = (now - lastUpdateTime) / (1000 * 60);
-    return diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Active' : 'Inactive';
+    return diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Online' : 'Offline';
   };
 
   const getStatusColor = (status) => {
-    return status === 'Active' ? '#4caf50' : '#f44336';
+    return status === 'Online' ? '#4caf50' : '#f44336';
   };
 
   const handleDragStart = (e, device) => {
