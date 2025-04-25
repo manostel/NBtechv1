@@ -254,6 +254,10 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     variables: null
   });
 
+  // Add these state variables near the other state declarations
+  const [batteryLevel, setBatteryLevel] = useState(0);
+  const [signalStrength, setSignalStrength] = useState(0);
+
   useEffect(() => {
     if (metricsConfig) {
       const variables = Object.keys(metricsConfig);
@@ -372,20 +376,26 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       console.log('Received latest data:', result);
 
       if (result.data_latest && Array.isArray(result.data_latest) && result.data_latest.length > 0) {
-        // Update the metrics data while preserving existing data
+        const latestData = result.data_latest[0];
+        const summary = result.summary_latest || {};
+
+        // Update device status based on timestamp
+        const lastTimestamp = new Date(latestData.timestamp);
+        const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
+        const deviceStatus = timeDiffSeconds <= 120 ? "Active" : "Inactive";
+
+        // Update metrics data with latest values
         setMetricsData(prevData => ({
           ...prevData,
           data_latest: result.data_latest,
-          summary_latest: result.summary_latest || {}
+          summary_latest: summary
         }));
-        
-        // Update last seen and device status
-        const lastTimestamp = new Date(result.data_latest[0].timestamp);
+
+        // Update device info
+        setDeviceStatus(deviceStatus);
         setLastSeen(lastTimestamp);
-        
-        // Update device status
-        const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
-        setDeviceStatus(timeDiffSeconds <= 120 ? "Active" : "Inactive");
+        setClientID(device.client_id);
+        setDeviceName(device.name || "Unknown");
       }
     } catch (error) {
       console.error('Error fetching latest data:', error);
@@ -973,8 +983,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           status={deviceStatus}
           lastOnline={lastSeen ? lastSeen.toLocaleString() : 
             device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString() : "N/A"}
-          batteryLevel={metricsData?.summary?.latest_battery_level || metricsData?.summary?.latest_battery || 0}
-          signalStrength={metricsData?.summary?.latest_signal_quality || metricsData?.summary?.latest_signal || 0}
+          batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
+          signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
           showClientId={showClientId}
           onToggleClientId={() => setShowClientId(!showClientId)}
         />
