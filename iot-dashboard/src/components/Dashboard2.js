@@ -393,7 +393,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
-  const fetchData = async () => {
+  const fetchGraphData = async () => {
     if (!device || !device.client_id) {
       console.error('No device or client_id available');
       return;
@@ -496,7 +496,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       if (!isMounted.current) return;
       
       // 2. Fetch regular dashboard data
-      await fetchData();
+      await fetchGraphData();
       
       // Check if component is still mounted
       if (!isMounted.current) return;
@@ -840,7 +840,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             toggle1={toggle1}
             toggle2={toggle2}
             speedInput={speedInput}
-            onRefresh={fetchData}
+            onRefresh={fetchGraphData}
             selectedVariables={selectedVariablesOverview}
             availableVariables={availableVariables}
             onVariableChange={(e) => handleVariableChange(e, true)}
