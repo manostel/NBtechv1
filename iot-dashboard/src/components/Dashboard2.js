@@ -262,6 +262,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   // Add this state variable near other state declarations
   const [batteryState, setBatteryState] = useState('idle');
 
+  // Add a ref to track if we're already fetching
+  const isFetching = useRef(false);
+
   useEffect(() => {
     if (metricsConfig) {
       const variables = Object.keys(metricsConfig);
@@ -453,9 +456,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         setLastSeen(lastTimestamp);
         setClientID(device.client_id);
         setDeviceName(device.name || "Unknown");
-
-        // Fetch battery state
-        await fetchBatteryState();
       }
     } catch (error) {
       console.error('Error fetching latest data:', error);
@@ -571,29 +571,11 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       // Check if component is still mounted
       if (!isMounted.current) return;
       
-      // 3. Fetch latest data
-      await fetchLatestData();
-      
-      // Check if component is still mounted
-      if (!isMounted.current) return;
-      
-      // 4. Finally fetch device state
-      await fetchDeviceState();
-
-      // Set up interval for periodic updates
-      const intervalId = setInterval(async () => {
-        if (!isMounted.current) {
-          clearInterval(intervalId);
-          return;
-        }
-        await fetchLatestData();
-        await fetchDeviceState();
-      }, 30000);
-
-      // Cleanup interval on unmount
-      return () => {
-        clearInterval(intervalId);
-      };
+      // 3. Fetch latest data and device state together
+      await Promise.all([
+        fetchLatestData(),
+        fetchDeviceState()
+      ]);
       
     } catch (error) {
       console.error('Error in initial data fetch:', error);
@@ -610,11 +592,54 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   // Update the initial data fetch useEffect
   useEffect(() => {
     if (device && device.client_id) {
-      fetchInitialData();
+      const fetchData = async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
+        
+        try {
+          await fetchInitialData();
+          // Make initial call to fetch battery state
+          await fetchBatteryState();
+        } finally {
+          isFetching.current = false;
+        }
+      };
+
+      fetchData();
+      
+      // Set up intervals for different data types
+      const latestDataInterval = setInterval(async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
+        
+        try {
+          // Fetch latest data and device state together every 30 seconds
+          await Promise.all([
+            fetchLatestData(),
+            fetchDeviceState()
+          ]);
+        } finally {
+          isFetching.current = false;
+        }
+      }, 30000); // 30 seconds for latest data and device state
+
+      const batteryStateInterval = setInterval(async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
+        
+        try {
+          await fetchBatteryState();
+        } finally {
+          isFetching.current = false;
+        }
+      }, 150000); // 2.5minitues for battery state
+
+      // Cleanup intervals on unmount
+      return () => {
+        clearInterval(latestDataInterval);
+        clearInterval(batteryStateInterval);
+      };
     }
-    return () => {
-      isMounted.current = false;
-    };
   }, [device]);
 
   const handleCloseError = () => {

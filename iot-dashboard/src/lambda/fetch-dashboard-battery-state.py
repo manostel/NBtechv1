@@ -62,13 +62,13 @@ def determine_battery_state(battery_data: List[tuple]) -> str:
         change = last_battery - first_battery
         
         # If battery increased by 3% or more, it's charging
-        if change >= 4.0:
+        if change >= 1.0:
             return 'charging'
         # If battery decreased by 3% or more, it's discharging
-        elif change <= -4.0:
+        elif change <= -1.0:
             return 'discharging'
         # If change is between -2% and +2%, it's idle
-        elif -4.0 < change < 4.0:
+        elif -1.0 < change < 1.0:
             return 'idle'
         # For changes between 2-3% or -3% to -2%, we'll consider it idle
         return 'idle'
