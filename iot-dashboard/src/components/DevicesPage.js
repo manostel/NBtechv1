@@ -52,6 +52,7 @@ import { useTheme as useMuiTheme } from '@mui/material/styles';
 const DEVICES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
 const DEVICE_PREFERENCES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-preferences";
+const BATTERY_STATE_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
 
 const DeviceSkeleton = () => (
   <Paper sx={{ p: 2, height: '100%' }}>
@@ -250,15 +251,35 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       const dataResult = await dataResponse.json();
       const deviceData = JSON.parse(dataResult.body).device_data;
 
+      // Fetch battery state
+      const batteryStateResponse = await fetch(BATTERY_STATE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      let batteryState = 'idle';
+      if (batteryStateResponse.ok) {
+        const batteryResult = await batteryStateResponse.json();
+        batteryState = batteryResult.battery_state;
+      }
+
       return {
         ...device,
         ...deviceData,
+        battery_state: batteryState
       };
 
     } catch (error) {
       console.error(`Error fetching data for device ${device.client_id}:`, error);
       return {
         ...device,
+        battery_state: 'idle'
       };
     }
   };
@@ -1311,7 +1332,10 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
                                         {/* Indicators */}
                                         <Box sx={{ display: 'flex', gap: 2, my: 2 }}>
-                                            <BatteryIndicator value={Number(latestData.battery) || 0} />
+                                            <BatteryIndicator 
+                                              value={Number(latestData.battery) || 0} 
+                                              batteryState={currentDeviceData.battery_state || 'idle'} 
+                                            />
                                             <SignalIndicator value={Number(latestData.signal_quality) || 0} />
                   </Box>
 
