@@ -23,15 +23,6 @@ const DashboardOverviewTab = ({
   const latestData = metricsData.data_latest?.[0] || {};
   const summary = metricsData.summary_latest || {};
 
-  // Define the metrics to display in order
-  const metrics = [
-    { key: 'signal_quality', label: 'Signal Quality', unit: '%' },
-    { key: 'thermistor_temp', label: 'Thermistor Temperature', unit: '°C' },
-    { key: 'humidity', label: 'Humidity', unit: '%' },
-    { key: 'temperature', label: 'Temperature', unit: '°C' },
-    { key: 'battery', label: 'Battery', unit: '%' }
-  ];
-
   return (
     <Box sx={{ p: 3 }}>
       <VariableSelector
@@ -40,17 +31,21 @@ const DashboardOverviewTab = ({
         onVariableChange={onVariableChange}
       />
       
-      <Grid container spacing={3}>
-        {metrics.map(({ key, label, unit }) => {
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        {selectedVariables.map((key) => {
+          const config = metricsConfig[key];
+          if (!config) return null;
+
           // Get value directly from latestData
           const value = latestData[key];
           
           return (
             <Grid item xs={12} sm={6} md={3} key={key}>
               <MetricCard
-                title={label}
+                title={config.label}
                 value={value !== undefined ? value : 'N/A'}
-                unit={unit}
+                unit={config.unit}
+                color={config.color}
               />
             </Grid>
           );

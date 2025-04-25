@@ -359,7 +359,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          client_id: device.client_id
+          client_id: device.client_id,
+          selected_variables: selectedVariablesOverview
         })
       });
 
@@ -494,60 +495,36 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       // Check if component is still mounted
       if (!isMounted.current) return;
       
-      // 2. Fetch latest data for overview tab
+      // 2. Fetch regular dashboard data
+      await fetchData();
+      
+      // Check if component is still mounted
+      if (!isMounted.current) return;
+      
+      // 3. Fetch latest data
       await fetchLatestData();
       
       // Check if component is still mounted
       if (!isMounted.current) return;
       
-      // 3. Fetch regular dashboard data with selected variables
-      const response = await fetch(DASHBOARD_DATA_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'get_dashboard_data',
-          client_id: device.client_id,
-          user_email: user.email,
-          time_range: timeRange,
-          points: 60,
-          include_state: true,
-          selected_variables: selectedVariablesChartsStats
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log('Received initial dashboard data:', result);
-
-      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        const newMetricsData = {
-          data: result.data,
-          summary: result.summary || {}
-        };
-        setMetricsData(newMetricsData);
-      }
-      
-      // Check if component is still mounted
-      if (!isMounted.current) return;
-      
       // 4. Finally fetch device state
-      const state = await fetchDeviceState();
+      await fetchDeviceState();
+
+      // Set up interval for periodic updates
+      const intervalId = setInterval(async () => {
+        if (!isMounted.current) {
+          clearInterval(intervalId);
+          return;
+        }
+        await fetchLatestData();
+        await fetchDeviceState();
+      }, 30000);
+
+      // Cleanup interval on unmount
+      return () => {
+        clearInterval(intervalId);
+      };
       
-      // Check if component is still mounted before updating state
-      if (!isMounted.current) return;
-      
-      // Update UI with device state
-      if (state) {
-        setToggle1(state.led1_state === 1);
-        setToggle2(state.led2_state === 1);
-        setSpeedInput(state.motor_speed?.toString() || "0");
-      }
     } catch (error) {
       console.error('Error in initial data fetch:', error);
       if (isMounted.current) {
@@ -569,26 +546,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       isMounted.current = false;
     };
   }, [device]);
-
-  // Add new useEffect for periodic data fetching
-  useEffect(() => {
-    if (!device || !device.client_id) return;
-
-    // Initial fetch
-    fetchLatestData();
-    fetchDeviceState();
-
-    // Set up interval to fetch every 30 seconds regardless of tab
-    const intervalId = setInterval(() => {
-      fetchLatestData();
-      fetchDeviceState();
-    }, 30000);
-
-    // Cleanup interval on unmount
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [device]); // Removed selectedTab from dependencies
 
   const handleCloseError = () => {
     setError(null);
