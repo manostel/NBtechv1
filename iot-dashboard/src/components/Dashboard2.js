@@ -110,6 +110,7 @@ const DASHBOARD_LATEST_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazon
 const STATUS_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-status";
 const VARIABLES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-variables";
 const COMMAND_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/send-command";
+const BATTERY_STATE_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -258,6 +259,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [batteryLevel, setBatteryLevel] = useState(0);
   const [signalStrength, setSignalStrength] = useState(0);
 
+  // Add this state variable near other state declarations
+  const [batteryState, setBatteryState] = useState('idle');
+
   useEffect(() => {
     if (metricsConfig) {
       const variables = Object.keys(metricsConfig);
@@ -349,6 +353,59 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
+  const fetchBatteryState = async (retryCount = 0) => {
+    if (!device || !device.client_id) {
+      console.warn('No device or client_id available for battery state fetch');
+      return;
+    }
+
+    try {
+      console.log(`Fetching battery state for device: ${device.client_id}`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(BATTERY_STATE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 502 && retryCount < 1) {
+          console.warn('Received 502 Bad Gateway, retrying once...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return fetchBatteryState(retryCount + 1);
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result || typeof result.battery_state !== 'string') {
+        console.error('Invalid response format from battery state API:', result);
+        throw new Error('Invalid response format from battery state API');
+      }
+
+      console.log('Successfully fetched battery state:', result.battery_state);
+      setBatteryState(result.battery_state);
+    } catch (error) {
+      console.error('Error fetching battery state:', error);
+      if (error.name === 'AbortError') {
+        console.warn('Request timed out');
+      }
+      setBatteryState('idle');
+    }
+  };
+
   const fetchLatestData = async () => {
     if (!device || !device.client_id) {
       console.error('No device or client_id available');
@@ -396,6 +453,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         setLastSeen(lastTimestamp);
         setClientID(device.client_id);
         setDeviceName(device.name || "Unknown");
+
+        // Fetch battery state
+        await fetchBatteryState();
       }
     } catch (error) {
       console.error('Error fetching latest data:', error);
@@ -975,7 +1035,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           width: '100%'
         }}
       >
-        {/* Device Info Card */}
         <DeviceInfoCard
           clientID={device?.client_id || "Unknown"}
           deviceName={device?.device_name || "Unknown"}
@@ -987,6 +1046,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
           showClientId={showClientId}
           onToggleClientId={() => setShowClientId(!showClientId)}
+          batteryState={batteryState}
         />
 
         {/* Tabs */}

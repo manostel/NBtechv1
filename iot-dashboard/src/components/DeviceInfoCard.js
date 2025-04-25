@@ -14,7 +14,8 @@ export default function DeviceInfoCard({
   batteryLevel, 
   signalStrength,
   showClientId,
-  onToggleClientId 
+  onToggleClientId,
+  batteryState
 }) {
   const theme = useTheme();
 
@@ -74,7 +75,10 @@ export default function DeviceInfoCard({
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <BatteryIndicator value={batteryLevel || 0} />
+                  <BatteryIndicator 
+                    value={batteryLevel || 0} 
+                    batteryState={batteryState}
+                  />
                   <SignalIndicator value={signalStrength || 0} />
                 </Box>
               </>

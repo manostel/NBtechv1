@@ -1,8 +1,8 @@
 import React from "react";
 import { Box, useTheme, Typography } from "@mui/material";
-import { FaBatteryFull } from "react-icons/fa";
+import { FaBatteryFull, FaBolt, FaArrowUp, FaArrowDown, FaPause } from "react-icons/fa";
 
-export default function BatteryIndicator({ value }) {
+export default function BatteryIndicator({ value, isCharging, batteryState }) {
   const theme = useTheme();
   
   // Get battery icon color based on level
@@ -12,9 +12,39 @@ export default function BatteryIndicator({ value }) {
     return theme.palette.error.main;
   };
 
+  // Get state icon based on battery state
+  const getStateIcon = () => {
+    switch (batteryState) {
+      case 'charging':
+        return <FaBolt size={12} style={{ color: theme.palette.success.main }} />;
+      case 'discharging':
+        return <FaArrowDown size={12} style={{ color: theme.palette.error.main }} />;
+      case 'idle':
+        return <FaPause size={12} style={{ color: theme.palette.warning.main }} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
-      <FaBatteryFull size={16} style={{ color: getBatteryColor(value) }} />
+      <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <FaBatteryFull size={16} style={{ color: getBatteryColor(value) }} />
+        {batteryState && (
+          <Box sx={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 20,
+            height: 20,
+            backgroundColor: theme.palette.background.paper,
+            borderRadius: '50%',
+            border: `1px solid ${theme.palette.divider}`
+          }}>
+            {getStateIcon()}
+          </Box>
+        )}
+      </Box>
       <Box sx={{ width: 70, height: 6, backgroundColor: "#555", borderRadius: 1, overflow: "hidden" }}>
         <Box 
           sx={{ 
