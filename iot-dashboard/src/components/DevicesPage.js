@@ -221,12 +221,20 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
     initializeDevices();
 
-    // Set up polling only for device data
-    const intervalId = setInterval(() => {
+    // Set up polling for device data
+    const deviceDataInterval = setInterval(() => {
         updateDevicesData();
     }, 55000);
 
-    return () => clearInterval(intervalId);
+    // Set up polling for battery states
+    const batteryStateInterval = setInterval(() => {
+        fetchBatteryStates();
+    }, 150000);
+
+    return () => {
+        clearInterval(deviceDataInterval);
+        clearInterval(batteryStateInterval);
+    };
   }, [user.email]);
 
   const fetchDeviceData = async (device) => {
@@ -1057,10 +1065,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             const result = await dataResponse.json();
             const newData = JSON.parse(result.body).device_data;
 
-            // Update only the latest_data while preserving other device information
+            // Update only the latest_data while preserving battery_state
             updatedDeviceData[device.client_id] = {
                 ...updatedDeviceData[device.client_id],
-                latest_data: newData
+                latest_data: newData,
+                battery_state: updatedDeviceData[device.client_id]?.battery_state || 'idle' // Preserve existing battery state
             };
         }
 
@@ -1068,7 +1077,40 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     } catch (error) {
         console.error('Error updating device data:', error);
     }
-};
+  };
+
+  // Add new function to fetch battery states
+  const fetchBatteryStates = async () => {
+    try {
+      const updatedDeviceData = { ...deviceData };
+      
+      for (const device of devices) {
+        const batteryStateResponse = await fetch(BATTERY_STATE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            client_id: device.client_id
+          })
+        });
+
+        if (batteryStateResponse.ok) {
+          const batteryResult = await batteryStateResponse.json();
+          // Preserve all existing data and only update the battery_state
+          updatedDeviceData[device.client_id] = {
+            ...updatedDeviceData[device.client_id],
+            battery_state: batteryResult.battery_state
+          };
+        }
+      }
+
+      setDeviceData(updatedDeviceData);
+    } catch (error) {
+      console.error('Error fetching battery states:', error);
+    }
+  };
 
   return (
     <Box sx={{ 
