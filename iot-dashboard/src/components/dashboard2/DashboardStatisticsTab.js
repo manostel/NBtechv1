@@ -48,15 +48,42 @@ const DashboardStatisticsTab = ({
   };
 
   const StatCard = ({ title, value, unit, icon, color }) => (
-    <Paper sx={{ p: 2, height: '100%', bgcolor: theme.palette.background.paper }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+    <Paper 
+      elevation={0}
+      sx={{ 
+        p: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        border: '1px solid',
+        borderColor: theme.palette.divider,
+        borderRadius: 2,
+        bgcolor: theme.palette.background.paper,
+        transition: 'all 0.2s ease-in-out',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: theme.shadows[2]
+        }
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
         {icon}
-        <Typography variant="subtitle1" color="primary">
+        <Typography variant="subtitle2" color="textSecondary" sx={{ ml: 1 }}>
           {title}
         </Typography>
       </Box>
-      <Typography variant="h4" sx={{ color }}>
-        {value !== undefined ? value.toFixed(2) : 'N/A'}{unit}
+      <Typography variant="h4" component="div" sx={{ mt: 1 }}>
+        {value !== undefined ? value.toFixed(2) : 'N/A'}
+        {unit && (
+          <Typography 
+            component="span" 
+            variant="body2" 
+            color="textSecondary"
+            sx={{ ml: 0.5 }}
+          >
+            {unit}
+          </Typography>
+        )}
       </Typography>
     </Paper>
   );
@@ -71,7 +98,7 @@ const DashboardStatisticsTab = ({
         onTimeRangeChange={onTimeRangeChange}
         onApply={onApply}
       />
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {selectedVariables.map((key) => {
           const config = metricsConfig[key];
           if (!config) return null;
@@ -81,11 +108,11 @@ const DashboardStatisticsTab = ({
 
           return (
             <Grid item xs={12} key={key}>
-              <Paper sx={{ p: 3, mb: 3, bgcolor: theme.palette.background.paper }}>
+              <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   {config.label}
                 </Typography>
-                <Grid container spacing={3}>
+                <Grid container spacing={2}>
                   <Grid item xs={12} sm={6} md={3}>
                     <StatCard
                       title="Average"
@@ -126,7 +153,7 @@ const DashboardStatisticsTab = ({
                 <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
                   Based on {stats.count} data points
                 </Typography>
-              </Paper>
+              </Box>
             </Grid>
           );
         })}

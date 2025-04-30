@@ -7,15 +7,18 @@ import {
   MenuItem, 
   Checkbox, 
   ListItemText, 
-  OutlinedInput
+  OutlinedInput,
+  Typography
 } from '@mui/material';
+import { ShowChart as ShowChartIcon } from '@mui/icons-material';
 
 const VariableSelector = ({ 
   variables, 
   selectedVariables, 
   onVariableChange,
   label = "Select variables",
-  singleSelect = false
+  singleSelect = false,
+  showTitle = false
 }) => {
   const [tempSelected, setTempSelected] = useState(selectedVariables);
 
@@ -33,6 +36,14 @@ const VariableSelector = ({
 
   return (
     <Box sx={{ mb: 2 }}>
+      {showTitle && (
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <ShowChartIcon sx={{ mr: 1, color: 'primary.main' }} />
+          <Typography variant="h6">
+            Metrics
+          </Typography>
+        </Box>
+      )}
       <FormControl sx={{ width: 150 }} size="small">
         <InputLabel>{label}</InputLabel>
         <Select

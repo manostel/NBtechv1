@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Grid, Typography, Select, MenuItem, FormControl, InputLabel, Button } from '@mui/material';
+import { Box, FormControl, InputLabel, Select, MenuItem, Button } from '@mui/material';
 import VariableSelector from './VariableSelector';
 
 const TIME_RANGES = [
@@ -28,42 +28,48 @@ const SharedControls = ({
   }
 
   return (
-    <Box sx={{ mb: 3 }}>
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Box sx={{ flex: 1, minWidth: 200 }}>
-          <VariableSelector
-            variables={availableVariables}
-            selectedVariables={selectedVariables}
-            onVariableChange={onVariableChange}
-            label="Chart Variables"
-          />
-        </Box>
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Time Range</InputLabel>
-          <Select
-            value={timeRange}
-            onChange={(e) => onTimeRangeChange(e.target.value)}
-            label="Time Range"
-            size="small"
-          >
-            {TIME_RANGES.map((range) => (
-              <MenuItem key={range.value} value={range.value}>
-                {range.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={onApply}
-          disabled={selectedVariables.length === 0}
-          size="small"
-          sx={{ minWidth: 100 }}
-        >
-          Apply
-        </Button>
+    <Box sx={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: 2,
+      '& > *': { height: '40px' } // Ensure consistent height for all elements
+    }}>
+      <Box sx={{ minWidth: 200, flex: 1 }}>
+        <VariableSelector
+          variables={availableVariables}
+          selectedVariables={selectedVariables}
+          onVariableChange={onVariableChange}
+          label="Chart Variables"
+        />
       </Box>
+      <FormControl size="small" sx={{ minWidth: 150 }}>
+        <InputLabel>Time Range</InputLabel>
+        <Select
+          value={timeRange}
+          onChange={(e) => onTimeRangeChange(e.target.value)}
+          label="Time Range"
+          size="small"
+        >
+          {TIME_RANGES.map((range) => (
+            <MenuItem key={range.value} value={range.value}>
+              {range.label}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={onApply}
+        disabled={selectedVariables.length === 0}
+        size="small"
+        sx={{ 
+          minWidth: 100,
+          height: '40px' // Match height with other elements
+        }}
+      >
+        Apply
+      </Button>
     </Box>
   );
 };

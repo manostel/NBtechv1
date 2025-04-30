@@ -1,14 +1,17 @@
 import React from 'react';
 import { Box, Grid, Typography } from '@mui/material';
-import MetricCard from './MetricCard';
+import OverviewTiles from './OverviewTiles';
 import VariableSelector from './VariableSelector';
+import DeviceStateDisplay from './DeviceStateDisplay';
+import PropTypes from 'prop-types';
 
 const DashboardOverviewTab = ({ 
   metricsData, 
   metricsConfig,
-  deviceState,
   selectedVariables,
   availableVariables,
+  deviceState,
+  isLoading,
   onVariableChange
 }) => {
   if (!metricsData || !metricsConfig) {
@@ -19,72 +22,43 @@ const DashboardOverviewTab = ({
     );
   }
 
-  // Get the latest data point from data_latest array
-  const latestData = metricsData.data_latest?.[0] || {};
-  const summary = metricsData.summary_latest || {};
-
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 2 }}>
+      {/* Variable Selector */}
       <VariableSelector
         variables={availableVariables}
         selectedVariables={selectedVariables}
         onVariableChange={onVariableChange}
+        showTitle={true}
       />
-      
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        {selectedVariables.map((key) => {
-          const config = metricsConfig[key];
-          if (!config) return null;
 
-          // Get value directly from latestData
-          const value = latestData[key];
-          
-          return (
-            <Grid item xs={12} sm={6} md={3} key={key}>
-              <MetricCard
-                title={config.label}
-                value={value !== undefined ? value : 'N/A'}
-                unit={config.unit}
-                color={config.color}
+      {/* Overview Tiles */}
+      <Box sx={{ mt: 3 }}>
+        <OverviewTiles
+          metricsData={metricsData}
+          metricsConfig={metricsConfig}
+          selectedVariables={selectedVariables}
+          isLoading={isLoading}
               />
-            </Grid>
-          );
-        })}
-      </Grid>
+      </Box>
 
-      {/* Device Status Section */}
-      {deviceState && (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h6" gutterBottom>
-            Device Status
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard
-                title="LED 1"
-                value={deviceState.led1_state === 1 ? "ON" : "OFF"}
-                isText={true}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard
-                title="LED 2"
-                value={deviceState.led2_state === 1 ? "ON" : "OFF"}
-                isText={true}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard
-                title="Motor Speed"
-                value={deviceState.motor_speed}
-                unit="%"
-              />
-            </Grid>
-          </Grid>
-        </Box>
-      )}
+      {/* Device State Display */}
+      <DeviceStateDisplay
+        deviceState={deviceState}
+        isLoading={isLoading}
+      />
     </Box>
   );
+};
+
+DashboardOverviewTab.propTypes = {
+  metricsData: PropTypes.object,
+  metricsConfig: PropTypes.object,
+  selectedVariables: PropTypes.arrayOf(PropTypes.string),
+  availableVariables: PropTypes.arrayOf(PropTypes.string),
+  deviceState: PropTypes.object,
+  isLoading: PropTypes.bool,
+  onVariableChange: PropTypes.func
 };
 
 export default DashboardOverviewTab; 

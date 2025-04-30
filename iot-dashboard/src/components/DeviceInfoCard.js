@@ -16,7 +16,8 @@ export default function DeviceInfoCard({
   signalStrength,
   showClientId,
   onToggleClientId,
-  batteryState
+  batteryState,
+  lastTimestamp
 }) {
   const theme = useTheme();
 
@@ -105,7 +106,8 @@ DeviceInfoCard.propTypes = {
   signalStrength: PropTypes.number,
   showClientId: PropTypes.bool,
   onToggleClientId: PropTypes.func,
-  batteryState: PropTypes.string
+  batteryState: PropTypes.string,
+  lastTimestamp: PropTypes.string
 };
 
 DeviceInfoCard.defaultProps = {
@@ -118,5 +120,6 @@ DeviceInfoCard.defaultProps = {
   signalStrength: 0,
   showClientId: false,
   onToggleClientId: () => {},
-  batteryState: 'idle'
+  batteryState: 'idle',
+  lastTimestamp: null
 };
