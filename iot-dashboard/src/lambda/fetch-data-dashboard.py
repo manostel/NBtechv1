@@ -37,27 +37,62 @@ def create_cors_response(status_code, body):
         'body': json.dumps(body, cls=DecimalEncoder)
     }
 
+def get_step_size(time_range):
+    """Get the step size for a given time range"""
+    if time_range == 'live':
+        return timedelta(minutes=1)  # 1-minute step
+    elif time_range == '15m':
+        return timedelta(minutes=1)  # 1-minute step
+    elif time_range == '1h':
+        return timedelta(minutes=1)  # 1-minute step
+    elif time_range == '2h':
+        return timedelta(minutes=2)  # 2-minute step
+    elif time_range == '4h':
+        return timedelta(minutes=3)  # 3-minute step
+    elif time_range == '8h':
+        return timedelta(minutes=4)  # 4-minute step
+    elif time_range == '16h':
+        return timedelta(minutes=5)  # 5-minute step
+    elif time_range == '24h':
+        return timedelta(minutes=30)  # 30-minute step (was 15)
+    elif time_range == '3d':
+        return timedelta(hours=2)  # 2-hour step (was 130 minutes)
+    elif time_range == '7d':
+        return timedelta(hours=6)  # 6-hour step (was 3 hours)
+    elif time_range == '30d':
+        return timedelta(hours=12)  # 12-hour step (was 5 hours)
+    else:
+        return timedelta(minutes=1)  # Default to 1-minute step
+
 def get_time_range_and_points(time_range, target_points=100):
     """Get start time and calculate interval for consistent points"""
     now = datetime.utcnow()
+    step = get_step_size(time_range)
+    
     if time_range == 'live':
         return now - timedelta(minutes=2), 20
     elif time_range == '15m':
-        return now - timedelta(minutes=15), 15  # One point per minute for 15m
+        return now - timedelta(minutes=15), 15
     elif time_range == '1h':
-        return now - timedelta(hours=1), target_points
+        return now - timedelta(hours=1), 60
     elif time_range == '2h':
-        return now - timedelta(hours=2), target_points
+        return now - timedelta(hours=2), 120
     elif time_range == '4h':
-        return now - timedelta(hours=4), target_points
+        return now - timedelta(hours=4), 240
     elif time_range == '8h':
-        return now - timedelta(hours=8), target_points
+        return now - timedelta(hours=8), 480
     elif time_range == '16h':
-        return now - timedelta(hours=16), target_points
+        return now - timedelta(hours=16), 960
     elif time_range == '24h':
-        return now - timedelta(hours=24), target_points
+        return now - timedelta(hours=24), 96
+    elif time_range == '3d':
+        return now - timedelta(days=3), 144
+    elif time_range == '7d':
+        return now - timedelta(days=7), 168
+    elif time_range == '30d':
+        return now - timedelta(days=30), 360
     else:
-        return now - timedelta(hours=1), target_points
+        return now - timedelta(hours=1), 60
 
 def get_last_timestamp(client_id):
     """Get the most recent timestamp for a given client_id"""
@@ -90,6 +125,73 @@ def get_last_timestamp(client_id):
         logger.error(f"Error getting last timestamp: {str(e)}")
         return None
 
+def fetch_chunk(client_id, start_time, end_time, selected_variables, include_state):
+    """Fetch data from DynamoDB for a specific time chunk"""
+    try:
+        # Calculate time step based on time range
+        time_diff = end_time - start_time
+        total_hours = time_diff.total_seconds() / 3600
+        
+        # Determine time range based on total hours
+        if total_hours <= 0.25:  # 15 minutes
+            time_range = '15m'
+        elif total_hours <= 1:  # 1 hour
+            time_range = '1h'
+        elif total_hours <= 2:  # 2 hours
+            time_range = '2h'
+        elif total_hours <= 4:  # 4 hours
+            time_range = '4h'
+        elif total_hours <= 8:  # 8 hours
+            time_range = '8h'
+        elif total_hours <= 16:  # 16 hours
+            time_range = '16h'
+        elif total_hours <= 24:  # 24 hours
+            time_range = '24h'
+        elif total_hours <= 72:  # 3 days
+            time_range = '3d'
+        elif total_hours <= 168:  # 7 days
+            time_range = '7d'
+        else:  # 30 days
+            time_range = '30d'
+        
+        step = get_step_size(time_range)
+        num_points = int((end_time - start_time) / step)
+        
+        # Build the query
+        query_params = {
+            'TableName': 'iot_metrics',
+            'KeyConditionExpression': 'client_id = :client_id AND timestamp BETWEEN :start AND :end',
+            'ExpressionAttributeValues': {
+                ':client_id': {'S': client_id},
+                ':start': {'S': start_time.isoformat()},
+                ':end': {'S': end_time.isoformat()}
+            },
+            'ScanIndexForward': True,
+            'Limit': num_points
+        }
+        
+        # Add state if requested
+        if include_state:
+            query_params['ProjectionExpression'] = 'timestamp, #state, ' + ', '.join(selected_variables)
+            query_params['ExpressionAttributeNames'] = {'#state': 'state'}
+        else:
+            query_params['ProjectionExpression'] = 'timestamp, ' + ', '.join(selected_variables)
+        
+        # Execute the query
+        response = dynamodb.query(**query_params)
+        items = response.get('Items', [])
+        
+        # If we have more data, continue paginating
+        while 'LastEvaluatedKey' in response:
+            query_params['ExclusiveStartKey'] = response['LastEvaluatedKey']
+            response = dynamodb.query(**query_params)
+            items.extend(response.get('Items', []))
+        
+        return items
+    except Exception as e:
+        logger.error(f"Error fetching chunk: {str(e)}")
+        raise
+
 def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variables=None):
     """Fetch data in smaller chunks to prevent timeouts"""
     all_items = []
@@ -97,147 +199,223 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
     query_count = 0
     total_scan_time = 0
     
-    # For longer time periods, use larger chunks
-    if end_time and (end_time - start_time).total_seconds() > 24 * 60 * 60:
-        chunk_hours = 12
-    else:
-        chunk_hours = 4
-    
-    current_start = start_time
-    final_end = end_time or datetime.utcnow()
-    
-    logger.info(f"Starting data fetch for client_id: {client_id}")
-    logger.info(f"Time range: {current_start.isoformat()} to {final_end.isoformat()}")
-    logger.info(f"Selected variables: {selected_variables}")
-    
-    while current_start < final_end:
-        chunk_end = min(current_start + timedelta(hours=chunk_hours), final_end)
-        logger.info(f"Fetching chunk from {current_start.isoformat()} to {chunk_end.isoformat()}")
+    try:
+        # Calculate time range in hours
+        time_range_hours = (end_time - start_time).total_seconds() / 3600
         
-        chunk_items = []
-        last_evaluated_key = None
+        # Adjust chunk size based on time range
+        if time_range_hours > 24 * 7:  # More than 7 days
+            chunk_hours = 24  # 1-day chunks for very long ranges
+        elif time_range_hours > 24:  # More than 1 day
+            chunk_hours = 12  # 12-hour chunks for multi-day ranges
+        else:
+            chunk_hours = 4  # 4-hour chunks for shorter ranges
         
-        while True:
-            query_start = time.time()
-            query_count += 1
+        current_start = start_time
+        final_end = end_time or datetime.utcnow()
+        
+        logger.info(f"Starting data fetch for client_id: {client_id}")
+        logger.info(f"Time range: {current_start.isoformat()} to {final_end.isoformat()}")
+        logger.info(f"Selected variables: {selected_variables}")
+        logger.info(f"Using chunk size of {chunk_hours} hours")
+        
+        while current_start < final_end:
+            chunk_end = min(current_start + timedelta(hours=chunk_hours), final_end)
+            logger.info(f"Fetching chunk from {current_start.isoformat()} to {chunk_end.isoformat()}")
             
-            try:
-                if last_evaluated_key:
-                    response = device_data_table.query(
-                        KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
-                        ExpressionAttributeValues={
-                            ':client_id': client_id,
-                            ':start_time': current_start.isoformat(),
-                            ':end_time': chunk_end.isoformat()
-                        },
-                        ExpressionAttributeNames={
-                            '#ts': 'timestamp'
-                        },
-                        ExclusiveStartKey=last_evaluated_key,
-                        ScanIndexForward=True  # Get data in chronological order
-                    )
-                else:
-                    response = device_data_table.query(
-                        KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
-                        ExpressionAttributeValues={
-                            ':client_id': client_id,
-                            ':start_time': current_start.isoformat(),
-                            ':end_time': chunk_end.isoformat()
-                        },
-                        ExpressionAttributeNames={
-                            '#ts': 'timestamp'
-                        },
-                        ScanIndexForward=True  # Get data in chronological order
-                    )
+            chunk_items = []
+            last_evaluated_key = None
+            
+            while True:
+                query_start = time.time()
+                query_count += 1
                 
-                query_time = time.time() - query_start
-                total_scan_time += query_time
-                
-                items_count = len(response.get('Items', []))
-                logger.info(f"Query {query_count} returned {items_count} items in {query_time:.2f}s")
-                
-                if 'Items' in response:
-                    # Filter items based on selected variables if provided
-                    if selected_variables:
-                        filtered_items = []
-                        for item in response['Items']:
-                            filtered_item = {
-                                'timestamp': item['timestamp'],
-                                'client_id': item['client_id']
-                            }
-                            for var in selected_variables:
-                                if var in item:
-                                    filtered_item[var] = item[var]
-                            filtered_items.append(filtered_item)
-                        chunk_items.extend(filtered_items)
+                try:
+                    if last_evaluated_key:
+                        response = device_data_table.query(
+                            KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
+                            ExpressionAttributeValues={
+                                ':client_id': client_id,
+                                ':start_time': current_start.isoformat(),
+                                ':end_time': chunk_end.isoformat()
+                            },
+                            ExpressionAttributeNames={
+                                '#ts': 'timestamp'
+                            },
+                            ExclusiveStartKey=last_evaluated_key,
+                            ScanIndexForward=True,  # Get data in chronological order
+                            Limit=1000  # Limit number of items per query
+                        )
                     else:
-                        chunk_items.extend(response['Items'])
-                
-                last_evaluated_key = response.get('LastEvaluatedKey')
-                if not last_evaluated_key:
-                    break
+                        response = device_data_table.query(
+                            KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
+                            ExpressionAttributeValues={
+                                ':client_id': client_id,
+                                ':start_time': current_start.isoformat(),
+                                ':end_time': chunk_end.isoformat()
+                            },
+                            ExpressionAttributeNames={
+                                '#ts': 'timestamp'
+                            },
+                            ScanIndexForward=True,  # Get data in chronological order
+                            Limit=1000  # Limit number of items per query
+                        )
                     
-            except Exception as e:
-                logger.error(f"Error in query: {str(e)}")
-                break
+                    query_time = time.time() - query_start
+                    total_scan_time += query_time
+                    
+                    items_count = len(response.get('Items', []))
+                    logger.info(f"Query {query_count} returned {items_count} items in {query_time:.2f}s")
+                    
+                    if 'Items' in response:
+                        # Filter items based on selected variables if provided
+                        if selected_variables:
+                            filtered_items = []
+                            for item in response['Items']:
+                                filtered_item = {
+                                    'timestamp': item['timestamp'],
+                                    'client_id': item['client_id']
+                                }
+                                for var in selected_variables:
+                                    if var in item:
+                                        filtered_item[var] = item[var]
+                                filtered_items.append(filtered_item)
+                            chunk_items.extend(filtered_items)
+                        else:
+                            chunk_items.extend(response['Items'])
+                    
+                    last_evaluated_key = response.get('LastEvaluatedKey')
+                    if not last_evaluated_key:
+                        break
+                        
+                except Exception as e:
+                    logger.error(f"Error in query: {str(e)}")
+                    break
+            
+            all_items.extend(chunk_items)
+            current_start = chunk_end
+            
+            # Add a small delay between chunks to prevent throttling
+            time.sleep(0.1)
         
-        all_items.extend(chunk_items)
-        current_start = chunk_end
-    
-    logger.info(f"Total items fetched: {len(all_items)} in {query_count} queries. Scan time: {total_scan_time:.2f}s")
-    
-    if not all_items:
-        logger.warning(f"No data found for client_id: {client_id} in the specified time range")
-        logger.warning(f"Query parameters: client_id={client_id}, start_time={start_time.isoformat()}, end_time={end_time.isoformat() if end_time else 'now'}")
-    
-    return all_items
+        logger.info(f"Total items fetched: {len(all_items)} in {query_count} queries. Scan time: {total_scan_time:.2f}s")
+        
+        if not all_items:
+            logger.warning(f"No data found for client_id: {client_id} in the specified time range")
+            logger.warning(f"Query parameters: client_id={client_id}, start_time={start_time.isoformat()}, end_time={end_time.isoformat() if end_time else 'now'}")
+        
+        return all_items
+        
+    except Exception as e:
+        logger.error(f"Error in fetch_data_in_chunks: {str(e)}")
+        raise
 
 def aggregate_data(items, target_points, selected_variables=None):
-    """Aggregate data to achieve consistent number of points"""
+    """Aggregate data points to match target number of points"""
     if not items:
         return []
-
+    
     # Sort items by timestamp
     sorted_items = sorted(items, key=lambda x: x['timestamp'])
     
-    # Calculate number of items per group
-    items_per_group = max(1, len(sorted_items) // target_points)
+    # Calculate time step based on time range
+    start_time = datetime.fromisoformat(sorted_items[0]['timestamp'].replace('Z', '+00:00'))
+    end_time = datetime.fromisoformat(sorted_items[-1]['timestamp'].replace('Z', '+00:00'))
+    time_diff = end_time - start_time
     
-    processed_data = []
-    current_group = []
+    # Calculate total hours in the time range
+    total_hours = time_diff.total_seconds() / 3600
     
-    # Get all possible metrics from the first item, excluding specific fields
-    excluded_fields = {'timestamp', 'client_id', 'user_email', 'device'}
-    if selected_variables:
-        metrics = selected_variables
-    else:
-        metrics = [key for key in sorted_items[0].keys() if key not in excluded_fields]
+    # Get step size based on total hours
+    if total_hours <= 0.25:  # 15 minutes
+        step = get_step_size('15m')
+    elif total_hours <= 1:  # 1 hour
+        step = get_step_size('1h')
+    elif total_hours <= 2:  # 2 hours
+        step = get_step_size('2h')
+    elif total_hours <= 4:  # 4 hours
+        step = get_step_size('4h')
+    elif total_hours <= 8:  # 8 hours
+        step = get_step_size('8h')
+    elif total_hours <= 16:  # 16 hours
+        step = get_step_size('16h')
+    elif total_hours <= 24:  # 24 hours
+        step = get_step_size('24h')
+    elif total_hours <= 72:  # 3 days
+        step = get_step_size('3d')
+    elif total_hours <= 168:  # 7 days
+        step = get_step_size('7d')
+    else:  # 30 days
+        step = get_step_size('30d')
     
+    # Calculate number of intervals
+    num_intervals = int((end_time - start_time) / step) + 1
+    
+    # Initialize aggregated data
+    aggregated_data = []
+    current_interval_start = start_time
+    current_interval_items = []
+    
+    # Process items in chronological order
     for item in sorted_items:
-        group_data = {}
-        for metric in metrics:
-            try:
-                group_data[metric] = float(item.get(metric, 0))
-            except (ValueError, TypeError):
-                group_data[metric] = 0
-        current_group.append(group_data)
+        item_time = datetime.fromisoformat(item['timestamp'].replace('Z', '+00:00'))
         
-        if len(current_group) >= items_per_group:
-            avg_point = {'timestamp': item['timestamp']}
-            for metric in metrics:
-                values = [p[metric] for p in current_group]
-                avg_point[metric] = round(mean(values), 2)
-            processed_data.append(avg_point)
-            current_group = []
+        # If item is within current interval, add it to current interval items
+        if item_time < current_interval_start + step:
+            current_interval_items.append(item)
+        else:
+            # Process current interval if it has items
+            if current_interval_items:
+                # Calculate average values for the interval
+                interval_data = {'timestamp': current_interval_start.isoformat() + 'Z'}
+                for var in selected_variables:
+                    values = [float(item[var]) for item in current_interval_items if var in item]
+                    if values:
+                        # Round to 2 decimal places
+                        interval_data[var] = round(mean(values), 2)
+                aggregated_data.append(interval_data)
+            
+            # Move to next interval
+            current_interval_start = current_interval_start + step
+            current_interval_items = [item]
     
-    if current_group:
-        avg_point = {'timestamp': sorted_items[-1]['timestamp']}
-        for metric in metrics:
-            values = [p[metric] for p in current_group]
-            avg_point[metric] = round(mean(values), 2)
-        processed_data.append(avg_point)
-
-    return processed_data
+    # Process the last interval
+    if current_interval_items:
+        interval_data = {'timestamp': current_interval_start.isoformat() + 'Z'}
+        for var in selected_variables:
+            values = [float(item[var]) for item in current_interval_items if var in item]
+            if values:
+                # Round to 2 decimal places
+                interval_data[var] = round(mean(values), 2)
+        aggregated_data.append(interval_data)
+    
+    # If we have more points than target, resample to match target
+    if len(aggregated_data) > target_points:
+        # Calculate new step size to match target points
+        new_step = (end_time - start_time) / target_points
+        resampled_data = []
+        current_time = start_time
+        
+        for _ in range(target_points):
+            # Find all points within the current interval
+            interval_points = [point for point in aggregated_data 
+                             if datetime.fromisoformat(point['timestamp'].replace('Z', '+00:00')) < current_time + new_step]
+            
+            if interval_points:
+                # Calculate average values for the interval
+                interval_data = {'timestamp': current_time.isoformat() + 'Z'}
+                for var in selected_variables:
+                    values = [point[var] for point in interval_points if var in point]
+                    if values:
+                        # Round to 2 decimal places
+                        interval_data[var] = round(mean(values), 2)
+                resampled_data.append(interval_data)
+            
+            current_time += new_step
+        
+        return resampled_data
+    
+    return aggregated_data
 
 def calculate_summary_statistics(data, metrics):
     """Calculate summary statistics for all metrics"""
@@ -250,6 +428,7 @@ def calculate_summary_statistics(data, metrics):
     for metric in metrics:
         values = [float(item.get(metric, 0)) for item in data]
         if values:
+            # Round all statistics to 2 decimal places
             summary[f'avg_{metric}'] = round(mean(values), 2)
             summary[f'min_{metric}'] = round(min(values), 2)
             summary[f'max_{metric}'] = round(max(values), 2)
@@ -306,8 +485,44 @@ def lambda_handler(event, context):
             }
             
         # Get the time range and points
-        start_time, target_points = get_time_range_and_points(time_range, points)
-        
+        now = datetime.utcnow()
+        if time_range == 'live':
+            start_time = now - timedelta(minutes=2)
+            target_points = 20
+        elif time_range == '15m':
+            start_time = now - timedelta(minutes=15)
+            target_points = 15
+        elif time_range == '1h':
+            start_time = now - timedelta(hours=1)
+            target_points = 60
+        elif time_range == '2h':
+            start_time = now - timedelta(hours=2)
+            target_points = 120
+        elif time_range == '4h':
+            start_time = now - timedelta(hours=4)
+            target_points = 240
+        elif time_range == '8h':
+            start_time = now - timedelta(hours=8)
+            target_points = 480
+        elif time_range == '16h':
+            start_time = now - timedelta(hours=16)
+            target_points = 960
+        elif time_range == '24h':
+            start_time = now - timedelta(hours=24)
+            target_points = 96  # 4 points per hour
+        elif time_range == '3d':
+            start_time = now - timedelta(days=3)
+            target_points = 144  # 2 points per hour
+        elif time_range == '7d':
+            start_time = now - timedelta(days=7)
+            target_points = 168  # 1 point per hour
+        elif time_range == '30d':
+            start_time = now - timedelta(days=30)
+            target_points = 360  # 1 point every 2 hours
+        else:
+            start_time = now - timedelta(hours=1)
+            target_points = 60
+            
         # If latest_timestamp is provided, use it as the end time
         if latest_timestamp:
             end_time = datetime.fromisoformat(latest_timestamp.replace('Z', '+00:00'))
@@ -326,10 +541,16 @@ def lambda_handler(event, context):
                 start_time = end_time - timedelta(hours=16)
             elif time_range == '24h':
                 start_time = end_time - timedelta(hours=24)
+            elif time_range == '3d':
+                start_time = end_time - timedelta(days=3)
+            elif time_range == '7d':
+                start_time = end_time - timedelta(days=7)
+            elif time_range == '30d':
+                start_time = end_time - timedelta(days=30)
             else:
                 start_time = end_time - timedelta(hours=1)
         else:
-            end_time = datetime.utcnow()
+            end_time = now
             
         # Fetch data from DynamoDB with selected variables
         items = fetch_data_in_chunks(client_id, start_time, end_time, selected_variables)

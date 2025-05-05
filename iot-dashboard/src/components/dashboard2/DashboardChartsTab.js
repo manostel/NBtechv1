@@ -67,7 +67,7 @@ const DashboardChartsTab = ({
       });
 
     const chartData = {
-      labels: data.map(d => new Date(d.timestamp)),
+      labels: data.map(d => new Date(d.timestamp.replace('Z', ''))),
       datasets
     };
 
@@ -116,9 +116,9 @@ const DashboardChartsTab = ({
             unit: timeRange === 'live' ? 'second' :
                   timeRange === '15m' ? 'minute' :
                   timeRange === '1h' ? 'minute' :
-                  timeRange === '24h' || timeRange === '2d' || timeRange === '3d' ? 'hour' : 'minute',
+                  timeRange === '24h' || timeRange === '3d' || timeRange === '7d' || timeRange === '30d' ? 'hour' : 'minute',
             tooltipFormat: timeRange === 'live' ? "HH:mm:ss" : 
-                          (timeRange === '24h' || timeRange === '2d' || timeRange === '3d') ? "MMM dd, HH:mm" : "HH:mm",
+                          (timeRange === '24h' || timeRange === '3d' || timeRange === '7d' || timeRange === '30d') ? "MMM dd, HH:mm" : "HH:mm",
             displayFormats: {
               second: 'HH:mm:ss',
               minute: 'HH:mm',
@@ -130,7 +130,10 @@ const DashboardChartsTab = ({
             display: true, 
             text: "Time", 
             color: theme.palette.text.primary,
-            font: { weight: 'bold' }
+            font: { 
+              weight: 'bold',
+              size: window.innerWidth < 600 ? 8 : 10
+            }
           },
           ticks: {
             maxRotation: window.innerWidth < 600 ? 60 : 45,
@@ -138,13 +141,25 @@ const DashboardChartsTab = ({
             source: 'data',
             autoSkip: true,
             maxTicksLimit: timeRange === '15m' ? 15 : 
-                          timeRange === 'live' ? 4 : 10,
+                          timeRange === 'live' ? 4 : 
+                          timeRange === '3d' ? 8 :
+                          timeRange === '7d' || timeRange === '30d' ? 7 : 10,
+            color: theme.palette.text.primary,
             font: {
-              size: window.innerWidth < 600 ? 8 : 10
-            }
+              size: window.innerWidth < 600 ? 8 : 10,
+              weight: 'normal'
+            },
+            padding: 5
           },
           grid: {
-            display: chartConfig.showGrid
+            display: chartConfig.showGrid,
+            color: theme.palette.divider,
+            drawBorder: true,
+            borderColor: theme.palette.divider
+          },
+          border: {
+            display: true,
+            color: theme.palette.divider
           }
         },
         y: {
@@ -200,7 +215,7 @@ const DashboardChartsTab = ({
     }
 
     const chartData = {
-      labels: data.map(d => new Date(d.timestamp)),
+      labels: data.map(d => new Date(d.timestamp.replace('Z', ''))),
       datasets: [
         {
           label: `${config.label} (${config.unit})`,
@@ -264,9 +279,9 @@ const DashboardChartsTab = ({
             unit: timeRange === 'live' ? 'second' :
                   timeRange === '15m' ? 'minute' :
                   timeRange === '1h' ? 'minute' :
-                  timeRange === '24h' || timeRange === '2d' || timeRange === '3d' ? 'hour' : 'minute',
+                  timeRange === '24h' || timeRange === '3d' || timeRange === '7d' || timeRange === '30d' ? 'hour' : 'minute',
             tooltipFormat: timeRange === 'live' ? "HH:mm:ss" : 
-                          (timeRange === '24h' || timeRange === '2d' || timeRange === '3d') ? "MMM dd, HH:mm" : "HH:mm",
+                          (timeRange === '24h' || timeRange === '3d' || timeRange === '7d' || timeRange === '30d') ? "MMM dd, HH:mm" : "HH:mm",
             displayFormats: {
               second: 'HH:mm:ss',
               minute: 'HH:mm',
@@ -278,7 +293,10 @@ const DashboardChartsTab = ({
             display: true, 
             text: "Time", 
             color: theme.palette.text.primary,
-            font: { weight: 'bold' }
+            font: { 
+              weight: 'bold',
+              size: window.innerWidth < 600 ? 8 : 10
+            }
           },
           ticks: {
             maxRotation: window.innerWidth < 600 ? 60 : 45,
@@ -286,13 +304,25 @@ const DashboardChartsTab = ({
             source: 'data',
             autoSkip: true,
             maxTicksLimit: timeRange === '15m' ? 15 : 
-                          timeRange === 'live' ? 4 : 10,
+                          timeRange === 'live' ? 4 : 
+                          timeRange === '3d' ? 8 :
+                          timeRange === '7d' || timeRange === '30d' ? 7 : 10,
+            color: theme.palette.text.primary,
             font: {
-              size: window.innerWidth < 600 ? 8 : 10
-            }
+              size: window.innerWidth < 600 ? 8 : 10,
+              weight: 'normal'
+            },
+            padding: 5
           },
           grid: {
-            display: chartConfig.showGrid
+            display: chartConfig.showGrid,
+            color: theme.palette.divider,
+            drawBorder: true,
+            borderColor: theme.palette.divider
+          },
+          border: {
+            display: true,
+            color: theme.palette.divider
           }
         },
         y: {

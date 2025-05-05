@@ -318,6 +318,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         throw new Error('Invalid response format from variables API');
       }
 
+      // Store the available variables
+      setAvailableVariables(result.variables);
+
       // Create metrics config based on available variables
       const newMetricsConfig = {};
       result.variables.forEach(variable => {
@@ -349,10 +352,19 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
       setMetricsConfig(newMetricsConfig);
       setVariablesLoaded(true);
+
+      // Set initial selected variables for overview
+      setSelectedVariablesOverview(result.variables);
+      // Set initial selected variables for charts and stats
+      setSelectedVariablesChartsStats(result.variables);
+
+      // Return the variables for immediate use
+      return result.variables;
     } catch (error) {
       console.error('Error fetching variables:', error);
       setError(error.message || 'Failed to fetch available variables');
       setVariablesLoaded(false);
+      return [];
     }
   };
 
@@ -475,7 +487,27 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         setIsLoading(true);
       }
       setError(null);
+
+      // First get the variables
+      const variablesResponse = await fetch(VARIABLES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!variablesResponse.ok) {
+        throw new Error(`HTTP error! status: ${variablesResponse.status}`);
+      }
+
+      const variablesResult = await variablesResponse.json();
+      const variables = variablesResult.variables || [];
       
+      // Now fetch the dashboard data with these variables
       const response = await fetch(DASHBOARD_DATA_URL, {
         method: 'POST',
         headers: {
@@ -489,7 +521,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           time_range: timeRange,
           points: 60,
           include_state: true,
-          selected_variables: selectedVariablesChartsStats
+          selected_variables: variables
         })
       });
 
@@ -501,8 +533,20 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       console.log('Received dashboard data:', result);
 
       if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+        // Process the data to round all numeric values to 2 decimal places
+        const processedData = result.data.map(item => {
+          const processedItem = { ...item };
+          // Round all numeric values except timestamp
+          Object.keys(processedItem).forEach(key => {
+            if (key !== 'timestamp' && typeof processedItem[key] === 'number') {
+              processedItem[key] = Number(processedItem[key].toFixed(2));
+            }
+          });
+          return processedItem;
+        });
+
         const newMetricsData = {
-          data: result.data,
+          data: processedData,
           summary: result.summary || {}
         };
         setMetricsData(newMetricsData);
@@ -559,13 +603,13 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
     setIsLoading(true);
     try {
-      // 1. First fetch variables
-      await fetchVariables();
+      // 1. First fetch variables and get them immediately
+      const variables = await fetchVariables();
       
       // Check if component is still mounted
       if (!isMounted.current) return;
       
-      // 2. Fetch regular dashboard data
+      // 2. Fetch regular dashboard data with the variables we just got
       await fetchGraphData();
       
       // Check if component is still mounted
@@ -891,7 +935,14 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           client_id: device.client_id,
           user_email: user.email,
           time_range: timeRange,
-          points: 60,
+          points: timeRange === 'live' ? 60 : 
+                 timeRange === '15m' ? 15 :
+                 timeRange === '1h' ? 60 :
+                 timeRange === '24h' ? 96 : // 15-minute intervals for 24h
+                 timeRange === '3d' ? 144 : // 30-minute intervals for 3d
+                 timeRange === '7d' ? 168 : // 1-hour intervals for 7d
+                 timeRange === '30d' ? 360 : // 2-hour intervals for 30d
+                 60,
           include_state: true,
           selected_variables: selectedVariablesChartsStats
         })

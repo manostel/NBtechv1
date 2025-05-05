@@ -10,7 +10,10 @@ const TIME_RANGES = [
   { value: '4h', label: 'Last 4 hours' },
   { value: '8h', label: 'Last 8 hours' },
   { value: '16h', label: 'Last 16 hours' },
-  { value: '24h', label: 'Last 24 hours' }
+  { value: '24h', label: 'Last 24 hours' },
+  { value: '3d', label: 'Last 3 days' },
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' }
 ];
 
 const SharedControls = ({

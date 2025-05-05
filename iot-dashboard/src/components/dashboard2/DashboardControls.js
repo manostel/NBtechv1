@@ -15,7 +15,10 @@ const TIME_RANGES = [
   { value: '4h', label: '4 Hours' },
   { value: '8h', label: '8 Hours' },
   { value: '16h', label: '16 Hours' },
-  { value: '24h', label: '24 Hours' }
+  { value: '24h', label: '24 Hours' },
+  { value: '3d', label: '3 Days' },
+  { value: '7d', label: '7 Days' },
+  { value: '30d', label: '30 Days' }
 ];
 
 export default function DashboardControls({ 
