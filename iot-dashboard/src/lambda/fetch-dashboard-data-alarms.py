@@ -1,9 +1,14 @@
 import json
 import boto3
-import os
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timezone, timedelta
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
+from typing import Dict, List, Optional
+
+# Configure logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Initialize DynamoDB
 dynamodb = boto3.resource('dynamodb')
@@ -17,10 +22,11 @@ def decimal_default(obj):
     raise TypeError
 
 def get_cors_headers():
+    """Return CORS headers for the response"""
     return {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-        'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,DELETE',
+        'Access-Control-Allow-Methods': 'OPTIONS,POST',
         'Content-Type': 'application/json'
     }
 
@@ -73,7 +79,13 @@ def check_alarms(client_id):
                 should_trigger = True
             
             if should_trigger:
-                triggered_alarms.append(alarm)
+                # Include severity in triggered alarm
+                triggered_alarm = {
+                    **alarm,
+                    'current_value': value,
+                    'severity': alarm.get('severity', 'info')
+                }
+                triggered_alarms.append(triggered_alarm)
         
         return triggered_alarms
     except Exception as e:
@@ -101,17 +113,25 @@ def get_alarms_data(client_id):
         return None
 
 def lambda_handler(event, context):
-    # Handle CORS preflight requests
-    if event.get('httpMethod') == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': get_cors_headers(),
-            'body': json.dumps({})
-        }
-
     try:
-        # Extract client_id from the request
-        body = json.loads(event.get('body', '{}'))
+        logger.info("Received event: %s", json.dumps(event))
+        
+        # Handle CORS preflight request
+        if event.get("httpMethod") == "OPTIONS":
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': json.dumps({"message": "CORS preflight successful"})
+            }
+        
+        # Handle both direct JSON and API Gateway events
+        if 'body' in event:
+            # API Gateway event
+            body = json.loads(event['body'])
+        else:
+            # Direct JSON event
+            body = event
+            
         client_id = body.get('client_id')
         
         if not client_id:
@@ -119,50 +139,80 @@ def lambda_handler(event, context):
                 'statusCode': 400,
                 'headers': get_cors_headers(),
                 'body': json.dumps({
-                    'error': 'client_id is required'
+                    'error': 'Missing client_id parameter',
+                    'alarms': [],
+                    'triggered_alarms': []
                 })
             }
-
-        # Query alarms for the device
+        
+        # Query DynamoDB for alarms
         response = alarms_table.query(
-            KeyConditionExpression=Key('client_id').eq(client_id)
+            KeyConditionExpression='client_id = :cid',
+            ExpressionAttributeValues={
+                ':cid': client_id
+            }
         )
         
         alarms = response.get('Items', [])
         
         # Get current device state to check for triggered alarms
-        device_state = get_device_state(client_id)
+        device_table = dynamodb.Table('IoT_DeviceData')
+        device_response = device_table.query(
+            KeyConditionExpression='client_id = :cid',
+            ExpressionAttributeValues={
+                ':cid': client_id
+            },
+            ScanIndexForward=False,  # Get most recent first
+            Limit=1  # Get only the latest state
+        )
+        
+        current_state = device_response.get('Items', [{}])[0] if device_response.get('Items') else {}
         triggered_alarms = []
         
-        if device_state:
-            for alarm in alarms:
-                if alarm.get('is_active', True):
-                    variable_value = device_state.get(alarm['variable_name'])
-                    if variable_value is not None:
-                        if alarm['condition'] == 'above' and variable_value > alarm['threshold']:
-                            triggered_alarms.append(alarm)
-                        elif alarm['condition'] == 'below' and variable_value < alarm['threshold']:
-                            triggered_alarms.append(alarm)
-
+        # Check which alarms are triggered
+        for alarm in alarms:
+            if not alarm.get('enabled', True):
+                continue
+                
+            variable_name = alarm.get('variable_name')
+            condition = alarm.get('condition')
+            threshold = float(alarm.get('threshold', 0))
+            current_value = float(current_state.get(variable_name, 0))
+            
+            is_triggered = False
+            if condition == 'above' and current_value > threshold:
+                is_triggered = True
+            elif condition == 'below' and current_value < threshold:
+                is_triggered = True
+                
+            if is_triggered:
+                triggered_alarms.append({
+                    **alarm,
+                    'current_value': current_value,
+                    'severity': alarm.get('severity', 'info')
+                })
+        
         return {
             'statusCode': 200,
             'headers': get_cors_headers(),
             'body': json.dumps({
                 'client_id': client_id,
-                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'timestamp': datetime.utcnow().isoformat() + 'Z',
                 'alarms': alarms,
                 'triggered_alarms': triggered_alarms
-            })
+            }, default=decimal_default)
         }
-
+        
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.error(f"Error processing request: {str(e)}")
         return {
             'statusCode': 500,
             'headers': get_cors_headers(),
             'body': json.dumps({
-                'error': str(e)
-            })
+                'error': str(e),
+                'alarms': [],
+                'triggered_alarms': []
+            }, default=decimal_default)
         }
 
 def get_device_state(client_id):

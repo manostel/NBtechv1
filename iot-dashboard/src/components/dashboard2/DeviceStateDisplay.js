@@ -190,52 +190,44 @@ const DeviceStateDisplay = ({ deviceState, isLoading }) => {
       </Box>
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6} md={4}>
-          <Tooltip title="LED 1 Control Status">
-            <StateCard
-              title="LED 1 Control"
-              value={deviceState.led1_state === 1}
-              icon={<LightbulbIcon />}
-              color={theme.palette.primary.main}
-              isBoolean={true}
-              isLoading={isLoading}
-            />
-          </Tooltip>
+          <StateCard
+            title="LED 1 Control Status"
+            value={deviceState.led1_state === 1}
+            icon={<LightbulbIcon />}
+            color={theme.palette.primary.main}
+            isBoolean={true}
+            isLoading={isLoading}
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <Tooltip title="LED 2 Control Status">
-            <StateCard
-              title="LED 2 Control"
-              value={deviceState.led2_state === 1}
-              icon={<LightbulbIcon />}
-              color={theme.palette.primary.main}
-              isBoolean={true}
-              isLoading={isLoading}
-            />
-          </Tooltip>
+          <StateCard
+            title="LED 2 Control Status"
+            value={deviceState.led2_state === 1}
+            icon={<LightbulbIcon />}
+            color={theme.palette.primary.main}
+            isBoolean={true}
+            isLoading={isLoading}
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <Tooltip title="Motor Speed Control">
-            <StateCard
-              title="Motor Speed Control"
-              value={deviceState.motor_speed}
-              icon={<SpeedIcon />}
-              color={theme.palette.primary.main}
-              unit="%"
-              isLoading={isLoading}
-            />
-          </Tooltip>
+          <StateCard
+            title="Motor Speed Control"
+            value={deviceState.motor_speed}
+            icon={<SpeedIcon />}
+            color={theme.palette.primary.main}
+            unit="%"
+            isLoading={isLoading}
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <Tooltip title="Power Saving Mode Status">
-            <StateCard
-              title="Power Saving Mode"
-              value={deviceState.power_saving === 1}
-              icon={<PowerIcon />}
-              color={theme.palette.primary.main}
-              isBoolean={true}
-              isLoading={isLoading}
-            />
-          </Tooltip>
+          <StateCard
+            title="Power Saving Mode Status"
+            value={deviceState.power_saving === 1}
+            icon={<PowerIcon />}
+            color={theme.palette.primary.main}
+            isBoolean={true}
+            isLoading={isLoading}
+          />
         </Grid>
       </Grid>
     </Box>

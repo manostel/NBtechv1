@@ -411,13 +411,16 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       }
 
       console.log('Successfully fetched battery state:', result.battery_state);
-      setBatteryState(result.battery_state);
+      // Only update battery state if it's different
+      if (batteryState !== result.battery_state) {
+        setBatteryState(result.battery_state);
+      }
     } catch (error) {
       console.error('Error fetching battery state:', error);
       if (error.name === 'AbortError') {
         console.warn('Request timed out');
       }
-      setBatteryState('idle');
+      // Don't update battery state on error
     }
   };
 
@@ -677,7 +680,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         } finally {
           isFetching.current = false;
         }
-      }, 150000); // 2.5minitues for battery state
+      }, 150000); // 2.5 minutes for battery state
 
       // Cleanup intervals on unmount
       return () => {
@@ -1036,10 +1039,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       case 4:
         return (
           <DashboardAlarmsTab
+            device={device}
             metricsConfig={metricsConfig}
-            alarms={alarms}
-            alarmHistory={alarmHistory}
-            onAlarmUpdate={handleAlarmUpdate}
           />
         );
       default:

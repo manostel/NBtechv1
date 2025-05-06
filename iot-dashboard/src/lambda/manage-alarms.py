@@ -1,9 +1,14 @@
 import json
 import boto3
-import os
+import logging
 from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
+from typing import Dict, List, Optional
+
+# Configure logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Initialize DynamoDB
 dynamodb = boto3.resource('dynamodb')
@@ -17,10 +22,12 @@ def decimal_default(obj):
     raise TypeError
 
 def get_cors_headers():
+    """Return CORS headers for the response"""
     return {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Origin,X-Requested-With',
         'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,DELETE',
+        'Access-Control-Allow-Credentials': 'true',
         'Content-Type': 'application/json'
     }
 
@@ -43,13 +50,18 @@ def get_available_variables(client_id):
         print(f"Error getting available variables: {str(e)}")
         return []
 
-def create_alarm(client_id, variable_name, threshold, condition, description):
+def create_alarm(client_id, variable_name, threshold, condition, description, severity='info'):
     """Create a new alarm for a device"""
     try:
         # Verify that the variable exists
         available_variables = get_available_variables(client_id)
         if variable_name not in available_variables:
             raise ValueError(f"Variable {variable_name} is not available for this device")
+
+        # Validate severity
+        valid_severities = ['info', 'warning', 'error']
+        if severity not in valid_severities:
+            severity = 'info'
 
         alarm = {
             'client_id': client_id,
@@ -58,6 +70,7 @@ def create_alarm(client_id, variable_name, threshold, condition, description):
             'threshold': threshold,
             'condition': condition,  # 'above' or 'below'
             'description': description,
+            'severity': severity,
             'created_at': datetime.now(timezone.utc).isoformat(),
             'is_active': True,
             'last_triggered': None
@@ -151,17 +164,25 @@ def check_alarms(client_id):
         raise
 
 def lambda_handler(event, context):
-    # Handle CORS preflight requests
-    if event.get('httpMethod') == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': get_cors_headers(),
-            'body': json.dumps({})
-        }
-
     try:
-        # Extract request data
-        body = json.loads(event.get('body', '{}'))
+        logger.info("Received event: %s", json.dumps(event))
+        
+        # Handle CORS preflight request
+        if event.get("httpMethod") == "OPTIONS":
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': json.dumps({"message": "CORS preflight successful"})
+            }
+        
+        # Handle both direct JSON and API Gateway events
+        if 'body' in event:
+            # API Gateway event
+            body = json.loads(event['body'])
+        else:
+            # Direct JSON event
+            body = event
+            
         client_id = body.get('client_id')
         operation = body.get('operation')
         
@@ -170,121 +191,124 @@ def lambda_handler(event, context):
                 'statusCode': 400,
                 'headers': get_cors_headers(),
                 'body': json.dumps({
-                    'error': 'client_id and operation are required'
-                })
+                    'error': 'Missing required parameters',
+                    'success': False
+                }, default=decimal_default)
             }
-
+        
         if operation == 'create':
-            # Create new alarm
-            alarm_id = f"{client_id}_{body['variable_name']}_{datetime.now(timezone.utc).timestamp()}"
-            alarm = {
+            alarm = body.get('alarm')
+            if not alarm:
+                return {
+                    'statusCode': 400,
+                    'headers': get_cors_headers(),
+                    'body': json.dumps({
+                        'error': 'Missing alarm data',
+                        'success': False
+                    }, default=decimal_default)
+                }
+            
+            # Generate a unique alarm_id
+            timestamp = datetime.now(timezone.utc).timestamp()
+            alarm_id = f"{client_id}_{alarm['variable_name']}_{timestamp}"
+            
+            # Create the complete alarm object
+            alarm_data = {
                 'client_id': client_id,
                 'alarm_id': alarm_id,
-                'variable_name': body['variable_name'],
-                'threshold': float(body['threshold']),
-                'condition': body['condition'],
-                'description': body.get('description', ''),
+                'variable_name': alarm['variable_name'],
+                'condition': alarm['condition'],
+                'threshold': Decimal(str(alarm['threshold'])),
+                'description': alarm.get('description', ''),
+                'severity': alarm.get('severity', 'info'),
+                'enabled': alarm.get('enabled', True),
                 'created_at': datetime.now(timezone.utc).isoformat(),
-                'is_active': body.get('is_active', True),
                 'last_triggered': None
             }
             
-            alarms_table.put_item(Item=alarm)
+            # Put the alarm in DynamoDB
+            alarms_table.put_item(Item=alarm_data)
+            
             return {
                 'statusCode': 200,
                 'headers': get_cors_headers(),
-                'body': json.dumps(alarm)
+                'body': json.dumps({
+                    'message': 'Alarm created successfully',
+                    'success': True,
+                    'alarm': alarm_data
+                }, default=decimal_default)
             }
-
+            
         elif operation == 'delete':
-            # Delete alarm
             alarm_id = body.get('alarm_id')
             if not alarm_id:
                 return {
                     'statusCode': 400,
                     'headers': get_cors_headers(),
                     'body': json.dumps({
-                        'error': 'alarm_id is required for delete operation'
-                    })
+                        'error': 'Missing alarm_id',
+                        'success': False
+                    }, default=decimal_default)
                 }
             
+            # Delete the alarm from DynamoDB
             alarms_table.delete_item(
                 Key={
                     'client_id': client_id,
                     'alarm_id': alarm_id
                 }
             )
+            
             return {
                 'statusCode': 200,
                 'headers': get_cors_headers(),
                 'body': json.dumps({
-                    'message': 'Alarm deleted successfully'
-                })
+                    'message': 'Alarm deleted successfully',
+                    'success': True
+                }, default=decimal_default)
             }
-
+            
         elif operation == 'update':
-            # Update alarm
             alarm_id = body.get('alarm_id')
-            if not alarm_id:
+            enabled = body.get('enabled')
+            
+            if alarm_id is None or enabled is None:
                 return {
                     'statusCode': 400,
                     'headers': get_cors_headers(),
                     'body': json.dumps({
-                        'error': 'alarm_id is required for update operation'
-                    })
+                        'error': 'Missing required parameters for update',
+                        'success': False
+                    }, default=decimal_default)
                 }
             
-            update_expression = 'SET '
-            expression_values = {}
-            
-            if 'is_active' in body:
-                update_expression += 'is_active = :is_active'
-                expression_values[':is_active'] = body['is_active']
-            
-            if 'threshold' in body:
-                if update_expression != 'SET ':
-                    update_expression += ', '
-                update_expression += 'threshold = :threshold'
-                expression_values[':threshold'] = float(body['threshold'])
-            
-            if 'description' in body:
-                if update_expression != 'SET ':
-                    update_expression += ', '
-                update_expression += 'description = :description'
-                expression_values[':description'] = body['description']
-            
-            if not expression_values:
-                return {
-                    'statusCode': 400,
-                    'headers': get_cors_headers(),
-                    'body': json.dumps({
-                        'error': 'No valid update parameters provided'
-                    })
-                }
-            
+            # Update the alarm in DynamoDB
             alarms_table.update_item(
                 Key={
                     'client_id': client_id,
                     'alarm_id': alarm_id
                 },
-                UpdateExpression=update_expression,
-                ExpressionAttributeValues=expression_values
+                UpdateExpression='SET enabled = :enabled',
+                ExpressionAttributeValues={
+                    ':enabled': enabled
+                }
             )
             
             return {
                 'statusCode': 200,
                 'headers': get_cors_headers(),
                 'body': json.dumps({
-                    'message': 'Alarm updated successfully'
-                })
+                    'message': 'Alarm updated successfully',
+                    'success': True
+                }, default=decimal_default)
             }
-
+            
         elif operation == 'get':
             alarms = get_device_alarms(client_id)
             return {
                 'statusCode': 200,
                 'headers': get_cors_headers(),
-                'body': json.dumps(alarms)
+                'body': json.dumps(alarms, default=decimal_default)
             }
 
         elif operation == 'check':
@@ -292,7 +316,7 @@ def lambda_handler(event, context):
             return {
                 'statusCode': 200,
                 'headers': get_cors_headers(),
-                'body': json.dumps(triggered_alarms)
+                'body': json.dumps(triggered_alarms, default=decimal_default)
             }
 
         elif operation == 'variables':
@@ -302,7 +326,7 @@ def lambda_handler(event, context):
                 'headers': get_cors_headers(),
                 'body': json.dumps({
                     "variables": variables
-                })
+                }, default=decimal_default)
             }
 
         else:
@@ -310,16 +334,18 @@ def lambda_handler(event, context):
                 'statusCode': 400,
                 'headers': get_cors_headers(),
                 'body': json.dumps({
-                    'error': f'Invalid operation: {operation}'
-                })
+                    'error': 'Invalid operation',
+                    'success': False
+                }, default=decimal_default)
             }
-
+            
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.error(f"Error processing request: {str(e)}")
         return {
             'statusCode': 500,
             'headers': get_cors_headers(),
             'body': json.dumps({
-                'error': str(e)
-            })
+                'error': str(e),
+                'success': False
+            }, default=decimal_default)
         } 
