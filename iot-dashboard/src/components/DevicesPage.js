@@ -356,25 +356,9 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     }
   };
 
-  const handleDeviceClick = (dev, version = '1') => {
-    // Get the device data safely
-    const currentDeviceData = deviceData[dev.client_id] || {};
-    const latestData = currentDeviceData.latest_data || {};
-    
-    // Prepare the device data before navigation
-    const deviceInfo = {
-      client_id: dev.client_id,
-      device_name: dev.device_name || dev.client_id,
-      device_type: latestData.device || 'Unknown',
-      latest_data: latestData,
-      metrics_visibility: currentDeviceData.metrics_visibility || {}
-    };
-    
-    // Update the selected device first
-    onSelectDevice(deviceInfo);
-    
-    // Then navigate to the appropriate dashboard version
-    navigate(version === '1' ? "/dashboard" : "/dashboard2");
+  const handleDeviceClick = (dev) => {
+    onSelectDevice(dev);
+    navigate("/dashboard");
   };
 
   const handleLogout = () => {
@@ -850,7 +834,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
     } catch (error) {
         console.error('Error updating device:', error);
-        showSnackbar('Failed to update device name: ' + error.message, 'error');
+        showSnackbar('Failed to update device: ' + error.message, 'error');
     }
   };
 
@@ -1468,17 +1452,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                     >
                                                     <DeleteIcon fontSize="small" />
                     </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="View Dashboard 2">
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeviceClick(device, '2');
-                                                    }}
-                                                >
-                                                    <ShowChartIcon fontSize="small" />
-                                                </IconButton>
                                             </Tooltip>
                   </Box>
                 </Paper>

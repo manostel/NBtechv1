@@ -1,7 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Helmet } from "react-helmet";
 import { useNavigate } from "react-router-dom";
-import { Line, Bar } from "react-chartjs-2";
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  TimeScale
+} from 'chart.js';
+import 'chartjs-adapter-date-fns';
 import {
   AppBar,
   Toolbar,
@@ -20,7 +32,6 @@ import {
   Divider,
   Menu,
   MenuItem,
-  Tooltip,
   Alert,
   Snackbar,
   CircularProgress,
@@ -31,7 +42,13 @@ import {
   DialogActions,
   FormControl,
   InputLabel,
-  Select
+  Select,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  useMediaQuery
 } from "@mui/material";
 import { 
   Settings as SettingsIcon,
@@ -51,212 +68,108 @@ import {
   Logout as LogoutIcon,
   ArrowBack as ArrowBackIcon,
   Visibility,
-  VisibilityOff
+  VisibilityOff,
+  Dashboard as DashboardIcon,
+  Timeline as TimelineIcon,
+  Assessment as AssessmentIcon,
+  Build as BuildIcon,
+  Warning as WarningIcon
 } from '@mui/icons-material';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title as ChartTitle,
-  Tooltip as ChartTooltip,
-  Legend,
-  TimeScale,
-  ArcElement
-} from "chart.js";
-import zoomPlugin from 'chartjs-plugin-zoom';
-import "chartjs-adapter-date-fns";
-import DeviceInfoCard from "./DeviceInfoCard";
-import BatteryIndicator from "./BatteryIndicator";
-import SignalIndicator from "./SignalIndicator";
+import DashboardHeader from "./dashboard2/DashboardHeader";
+import DashboardContent from "./dashboard2/DashboardContent";
+import DashboardControls from "./dashboard2/DashboardControls";
+import DashboardCharts from "./dashboard2/DashboardCharts";
+import DashboardCommands from "./dashboard2/DashboardCommands";
+import DashboardHistory from "./dashboard2/DashboardHistory";
 import SettingsDrawer from "./SettingsDrawer";
-import { App } from '@capacitor/app';
-import { StatusBar } from '@capacitor/status-bar';
-import { Capacitor } from '@capacitor/core';
-import DashboardSkeleton from './DashboardSkeleton';
-import { keyframes } from '@mui/material/styles';
+import DeviceInfoCard from "./DeviceInfoCard";
+import TimeRangeMenu from './dashboard2/TimeRangeMenu';
+import DashboardSkeleton from "./dashboard2/DashboardSkeleton";
+import DashboardSummaryTab from './dashboard2/DashboardSummaryTab';
+import DashboardChartsTab from './dashboard2/DashboardChartsTab';
+import DashboardCommandsTab from './dashboard2/DashboardCommandsTab';
+import DashboardHistoryTab from './dashboard2/DashboardHistoryTab';
+import DashboardOverviewTab from './dashboard2/DashboardOverviewTab';
+import DashboardStatisticsTab from './dashboard2/DashboardStatisticsTab';
+import DashboardAlarmsTab from './dashboard2/DashboardAlarmsTab';
 
+// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
-  ChartTitle,
-  ChartTooltip,
+  Title,
+  Tooltip,
   Legend,
-  TimeScale,
-  ArcElement,
-  zoomPlugin
+  TimeScale
 );
 
-// Update the TIME_RANGES constant
-const TIME_RANGES = [
-  { value: 'live', label: 'Live' },
-  { value: '15m', label: '15 Minutes' },
-  { value: '1h', label: '1 Hour' },
-  { value: '2h', label: '2 Hours' },
-  { value: '4h', label: '4 Hours' },
-  { value: '8h', label: '8 Hours' },
-  { value: '16h', label: '16 Hours' },
-  { value: '24h', label: '24 Hours' }
-];
+const DASHBOARD_DATA_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
+const DASHBOARD_LATEST_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-latest";
+const STATUS_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-status";
+const VARIABLES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-variables";
+const COMMAND_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/send-command";
+const BATTERY_STATE_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
 
-// Add this keyframes animation near the top of your file
-const pulseAnimation = keyframes`
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-`;
+function TabPanel({ children, value, index, ...other }) {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`dashboard-tabpanel-${index}`}
+      aria-labelledby={`dashboard-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
 
-// Remove the static METRICS_CONFIG and replace with a function to generate config
-const generateMetricConfig = (key) => {
-  // Default configurations for known metrics
-  const defaultConfigs = {
-    temperature: {
-      label: "Temperature",
-      unit: "\u00B0C",
-      color: "#FF6B6B",
-      icon: <ThermostatIcon />,
-      alertThresholds: { min: 10, max: 30 },
-      summaryKey: 'temperature'
-    },
-    humidity: {
-      label: "Humidity",
-      unit: "%",
-      color: "#4ECDC4",
-      icon: <WaterDropIcon />,
-      alertThresholds: { min: 30, max: 70 },
-      summaryKey: 'humidity'
-    },
-    battery: {
-      label: "Battery",
-      unit: "%",
-      color: "#FFD93D",
-      icon: <BatteryIcon />,
-      alertThresholds: { min: 20 },
-      summaryKey: 'battery_level'
-    },
-    signal: {
-      label: "Signal",
-      unit: "%",
-      color: "#6C5CE7",
-      icon: <SignalIcon />,
-      alertThresholds: { min: 30 },
-      summaryKey: 'signal_quality',
-      dataKey: 'signal_quality'
-    },
-    signal_quality: {
-      label: "Signal",
-      unit: "%",
-      color: "#6C5CE7",
-      icon: <SignalIcon />,
-      alertThresholds: { min: 30 }
-    }
-  };
-
-  // If we have a default config, use it
-  if (defaultConfigs[key]) {
-    return {
-      ...defaultConfigs[key],
-      dataKey: key
-    };
-  }
-
-  // For unknown metrics, generate a config
-  const colors = [
-    "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#9B59B6",
-    "#E67E22", "#3498DB", "#2ECC71", "#F1C40F", "#E74C3C"
-  ];
-  const icons = [
-    "speed", "analytics", "assessment", "trending_up", "data_usage",
-    "monitoring", "insights", "query_stats", "bar_chart", "line_axis"
-  ];
-
-  // Generate a deterministic color and icon based on the key
-  const colorIndex = Math.abs(key.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
-  const iconIndex = Math.abs(key.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % icons.length;
-
+function a11yProps(index) {
   return {
-    label: key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-    unit: "%", // Default unit, can be updated based on data type
-    color: colors[colorIndex],
-    icon: icons[iconIndex],
-    alertThresholds: { min: 0, max: 100 }, // Default thresholds
-    summaryKey: `avg_${key}`,
-    dataKey: key
+    id: `dashboard-tab-${index}`,
+    'aria-controls': `dashboard-tabpanel-${index}`,
   };
-};
+}
 
-// Replace console.log with this function
-const log = (message, data) => {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(message, data);
-  }
-};
-
-// Update the get_time_range_and_points function to handle the new time ranges
-const get_time_range_and_points = (time_range, target_points=100) => {
-  const now = new Date();
-  switch(time_range) {
-    case 'live':
-      return now - new Date(Date.now() - 2 * 60 * 1000), 20;
-    case '15m':
-      return now - new Date(Date.now() - 15 * 60 * 1000), target_points;
-    case '1h':
-      return now - new Date(Date.now() - 60 * 60 * 1000), target_points;
-    case '2h':
-      return now - new Date(Date.now() - 2 * 60 * 60 * 1000), target_points;
-    case '4h':
-      return now - new Date(Date.now() - 4 * 60 * 60 * 1000), target_points;
-    case '8h':
-      return now - new Date(Date.now() - 8 * 60 * 60 * 1000), target_points;
-    case '16h':
-      return now - new Date(Date.now() - 16 * 60 * 60 * 1000), target_points;
-    case '24h':
-      return now - new Date(Date.now() - 24 * 60 * 60 * 1000), target_points;
-    default:
-      return now - new Date(Date.now() - 60 * 60 * 1000), target_points;
-  }
-};
-
-// Update the getTimeRangeLabel function
-const getTimeRangeLabel = (range) => {
-  switch(range) {
-    case 'live': return 'Live';
-    case '15m': return '15 Minutes';
-    case '1h': return '1 Hour';
-    case '2h': return '2 Hours';
-    case '4h': return '4 Hours';
-    case '8h': return '8 Hours';
-    case '16h': return '16 Hours';
-    case '24h': return '24 Hours';
-    default: return 'Live';
-  }
-};
-
-// Add these constants at the top of the file
-const MAX_RETRIES = 2;  // Maximum number of retries
-const RETRY_DELAY = 1500;  // Delay between retries in milliseconds
-const INITIAL_CHECK_DELAY = 4500;  // Initial delay before first check
-
-// Add this helper function
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-export default function Dashboard({ user, device, onLogout, onBack }) {
+export default function Dashboard2({ user, device, onLogout, onBack }) {
   const navigate = useNavigate();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [metricsData, setMetricsData] = useState(null);
+  const [deviceState, setDeviceState] = useState(null);
+  const [alarms, setAlarms] = useState([]);
+  const [alarmHistory, setAlarmHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [timeRange, setTimeRange] = useState('1h');
+  const [refreshInterval, setRefreshInterval] = useState(60);
+  const [chartType, setChartType] = useState('line');
+  const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
+  const [chartMenuAnchor, setChartMenuAnchor] = useState(null);
+  const [showCharts, setShowCharts] = useState(true);
+  const [showCommands, setShowCommands] = useState(true);
+  const [metricsConfig, setMetricsConfig] = useState(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [prevTabValue, setPrevTabValue] = useState(0);
+  const [variablesLoaded, setVariablesLoaded] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [alertThresholds, setAlertThresholds] = useState({
+    temperature: { min: 10, max: 30 },
+    humidity: { min: 30, max: 70 },
+    battery: { min: 20 },
+    signal: { min: 30 }
+  });
+
+  // Add error state
+  const [error, setError] = useState(null);
 
   // API & IoT data states
   const [labels, setLabels] = useState([]);
@@ -270,110 +183,53 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   const [deviceName, setDeviceName] = useState("Unknown");
   const [toggle1, setToggle1] = useState(false);
   const [toggle2, setToggle2] = useState(false);
-  const [speedInput, setSpeedInput] = useState("");
+  const [speedInput, setSpeedInput] = useState(0);
   const [commandHistory, setCommandHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [showAlerts, setShowAlerts] = useState(false);
-  const [timeRange, setTimeRange] = useState('15m');
-  const [chartType, setChartType] = useState('line');
-  const [tabValue, setTabValue] = useState(0);
-  const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
-  const [chartMenuAnchor, setChartMenuAnchor] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const [summary, setSummary] = useState({
-    avg_temperature: 0,
-    avg_humidity: 0,
-    min_battery: 0,
-    avg_signal: 0,
-    data_points: 0,
-    original_points: 0,
-    interval_seconds: 0
-  });
-
-  // Module toggles for commands and charts
-  const [showCharts, setShowCharts] = useState(true);
-  const [showCommands, setShowCommands] = useState(true);
-
-  // Settings drawer state
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
-  // Add new state for chart customization
   const [chartConfig, setChartConfig] = useState({
-    showGrid: true,
-    showPoints: false,
-    showLines: true,
-    animation: true
+    showPoints: true,
+    showGrid: true
   });
 
-  // Add new state for alert thresholds
-  const [alertThresholds, setAlertThresholds] = useState({
-    temperature: { min: 10, max: 30 },
-    humidity: { min: 30, max: 70 },
-    battery: { min: 20 },
-    signal: { min: 30 }
-  });
+  // Summary type state
+  const [summaryType, setSummaryType] = useState('latest');
 
-  // Replace individual state variables with a dynamic state object
-  const [metricsData, setMetricsData] = useState({});
-
-  // Add state for dynamic metrics config
-  const [metricsConfig, setMetricsConfig] = useState({});
-
-  // Add this state near the other state declarations
-  const [summaryType, setSummaryType] = useState('latest'); // 'latest', 'avg', 'min', or 'max'
-
-  // Add new state for showing/hiding battery and signal
+  // UI visibility states
   const [showBatterySignal, setShowBatterySignal] = useState(true);
-
-  // Add new state for clientID visibility
   const [showClientId, setShowClientId] = useState(false);
 
-  // Add the new state for time range menu
+  // Time range menu state
   const [timeRangeAnchor, setTimeRangeAnchor] = useState(null);
 
-  // Add this near your other state declarations
+  // Data range warning state
   const [dataRangeWarning, setDataRangeWarning] = useState(null);
 
-  // Add this near your other state declarations
-  const [isInitializing, setIsInitializing] = useState(true);
-
-  // Add this with your other useRefs or useState declarations
+  // Chart reference
   const chartRef = React.useRef(null);
 
-  // Add these states for tracking changes
+  // State tracking
   const [pendingStateCheck, setPendingStateCheck] = useState(false);
   const [stateCheckTimeout, setStateCheckTimeout] = useState(null);
-
-  // Add this state to track commands in progress
   const [pendingCommands] = useState(new Map());
-
-  // Add this state to track active commands
   const [activeCommands] = useState(new Set());
-
-  // Add this state for debounced fetching
   const [fetchTimeout, setFetchTimeout] = useState(null);
-
-  // Add this state to track pending verifications
   const [pendingVerifications, setPendingVerifications] = useState(new Map());
-
-  // Add this state at the top with other state declarations
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // Add this near your other state declarations
+  // Command feedback state
   const [commandFeedback, setCommandFeedback] = useState({
     show: false,
     message: '',
     loading: false
   });
 
-  // Add these new state variables near your other state declarations
+  // Date and time states
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [timeWindow, setTimeWindow] = useState('8h');
   const [selectedHistoryDate, setSelectedHistoryDate] = useState(null);
   const [selectedTimeWindow, setSelectedTimeWindow] = useState(null);
-
-  // Update the state variables for the enhanced date picker
   const [startDateTime, setStartDateTime] = useState(new Date());
   const [endDateTime, setEndDateTime] = useState(() => {
     const date = new Date();
@@ -382,171 +238,684 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
   });
   const [dateTimeError, setDateTimeError] = useState('');
 
-  // Add this state variable to track previous tab
-  const [prevTabValue, setPrevTabValue] = useState(0);
+  // Add cleanup ref for component unmount
+  const isMounted = useRef(true);
 
-  const API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
-  const COMMAND_API_URL = "https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command";
+  // Separate state for overview tab
+  const [selectedVariablesOverview, setSelectedVariablesOverview] = useState([]);
+  
+  // Shared state for charts and statistics tabs
+  const [selectedVariablesChartsStats, setSelectedVariablesChartsStats] = useState([]);
+  
+  const [availableVariables, setAvailableVariables] = useState([]);
 
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Add this state for device state
-  const [deviceState, setDeviceState] = useState({
-    led1_state: 0,
-    led2_state: 0,
-    motor_speed: 0,
-    timestamp: null
+  // Add state for tracking pending changes
+  const [pendingChanges, setPendingChanges] = useState({
+    timeRange: null,
+    variables: null
   });
 
-  // Add the sendCommand function inside the Dashboard component
-  const sendCommand = async (command, params = {}) => {
-    try {
-      if (!device || !device.client_id) {
-        throw new Error('No device or client_id available');
-      }
+  // Add these state variables near the other state declarations
+  const [batteryLevel, setBatteryLevel] = useState(0);
+  const [signalStrength, setSignalStrength] = useState(0);
 
-      const payload = {
-        body: JSON.stringify({
-          client_id: device.client_id,
-          command: command,
-          ...params
-        }),
-        httpMethod: "POST"
-      };
+  // Add this state variable near other state declarations
+  const [batteryState, setBatteryState] = useState('idle');
 
-      console.log('Sending command:', command, params);
+  // Add a ref to track if we're already fetching
+  const isFetching = useRef(false);
 
-      const response = await fetch(COMMAND_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
+  useEffect(() => {
+    if (metricsConfig) {
+      const variables = Object.keys(metricsConfig);
+      setAvailableVariables(variables);
+      setSelectedVariablesChartsStats(variables);
+      setSelectedVariablesOverview(variables);
+    }
+  }, [metricsConfig]);
 
-      if (!response.ok) {
-        throw new Error('Failed to send command');
-      }
-
-      const data = await response.json();
-      console.log('Command response:', data);
-      return data;
-    } catch (error) {
-      console.error('Error sending command:', error);
-      throw error;
+  const handleVariableChange = (event, isOverview = false) => {
+    const newVariables = event.target.value;
+    if (isOverview) {
+      setSelectedVariablesOverview(newVariables);
+    } else {
+      setSelectedVariablesChartsStats(newVariables);
     }
   };
 
-  // Add the sendCommandWithRetry function inside the Dashboard component
-  const sendCommandWithRetry = async (command, params = {}) => {
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const fetchVariables = async () => {
+    if (!device || !device.client_id) {
+      console.error('No device or client_id available');
+      return;
+    }
+
     try {
-      // First attempt
-      await sendCommand(command, params);
+      setVariablesLoaded(false);
+      const response = await fetch(VARIABLES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
       
-      // Wait 500ms before second attempt
-      await delay(500);
-      
-      // Second attempt
-      await sendCommand(command, params);
-      
-      return true;
+      if (!result.variables || !Array.isArray(result.variables)) {
+        throw new Error('Invalid response format from variables API');
+      }
+
+      // Store the available variables
+      setAvailableVariables(result.variables);
+
+      // Create metrics config based on available variables
+      const newMetricsConfig = {};
+      result.variables.forEach(variable => {
+        newMetricsConfig[variable] = {
+          label: variable === 'temperature' ? 'Temperature' :
+                 variable === 'humidity' ? 'Humidity' :
+                 variable === 'battery' ? 'Battery' :
+                 variable === 'signal_quality' ? 'Signal Quality' : variable,
+          color: variable === 'temperature' ? '#FF6B6B' :
+                 variable === 'humidity' ? '#4ECDC4' :
+                 variable === 'battery' ? '#FFD166' :
+                 variable === 'signal_quality' ? '#06D6A0' : theme.palette.primary.main,
+          unit: variable === 'temperature' ? '°C' : 
+                variable === 'humidity' ? '%' : 
+                variable === 'battery' ? '%' : 
+                variable === 'signal_quality' ? '%' : '',
+          alertThresholds: {
+            min: variable === 'temperature' ? 10 : 
+                 variable === 'humidity' ? 30 : 
+                 variable === 'battery' ? 20 : 
+                 variable === 'signal_quality' ? 30 : 0,
+            max: variable === 'temperature' ? 30 : 
+                 variable === 'humidity' ? 70 : 
+                 variable === 'battery' ? 100 : 
+                 variable === 'signal_quality' ? 100 : 100
+          }
+        };
+      });
+
+      setMetricsConfig(newMetricsConfig);
+      setVariablesLoaded(true);
+
+      // Set initial selected variables for overview
+      setSelectedVariablesOverview(result.variables);
+      // Set initial selected variables for charts and stats
+      setSelectedVariablesChartsStats(result.variables);
+
+      // Return the variables for immediate use
+      return result.variables;
     } catch (error) {
-      console.error('Error in sendCommandWithRetry:', error);
-      throw error;
+      console.error('Error fetching variables:', error);
+      setError(error.message || 'Failed to fetch available variables');
+      setVariablesLoaded(false);
+      return [];
+    }
+  };
+
+  const fetchBatteryState = async (retryCount = 0) => {
+    if (!device || !device.client_id) {
+      console.warn('No device or client_id available for battery state fetch');
+      return;
+    }
+
+    try {
+      console.log(`Fetching battery state for device: ${device.client_id}`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(BATTERY_STATE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 502 && retryCount < 1) {
+          console.warn('Received 502 Bad Gateway, retrying once...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return fetchBatteryState(retryCount + 1);
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result || typeof result.battery_state !== 'string') {
+        console.error('Invalid response format from battery state API:', result);
+        throw new Error('Invalid response format from battery state API');
+      }
+
+      console.log('Successfully fetched battery state:', result.battery_state);
+      setBatteryState(result.battery_state);
+    } catch (error) {
+      console.error('Error fetching battery state:', error);
+      if (error.name === 'AbortError') {
+        console.warn('Request timed out');
+      }
+      setBatteryState('idle');
+    }
+  };
+
+  const fetchLatestData = async () => {
+    if (!device || !device.client_id) {
+      console.error('No device or client_id available');
+      return;
+    }
+
+    try {
+      const response = await fetch(DASHBOARD_LATEST_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id,
+          selected_variables: selectedVariablesOverview
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Received latest data:', result);
+
+      if (result.data_latest && Array.isArray(result.data_latest) && result.data_latest.length > 0) {
+        const latestData = result.data_latest[0];
+        const summary = result.summary_latest || {};
+
+        // Update device status based on timestamp
+        const lastTimestamp = new Date(latestData.timestamp);
+        const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
+        
+        // Device is active if last seen within 7 minutes
+        setDeviceStatus(timeDiffSeconds <= 420 ? "Active" : "Inactive");
+
+        // Update metrics data with latest values
+        setMetricsData(prevData => ({
+          ...prevData,
+          data_latest: result.data_latest,
+          summary_latest: summary
+        }));
+
+        // Update device info
+        setLastSeen(lastTimestamp);
+        setClientID(device.client_id);
+        setDeviceName(device.name || "Unknown");
+      }
+    } catch (error) {
+      console.error('Error fetching latest data:', error);
+      setError(error.message || 'Failed to connect to the server');
+    }
+  };
+
+  const fetchGraphData = async () => {
+    if (!device || !device.client_id) {
+      console.error('No device or client_id available');
+      return;
+    }
+
+    try {
+      // Only set loading state for initial load
+      if (isInitialLoad) {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      // First get the variables
+      const variablesResponse = await fetch(VARIABLES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!variablesResponse.ok) {
+        throw new Error(`HTTP error! status: ${variablesResponse.status}`);
+      }
+
+      const variablesResult = await variablesResponse.json();
+      const variables = variablesResult.variables || [];
+      
+      // Now fetch the dashboard data with these variables
+      const response = await fetch(DASHBOARD_DATA_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'get_dashboard_data',
+          client_id: device.client_id,
+          user_email: user.email,
+          time_range: timeRange,
+          points: 60,
+          include_state: true,
+          selected_variables: variables
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Received dashboard data:', result);
+
+      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+        // Process the data to round all numeric values to 2 decimal places
+        const processedData = result.data.map(item => {
+          const processedItem = { ...item };
+          // Round all numeric values except timestamp
+          Object.keys(processedItem).forEach(key => {
+            if (key !== 'timestamp' && typeof processedItem[key] === 'number') {
+              processedItem[key] = Number(processedItem[key].toFixed(2));
+            }
+          });
+          return processedItem;
+        });
+
+        const newMetricsData = {
+          data: processedData,
+          summary: result.summary || {}
+        };
+        setMetricsData(newMetricsData);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setError(error.message || 'Failed to connect to the server');
+    } finally {
+      if (isInitialLoad) {
+        setIsLoading(false);
+        setIsInitialLoad(false);
+      }
     }
   };
 
   const fetchDeviceState = async () => {
+    if (!device || !device.client_id) {
+      console.error('No device or client_id available');
+      return;
+    }
+
     try {
-      if (!device || !device.client_id) {
-        console.error('No device or client_id available');
-        return null;
-      }
-
-      const payload = {
-        body: JSON.stringify({ client_id: device.client_id }),
-        httpMethod: "POST"
-      };
-
-      console.log('Fetching device state...');
-
-      const response = await fetch('https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-status', {
+      const response = await fetch(STATUS_API_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const deviceState = await response.json();
+      console.log('Device state response:', deviceState);
+
+      setDeviceState(deviceState);
+      return deviceState;
+    } catch (error) {
+      console.error('Error fetching device state:', error);
+      setError(error.message || 'Failed to fetch device state');
+      return null;
+    }
+  };
+
+  const fetchInitialData = async () => {
+    if (!device || !device.client_id || !isMounted.current) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // 1. First fetch variables and get them immediately
+      const variables = await fetchVariables();
+      
+      // Check if component is still mounted
+      if (!isMounted.current) return;
+      
+      // 2. Fetch regular dashboard data with the variables we just got
+      await fetchGraphData();
+      
+      // Check if component is still mounted
+      if (!isMounted.current) return;
+      
+      // 3. Fetch latest data and device state together
+      await Promise.all([
+        fetchLatestData(),
+        fetchDeviceState()
+      ]);
+      
+    } catch (error) {
+      console.error('Error in initial data fetch:', error);
+      if (isMounted.current) {
+        setError(error.message || 'Failed to fetch initial data');
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Update the initial data fetch useEffect
+  useEffect(() => {
+    if (device && device.client_id) {
+      const fetchData = async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
+        
+        try {
+          await fetchInitialData();
+          // Make initial call to fetch battery state
+          await fetchBatteryState();
+        } finally {
+          isFetching.current = false;
+        }
+      };
+
+      fetchData();
+      
+      // Set up intervals for different data types
+      const latestDataInterval = setInterval(async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
+        
+        try {
+          // Fetch latest data and device state together every 30 seconds
+          await Promise.all([
+            fetchLatestData(),
+            fetchDeviceState()
+          ]);
+        } finally {
+          isFetching.current = false;
+        }
+      }, 30000); // 30 seconds for latest data and device state
+
+      const batteryStateInterval = setInterval(async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
+        
+        try {
+          await fetchBatteryState();
+        } finally {
+          isFetching.current = false;
+        }
+      }, 150000); // 2.5minitues for battery state
+
+      // Cleanup intervals on unmount
+      return () => {
+        clearInterval(latestDataInterval);
+        clearInterval(batteryStateInterval);
+      };
+    }
+  }, [device]);
+
+  const handleCloseError = () => {
+    setError(null);
+  };
+
+  // Event handlers
+  const handleTabChange = (event, newValue) => {
+    setSelectedTab(newValue);
+  };
+
+  const handleTimeRangeChange = (newTimeRange) => {
+    setTimeRange(newTimeRange);
+    setPendingChanges(prev => ({
+      ...prev,
+      timeRange: newTimeRange
+    }));
+  };
+
+  const handleExportData = () => {
+    if (!metricsData || Object.keys(metricsData).length === 0) {
+      setSnackbar({
+        open: true,
+        message: 'No data available to export',
+        severity: 'error'
+      });
+      return;
+    }
+
+    // Create CSV content
+    const headers = ['Timestamp', 'Temperature', 'Humidity', 'Battery', 'Signal Quality'];
+    const rows = [headers];
+
+    // Get the first metric's timestamps
+    const timestamps = metricsData[Object.keys(metricsData)[0]]?.map(d => d.timestamp) || [];
+    
+    timestamps.forEach((timestamp, index) => {
+      const row = [
+        new Date(timestamp).toLocaleString(),
+        metricsData.temperature?.[index]?.value || '',
+        metricsData.humidity?.[index]?.value || '',
+        metricsData.battery?.[index]?.value || '',
+        metricsData.signal_quality?.[index]?.value || ''
+      ];
+      rows.push(row);
+    });
+
+    const csvContent = rows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `device_${device.client_id}_data.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportClick = (event) => {
+    setExportMenuAnchor(event.currentTarget);
+  };
+
+  const handleExportClose = () => {
+    setExportMenuAnchor(null);
+  };
+
+  const handleChartTypeClick = (event) => {
+    setChartMenuAnchor(event.currentTarget);
+  };
+
+  const handleChartTypeClose = () => {
+    setChartMenuAnchor(null);
+  };
+
+  const handleTimeRangeClick = (event) => {
+    setTimeRangeAnchor(event.currentTarget);
+  };
+
+  const handleTimeRangeClose = () => {
+    setTimeRangeAnchor(null);
+  };
+
+  const handleSettingsOpen = () => {
+    setSettingsOpen(true);
+  };
+
+  const handleSettingsClose = () => {
+    setSettingsOpen(false);
+  };
+
+  const handleToggle1Change = (event) => {
+    setToggle1(event.target.checked);
+    // Add command sending logic here
+  };
+
+  const handleToggle2Change = (event) => {
+    setToggle2(event.target.checked);
+    // Add command sending logic here
+  };
+
+  const handleSpeedInputChange = (event) => {
+    setSpeedInput(event.target.value);
+  };
+
+  const handleSpeedInputSubmit = () => {
+    const speed = parseInt(speedInput, 10);
+    console.log('Submitting speed:', speed); // Debug log
+    
+    if (isNaN(speed) || speed < 0 || speed > 100) {
+      setSnackbar({
+        open: true,
+        message: 'Speed must be a number between 0 and 100',
+        severity: 'error'
+      });
+      return;
+    }
+    
+    // Send the command with the speed value
+    handleCommandSend('SET_SPEED', { speed: speed });
+  };
+
+  const handleChartConfigChange = (key) => (event) => {
+    setChartConfig(prev => ({
+      ...prev,
+      [key]: event.target.checked
+    }));
+  };
+
+  const handleAlertThresholdChange = (metric, type) => (event) => {
+    setAlertThresholds(prev => ({
+      ...prev,
+      [metric]: {
+        ...prev[metric],
+        [type]: parseFloat(event.target.value)
+      }
+    }));
+  };
+
+  const handleSummaryTypeChange = (event) => {
+    setSummaryType(event.target.value);
+  };
+
+  const handleDateChange = (date) => {
+    setSelectedDate(date);
+    setDatePickerOpen(false);
+  };
+
+  const handleTimeWindowChange = (event) => {
+    setTimeWindow(event.target.value);
+  };
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  const handleAlarmUpdate = (updatedAlarms) => {
+    setAlarms(updatedAlarms);
+    // Here you would typically send the updated alarms to your backend
+  };
+
+  const handleCommandSend = async (command, params = {}) => {
+    if (!device || !device.client_id) {
+      console.error('No device or client_id available');
+      return false;
+    }
+
+    try {
+      const payload = {
+        client_id: device.client_id,
+        command: command
+      };
+
+      // Add speed to payload for SET_SPEED command
+      if (command === 'SET_SPEED') {
+        payload.speed = params.speed;
+      }
+
+      console.log('Sending command with payload:', payload);
+
+      const response = await fetch('https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch device state');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send command');
       }
 
-      const data = await response.json();
-      const parsedBody = JSON.parse(data.body);
-
-      console.log('Received device state:', parsedBody);
-
-      // Ensure we always store the state in a consistent format
-      const stateToStore = parsedBody.state || parsedBody;
-      setDeviceState(stateToStore);
-
-      // Update UI states using the state object
-      if (stateToStore.led1_state !== undefined) {
-        setToggle1(stateToStore.led1_state === 1);
-      }
-      if (stateToStore.led2_state !== undefined) {
-        setToggle2(stateToStore.led2_state === 1);
-      }
-      if (stateToStore.timestamp) {
-        setLastSeen(new Date(stateToStore.timestamp));
+      // The API might return a success response without a body
+      if (response.status === 200) {
+        setSnackbar({
+          open: true,
+          message: 'Command sent successfully',
+          severity: 'success'
+        });
+        return true;
       }
 
-      setPendingStateCheck(false);
-      
-      // Return the state for verification
-      return stateToStore;
+      // If there is a response body, try to parse it
+      const result = await response.json();
+      if (result && result.success) {
+        setSnackbar({
+          open: true,
+          message: 'Command sent successfully',
+          severity: 'success'
+        });
+        return true;
+      }
 
+      throw new Error(result?.error || 'Failed to send command');
     } catch (error) {
-      console.error('Error fetching device state:', error);
-      showSnackbar('Failed to fetch device state', 'error');
-      setPendingStateCheck(false);
-      return null;
+      console.error('Error sending command:', error);
+      setSnackbar({
+        open: true,
+        message: error.message || 'Failed to send command',
+        severity: 'error'
+      });
+      return false;
     }
   };
 
-  // Function to update command buttons based on state
-  const updateCommandButtons = (state) => {
-    // Update LED1 button
-    const led1Button = document.getElementById('led1-button');
-    if (led1Button) {
-      led1Button.textContent = state.led1_state ? 'Turn LED1 OFF' : 'Turn LED1 ON';
-    }
-
-    // Update LED2 button
-    const led2Button = document.getElementById('led2-button');
-    if (led2Button) {
-      led2Button.textContent = state.led2_state ? 'Turn LED2 OFF' : 'Turn LED2 ON';
-    }
-
-    // Update speed display
-    const speedDisplay = document.getElementById('speed-display');
-    if (speedDisplay) {
-      speedDisplay.textContent = `Current Speed: ${state.motor_speed}`;
-    }
-  };
-
-  // Remove the polling useEffect and replace with this new one
-  useEffect(() => {
-    // Cleanup function for timeouts
-    return () => {
-      if (stateCheckTimeout) {
-        clearTimeout(stateCheckTimeout);
-      }
-    };
-  }, []);
-
-  const fetchData = async () => {
+  const handleApply = async () => {
     if (!device || !device.client_id) {
       console.error('No device or client_id available');
       return;
@@ -554,1669 +923,131 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
 
     try {
       setIsLoading(true);
-      console.log('Fetching dashboard data for device:', device);
+      setError(null);
       
-      const requestBody = {
-        action: 'get_dashboard_data',
-        client_id: device.client_id,
-        user_email: user.email,
-        time_range: timeRange,
-        points: timeRange === 'live' ? 20 : 
-               timeRange === '15m' ? 15 : 
-               100
-      };
-
-      // Adjust timeout for live data to match new publication rate
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 
-        timeRange === 'live' ? 5000 : 8000  // Reduced timeout for live data to 5 seconds
-      );
-
-      const response = await fetch(API_URL, {
+      const response = await fetch(DASHBOARD_DATA_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal
+        body: JSON.stringify({
+          action: 'get_dashboard_data',
+          client_id: device.client_id,
+          user_email: user.email,
+          time_range: timeRange,
+          points: timeRange === 'live' ? 60 : 
+                 timeRange === '15m' ? 15 :
+                 timeRange === '1h' ? 60 :
+                 timeRange === '24h' ? 96 : // 15-minute intervals for 24h
+                 timeRange === '3d' ? 144 : // 30-minute intervals for 3d
+                 timeRange === '7d' ? 168 : // 1-hour intervals for 7d
+                 timeRange === '30d' ? 360 : // 2-hour intervals for 30d
+                 60,
+          include_state: true,
+          selected_variables: selectedVariablesChartsStats
+        })
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      
-      if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
-        throw new Error('No data received from server');
+      console.log('Received dashboard data:', result);
+
+      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+        // Update the metrics data while preserving latest data
+        setMetricsData(prevData => ({
+          ...prevData,
+          data: result.data,
+          summary: result.summary || {}
+        }));
       }
-
-      const data = result.data;
-      console.log('Received data:', data);
-
-      // Check data time range
-      const firstTimestamp = new Date(data[0].timestamp);
-      const lastTimestamp = new Date(data[data.length - 1].timestamp);
-      const dataRangeHours = (lastTimestamp - firstTimestamp) / (1000 * 60 * 60);
-
-      // Show more informative warning
-      if (timeRange === '30d' || timeRange === '7d') {
-        const requestedDays = timeRange === '30d' ? 30 : 7;
-        const startDate = firstTimestamp.toLocaleDateString();
-        const endDate = lastTimestamp.toLocaleDateString();
-        
-        setDataRangeWarning(
-          `Limited historical data available: Showing data from ${startDate} to ${endDate}. ` +
-          `Expected ${requestedDays} days but received ${Math.round(dataRangeHours)} hours of data. ` +
-          `Data points: ${summary.data_points} (aggregated from ${summary.original_points} readings)`
-        );
-        
-        showMobileToast(`Limited historical data: ${Math.round(dataRangeHours)} hours available`).then(shown => {
-          if (!shown) {
-        showSnackbar(`Limited historical data: ${Math.round(dataRangeHours)} hours available`, 'warning');
-          }
-        });
-      } else {
-        setDataRangeWarning(null);
-      }
-
-      if (Array.isArray(data) && data.length > 0) {
-        const timestamps = data.map((entry) => new Date(entry.timestamp));
-        setLabels(timestamps);
-
-        // Process data in the background
-        const firstDataPoint = data[0];
-        const newMetricsConfig = {};
-        Object.keys(firstDataPoint).forEach(key => {
-          // Exclude client_id from metrics configuration
-          if (key !== 'timestamp' && key !== 'client_id') {
-            newMetricsConfig[key] = generateMetricConfig(key);
-          }
-        });
-        setMetricsConfig(newMetricsConfig);
-
-        const newMetricsData = {};
-        Object.keys(newMetricsConfig).forEach(key => {
-          newMetricsData[key] = data.map(entry => parseFloat(entry[key]));
-        });
-        setMetricsData(newMetricsData);
-
-        // Update basic info
-        setClientID(device.client_id);
-        setDeviceName(device.device_name || "Unknown");
-
-        // Update last seen with the most recent timestamp
-        const lastTimestamp = new Date(data[data.length - 1].timestamp);
-        setLastSeen(lastTimestamp);
-        
-        // Calculate time difference in seconds between now and last timestamp
-        const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
-        
-        // Device is active if last seen within 2 minutes
-        setDeviceStatus(timeDiffSeconds <= 120 ? "Active" : "Inactive");
-
-        // Calculate summary statistics
-        const calculatedSummary = {};
-        Object.keys(newMetricsConfig).forEach(key => {
-          const values = newMetricsData[key].filter(v => !isNaN(v));
-          if (values.length > 0) {
-            calculatedSummary[`avg_${key}`] = values.reduce((a, b) => a + b, 0) / values.length;
-            calculatedSummary[`min_${key}`] = Math.min(...values);
-            calculatedSummary[`max_${key}`] = Math.max(...values);
-          }
-        });
-
-        // Merge summaries
-        const finalSummary = result.summary || {};
-        const mergedSummary = {
-          ...calculatedSummary,
-          ...finalSummary
-        };
-        setSummary(mergedSummary);
-
-        // Check alerts
-        Object.keys(newMetricsConfig).forEach(key => {
-          const value = newMetricsData[key][newMetricsData[key].length - 1];
-          const config = newMetricsConfig[key];
-          checkMetricAlert(key, value, config.alertThresholds);
-        });
-
-        // Make sure we pick up the latest timestamp from the summary if available
-        if (result.summary && result.summary.latest && result.summary.latest.timestamp) {
-          const latestTimestamp = new Date(result.summary.latest.timestamp);
-          setLastSeen(latestTimestamp);
-          
-          // Update status based on latest timestamp
-          const timeDiffSeconds = (new Date() - latestTimestamp) / 1000;
-          setDeviceStatus(timeDiffSeconds <= 120 ? "Active" : "Inactive");
-        }
-      }
-
-      // After successful data fetch, if this is the first load, fetch device status
-      if (isInitializing) {
-        console.log('Initial load - fetching device status');
-        await fetchDeviceState();
-      }
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setDeviceStatus("Error");
-      
-      if (error.name === 'AbortError') {
-        if (timeRange === 'live') {
-          console.log('Live data fetch timeout - will retry on next interval');
-        } else {
-          showMobileToast('Request timeout - try a shorter time range').then(shown => {
-            if (!shown) {
-          showSnackbar('Request timeout - try a shorter time range', 'error');
-            }
-          });
-        }
-      } else {
-        showMobileToast('Error fetching data. Please try again.').then(shown => {
-          if (!shown) {
-        showSnackbar('Error fetching data. Please try again.', 'error');
-      }
-        });
-      }
+      setError(error.message || 'Failed to connect to the server');
     } finally {
       setIsLoading(false);
-      setIsInitializing(false);
     }
   };
 
-  // Modify the checkAlerts function to handle dynamic metrics
-  const checkMetricAlert = (metric, value, thresholds) => {
-    const newAlerts = [];
-    if (thresholds.max && value > thresholds.max) {
-      newAlerts.push(`High ${metricsConfig[metric]?.label || metric} alert!`);
-    }
-    if (thresholds.min && value < thresholds.min) {
-      newAlerts.push(`Low ${metricsConfig[metric]?.label || metric} alert!`);
-    }
-    
-    if (newAlerts.length > 0) {
-      setAlerts(prev => [...newAlerts, ...prev]);
-      setShowAlerts(true);
-      showMobileToast(newAlerts[0]).then(shown => {
-        if (!shown) {
-      showSnackbar(newAlerts[0], 'warning');
-        }
-      });
-    }
-  };
-
-  // Replace traditional snackbar with native toast for better mobile experience
-  const showMobileToast = async (message, severity = 'info') => {
-    setSnackbar({ 
-      open: true, 
-      message, 
-      severity 
-    });
-    return true;
-  };
-
-  // Update the showSnackbar function
-  const showSnackbar = (message, severity = 'success') => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  // Update the verifyCommandSuccess function
-  const verifyCommandSuccess = (command, params, deviceState) => {
-    console.log('Verifying command:', command);
-    console.log('Device state:', deviceState);
-    
-    if (!deviceState) {
-      console.log('No device state available for verification');
-      return false;
-    }
-
-    // Ensure we have the correct state object
-    const state = deviceState.state || deviceState;
-    console.log('Parsed state:', state);
-
-    switch (command) {
-      case 'TOGGLE_1_ON':
-        return state.led1_state === 1;
-      case 'TOGGLE_1_OFF':
-        return state.led1_state === 0;
-      case 'TOGGLE_2_ON':
-        return state.led2_state === 1;
-      case 'TOGGLE_2_OFF':
-        return state.led2_state === 0;
-      case 'SET_SPEED':
-        const targetSpeed = Number(params.speed);
-        const currentSpeed = Number(state.motor_speed);
-        return currentSpeed === targetSpeed;
-      case 'RESTART':
-        return true; // Consider restart always successful if we get a state
-      default:
-        return false;
-    }
-  };
-
-  // Update the command handlers to include feedback
-  const handleToggle1 = async () => {
-    if (isVerifying) {
-      console.log('Verification in progress, skipping new command');
-      return;
-    }
-
-    const newState = !toggle1;
-    const command = newState ? "TOGGLE_1_ON" : "TOGGLE_1_OFF";
-    const commandId = `${command}_${Date.now()}`;
-    
-    if (activeCommands.has(commandId)) {
-      return;
-    }
-    
-    activeCommands.add(commandId);
-    setToggle1(newState);
-    setIsVerifying(true);
-    
-    setCommandFeedback({
-      show: true,
-      message: `Sending ${command} command...`,
-      loading: true
-    });
-
-    const commandEntry = {
-      id: commandId,
-      timestamp: new Date(),
-      action: command,
-      status: 'pending'
-    };
-
-    setCommandHistory(prev => [commandEntry, ...prev]);
-
-    try {
-      // Send command twice with delay
-      await sendCommandWithRetry(command);
-      
-      setCommandFeedback({
-        show: true,
-        message: 'Waiting for device confirmation...',
-        loading: true
-      });
-      
-      setTimeout(async () => {
-        try {
-          const finalState = await fetchDeviceState();
-          const success = verifyCommandSuccess(command, {}, finalState);
-          
-          setCommandHistory(prev => prev.map(cmd => {
-            if (cmd.id === commandId) {
-              return { 
-                ...cmd, 
-                status: success ? 'success' : 'failed'
-              };
-            }
-            return cmd;
-          }));
-
-          setCommandFeedback({
-            show: true,
-            message: success ? 'Command confirmed!' : 'Command failed to verify',
-            loading: false
-          });
-
-          setTimeout(async () => {
-            await fetchDeviceState();
-            setCommandFeedback({ show: false, message: '', loading: false });
-          }, 1000);
-
-        } catch (error) {
-          console.error('Verification error:', error);
-          setCommandHistory(prev => prev.map(cmd => {
-            if (cmd.id === commandId) {
-              return { ...cmd, status: 'failed' };
-            }
-            return cmd;
-          }));
-          
-          setCommandFeedback({
-            show: true,
-            message: 'Failed to verify command',
-            loading: false
-          });
-        } finally {
-          setIsVerifying(false);
-          activeCommands.delete(commandId);
-        }
-      }, 4500);
-      
-    } catch (error) {
-      console.error('Error in handleToggle1:', error);
-      setCommandHistory(prev => prev.map(cmd => {
-        if (cmd.id === commandId) {
-          return { ...cmd, status: 'failed' };
-        }
-        return cmd;
-      }));
-      setIsVerifying(false);
-      activeCommands.delete(commandId);
-      
-      setCommandFeedback({
-        show: true,
-        message: 'Failed to send command',
-        loading: false
-      });
-    }
-  };
-
-  // Update handleToggle2 similarly
-  const handleToggle2 = async () => {
-    if (isVerifying) {
-      console.log('Verification in progress, skipping new command');
-      return;
-    }
-
-    const newState = !toggle2;
-    const command = newState ? "TOGGLE_2_ON" : "TOGGLE_2_OFF";
-    const commandId = `${command}_${Date.now()}`;
-    
-    if (activeCommands.has(commandId)) {
-      return;
-    }
-    
-    activeCommands.add(commandId);
-    setToggle2(newState);
-    setIsVerifying(true);
-    
-    setCommandFeedback({
-      show: true,
-      message: `Sending ${command} command...`,
-      loading: true
-    });
-
-    const commandEntry = {
-      id: commandId,
-      timestamp: new Date(),
-      action: command,
-      status: 'pending'
-    };
-
-    setCommandHistory(prev => [commandEntry, ...prev]);
-
-    try {
-      // Send command twice with delay
-      await sendCommandWithRetry(command);
-      
-      setCommandFeedback({
-        show: true,
-        message: 'Waiting for device confirmation...',
-        loading: true
-      });
-      
-      setTimeout(async () => {
-        try {
-          const finalState = await fetchDeviceState();
-          const success = verifyCommandSuccess(command, {}, finalState);
-          
-          setCommandHistory(prev => prev.map(cmd => {
-            if (cmd.id === commandId) {
-              return { 
-                ...cmd, 
-                status: success ? 'success' : 'failed'
-              };
-            }
-            return cmd;
-          }));
-
-          setCommandFeedback({
-            show: true,
-            message: success ? 'Command confirmed!' : 'Command failed to verify',
-            loading: false
-          });
-
-          setTimeout(async () => {
-            await fetchDeviceState();
-            setCommandFeedback({ show: false, message: '', loading: false });
-          }, 1000);
-
-        } catch (error) {
-          console.error('Verification error:', error);
-          setCommandHistory(prev => prev.map(cmd => {
-            if (cmd.id === commandId) {
-              return { ...cmd, status: 'failed' };
-            }
-            return cmd;
-          }));
-          
-          setCommandFeedback({
-            show: true,
-            message: 'Failed to verify command',
-            loading: false
-          });
-        } finally {
-          setIsVerifying(false);
-          activeCommands.delete(commandId);
-        }
-      }, 4500);
-      
-    } catch (error) {
-      console.error('Error in handleToggle2:', error);
-      setCommandHistory(prev => prev.map(cmd => {
-        if (cmd.id === commandId) {
-          return { ...cmd, status: 'failed' };
-        }
-        return cmd;
-      }));
-      setIsVerifying(false);
-      activeCommands.delete(commandId);
-      
-      setCommandFeedback({
-        show: true,
-        message: 'Failed to send command',
-        loading: false
-      });
-    }
-  };
-
-  // Update handleSendSpeed similarly
-  const handleSendSpeed = async () => {
-    if (isVerifying) {
-      console.log('Verification in progress, skipping new command');
-      return;
-    }
-
-    if (speedInput.trim() === "") return;
-    
-    const speed = parseInt(speedInput);
-    if (isNaN(speed) || speed < 0 || speed > 100) {
-      showSnackbar('Speed must be a number between 0 and 100', 'error');
-      return;
-    }
-
-    const commandId = `SET_SPEED_${speed}_${Date.now()}`;
-    
-    if (activeCommands.has(commandId)) {
-      return;
-    }
-    
-    activeCommands.add(commandId);
-    setIsVerifying(true);
-    
-    setCommandFeedback({
-      show: true,
-      message: `Sending speed command (${speed}%)...`,
-      loading: true
-    });
-
-    const commandEntry = {
-      id: commandId,
-      timestamp: new Date(),
-      action: "SET_SPEED",
-      data: { speed },
-      status: 'pending'
-    };
-
-    setCommandHistory(prev => [commandEntry, ...prev]);
-
-    try {
-      // Send command twice with delay
-      await sendCommandWithRetry("SET_SPEED", { speed });
-      setSpeedInput("");
-      
-      setCommandFeedback({
-        show: true,
-        message: 'Waiting for device confirmation...',
-        loading: true
-      });
-      
-      setTimeout(async () => {
-        try {
-          const finalState = await fetchDeviceState();
-          const success = verifyCommandSuccess("SET_SPEED", { speed }, finalState);
-          
-          setCommandHistory(prev => prev.map(cmd => {
-            if (cmd.id === commandId) {
-              return { 
-                ...cmd, 
-                status: success ? 'success' : 'failed'
-              };
-            }
-            return cmd;
-          }));
-
-          setCommandFeedback({
-            show: true,
-            message: success ? 'Speed command confirmed!' : 'Speed command failed to verify',
-            loading: false
-          });
-
-          setTimeout(async () => {
-            await fetchDeviceState();
-            setCommandFeedback({ show: false, message: '', loading: false });
-          }, 1000);
-
-        } catch (error) {
-          console.error('Verification error:', error);
-          setCommandHistory(prev => prev.map(cmd => {
-            if (cmd.id === commandId) {
-              return { ...cmd, status: 'failed' };
-            }
-            return cmd;
-          }));
-          
-          setCommandFeedback({
-            show: true,
-            message: 'Failed to verify speed command',
-            loading: false
-          });
-        } finally {
-          setIsVerifying(false);
-          activeCommands.delete(commandId);
-        }
-      }, 4500);
-      
-    } catch (error) {
-      console.error('Error in handleSendSpeed:', error);
-      setCommandHistory(prev => prev.map(cmd => {
-        if (cmd.id === commandId) {
-          return { ...cmd, status: 'failed' };
-        }
-        return cmd;
-      }));
-      setIsVerifying(false);
-      activeCommands.delete(commandId);
-      
-      setCommandFeedback({
-        show: true,
-        message: 'Failed to send speed command',
-        loading: false
-      });
-    }
-  };
-
-  const handleRestart = async () => {
-    const commandId = `RESTART_${Date.now()}`;
-    const commandEntry = {
-      id: commandId,
-      timestamp: new Date(),
-      action: "RESTART",
-      status: 'pending'
-    };
-
-    setCommandHistory(prev => [commandEntry, ...prev]);
-
-    try {
-      // Send restart command twice with delay
-      await sendCommandWithRetry("RESTART");
-      
-      const timeout1 = setTimeout(async () => {
-        await fetchDeviceState();
-        
-        const timeout2 = setTimeout(async () => {
-          await fetchDeviceState();
-          
-          setCommandHistory(prev => prev.map(cmd => {
-            if (cmd.id === commandId) {
-              return {
-                ...cmd,
-                status: verifyCommandSuccess("RESTART", {}, deviceState) ? 'success' : 'failed'
-              };
-            }
-            return cmd;
-          }));
-          activeCommands.delete(commandId);
-        }, 2000);
-        
-        setStateCheckTimeout(timeout2);
-      }, 2000);
-      
-      setStateCheckTimeout(timeout1);
-      
-    } catch (error) {
-      setCommandHistory(prev => prev.map(cmd => {
-        if (cmd.id === commandId) {
-          return { ...cmd, status: 'failed' };
-        }
-        return cmd;
-      }));
-      activeCommands.delete(commandId);
-    }
-  };
-
-  // Add this new function to handle the delayed state checks
-  const scheduleStateChecks = () => {
-    // Clear any existing timeouts
-    if (stateCheckTimeout) {
-      clearTimeout(stateCheckTimeout);
-    }
-
-    // First check after 2 seconds
-    const timeout1 = setTimeout(() => {
-      fetchDeviceState();
-      
-      // Second check after another 2 seconds
-      const timeout2 = setTimeout(() => {
-        fetchDeviceState();
-        setStateCheckTimeout(null);
-      }, 2000);
-      
-      setStateCheckTimeout(timeout2);
-    }, 2000);
-
-    setStateCheckTimeout(timeout1);
-    setPendingStateCheck(true);
-  };
-
-  const handleExportData = (format) => {
-    const data = {
-      timestamps: labels,
-      temperature: temperatureData,
-      humidity: humidityData,
-      battery: batteryData,
-      signal: signalQualityData
-    };
-
-    let content;
-    let filename;
-    let type;
-
-    if (format === 'csv') {
-      content = 'Timestamp,Temperature,Humidity,Battery,Signal\n';
-      labels.forEach((label, i) => {
-        content += `${label.toISOString()},${temperatureData[i]},${humidityData[i]},${batteryData[i]},${signalQualityData[i]}\n`;
-      });
-      filename = 'device_data.csv';
-      type = 'text/csv';
-    } else {
-      content = JSON.stringify(data, null, 2);
-      filename = 'device_data.json';
-      type = 'application/json';
-    }
-
-    const blob = new Blob([content], { type });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  // Modify the refresh handler to not set loading state
-  const handleRefresh = () => {
-    fetchData();
-  };
-
-  // Replace haptic feedback with MUI visual feedback
-  const handleRefreshWithHaptics = () => {
-    // Visual feedback using MUI ripple effect is automatic in Button component
-    handleRefresh();
-  };
-
-  // Update the useEffect for initial load
-  useEffect(() => {
-    log('Dashboard mounted with device:', device);
-    if (device && device.client_id) {
-      // Only fetch data when component first mounts or if we're on the Overview tab
-      if (isInitializing || (tabValue === 0 && prevTabValue === 0)) {
-      log('Fetching initial data...');
-        fetchData();
-      }
-      
-      // Set up intervals for data fetching, but only activate them on the Overview tab
-      const liveInterval = setInterval(() => {
-        if (timeRange === 'live' && tabValue === 0) {
-          fetchData();
-        }
-      }, 10000);
-      
-      const historicalInterval = setInterval(() => {
-        if (timeRange !== 'live' && tabValue === 0) {
-          fetchData();
-        }
-      }, 60000);
-
-      return () => {
-        clearInterval(liveInterval);
-        clearInterval(historicalInterval);
-      };
-    }
-  }, [device, timeRange, tabValue]);
-
-  // Add this effect to track tab changes
-  useEffect(() => {
-    setPrevTabValue(tabValue);
-  }, [tabValue]);
-
-  // Modify the time range menu handler to check the current tab
-  const handleTimeRangeChange = (newRange) => {
-    // Only update time range and fetch data if we're on Overview tab
-    setTimeRange(newRange);
-    setTimeRangeAnchor(null);
-    
-    // Only fetch data if we're on the Overview tab
-    if (tabValue === 0) {
-      fetchData();
-    }
-  };
-
-  // Update the renderTimeRangeMenu function
-  const renderTimeRangeMenu = () => (
-    <Box sx={{ 
-      display: 'flex', 
-      gap: 1, 
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      mb: 1
-    }}>
-      {/* Refresh Button */}
-      <Button
-        size="small"
-        variant="outlined"
-        onClick={handleRefresh}
-        startIcon={<RefreshIcon />}
-        sx={{ 
-          minWidth: 'auto',
-          px: 1.5,  // Reduced padding
-          height: 28,  // Smaller height
-          borderRadius: 1,
-          fontSize: '0.75rem',  // Smaller font
-          textTransform: 'none',
-          '& .MuiButton-startIcon': {
-            mr: 0.5,
-            '& svg': {
-              fontSize: '1rem'  // Smaller icon
-            }
-          }
-        }}
-      >
-        Refresh
-      </Button>
-
-      {/* Time Range Button */}
-      <Button
-        size="small"
-        variant="outlined"
-        onClick={(e) => setTimeRangeAnchor(e.currentTarget)}
-        endIcon={<ArrowDropDownIcon />}
-        sx={{ 
-          minWidth: 'auto',
-          px: 1.5,
-          height: 28,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          textTransform: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          '& .MuiButton-endIcon': {
-            ml: 0.5,
-            '& svg': {
-              fontSize: '1.2rem'
-            }
-          }
-        }}
-      >
-        {timeRange === 'live' ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            Live
-            <Box
-              sx={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                bgcolor: 'error.main',
-                animation: `${pulseAnimation} 2s ease-in-out infinite`
-              }}
-            />
-          </Box>
-        ) : (
-          getTimeRangeLabel(timeRange)
-        )}
-      </Button>
-
-      {/* Reset Zoom Button */}
-      <Button
-        size="small"
-        variant="outlined"
-        onClick={handleResetZoom}
-        startIcon={<ZoomOutIcon />}
-        sx={{ 
-          minWidth: 'auto',
-          px: 1.5,
-          height: 28,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          textTransform: 'none',
-          '& .MuiButton-startIcon': {
-            mr: 0.5,
-            '& svg': {
-              fontSize: '1rem'
-            }
-          }
-        }}
-      >
-        Reset
-      </Button>
-
-      {/* Chart Options Button */}
-      <Button
-        size="small"
-        variant="outlined"
-        onClick={(e) => setChartMenuAnchor(e.currentTarget)}
-        startIcon={<ShowChartIcon />}
-        sx={{ 
-          minWidth: 'auto',
-          px: 1.5,
-          height: 28,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          textTransform: 'none',
-          '& .MuiButton-startIcon': {
-            mr: 0.5,
-            '& svg': {
-              fontSize: '1rem'
-            }
-          }
-        }}
-      >
-        Options
-      </Button>
-
-      {/* Summary Type Button */}
-      <Button
-        size="small"
-        variant="outlined"
-        onClick={cycleSummaryType}
-        sx={{ 
-          minWidth: 'auto',
-          px: 1.5,
-          height: 28,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          textTransform: 'capitalize'
-        }}
-      >
-        {summaryType === 'latest' ? 'Latest' :
-         summaryType === 'avg' ? 'Average' :
-         summaryType === 'min' ? 'Minimum' :
-         'Maximum'}
-      </Button>
-    </Box>
-  );
-
-  // Update the handleResetZoom function to use ChartJS instead of Chart
-  const handleResetZoom = () => {
-    try {
-      // Try different approaches to find and reset charts
-      if (chartRef.current) {
-        // For Chart.js v3+
-        if (chartRef.current.chartInstance && typeof chartRef.current.chartInstance.resetZoom === 'function') {
-          chartRef.current.chartInstance.resetZoom();
-        } 
-        // For legacy Chart.js
-        else if (chartRef.current.chart && typeof chartRef.current.chart.resetZoom === 'function') {
-          chartRef.current.chart.resetZoom();
-        }
-        // Direct access to chart
-        else if (typeof chartRef.current.resetZoom === 'function') {
-          chartRef.current.resetZoom();
-        }
-      } else {
-        // Fallback to finding all charts in the document
-        document.querySelectorAll('canvas').forEach(canvas => {
-          const chartInstance = ChartJS.getChart(canvas);
-          if (chartInstance && typeof chartInstance.resetZoom === 'function') {
-            chartInstance.resetZoom();
-          }
-        });
-      }
-      
-      showSnackbar('Chart zoom reset', 'info');
-    } catch (error) {
-      console.error('Error resetting zoom:', error);
-      showSnackbar('Could not reset zoom', 'error');
-    }
-  };
-
-  // Update the chart options for better mobile viewing
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { 
-        position: "top", 
-        labels: { 
-          color: theme.palette.text.primary,
-          boxWidth: window.innerWidth < 600 ? 10 : 40,
-          padding: window.innerWidth < 600 ? 8 : 10,
-          font: {
-            size: window.innerWidth < 600 ? 10 : 12
-          }
-        },
-        display: true
-      },
-      title: { 
-        display: true, 
-        text: "Real-time IoT Data", 
-        color: theme.palette.text.primary,
-        font: {
-          size: window.innerWidth < 600 ? 14 : 16,
-          weight: 'bold'
-        }
-      },
-      tooltip: {
-        enabled: true,
-        mode: 'index',
-        intersect: true,
-        callbacks: {
-          label: function(context) {
-            setTimeout(() => {
-              const tooltipEl = document.querySelector('.chartjs-tooltip');
-              if (tooltipEl) {
-                  tooltipEl.style.opacity = '0';
-              }
-            }, 1500);
-            
-            const label = context.dataset.label || '';
-            const value = context.parsed.y;
-            return `${label}: ${value}`;
-          }
-        },
-        animation: {
-          duration: 150
-        },
-        position: 'nearest',
-        backgroundColor: theme.palette.background.paper,
-        titleColor: theme.palette.text.primary,
-        bodyColor: theme.palette.text.secondary,
-        borderColor: theme.palette.divider,
-        borderWidth: 1,
-        padding: 8,
-        displayColors: false,
-        titleFont: {
-          size: 12,
-          weight: 'bold'
-        },
-        bodyFont: {
-          size: 11
-        }
-      },
-      zoom: {
-        pan: {
-          enabled: true,
-          mode: 'xy',
-          overScaleMode: 'y'
-        },
-        zoom: {
-          wheel: {
-            enabled: true,
-          },
-          pinch: {
-            enabled: true
-          },
-          mode: 'xy',
-          overScaleMode: 'y'
-        },
-        limits: {
-          y: {min: 'original', max: 'original'}
-        }
-      }
-    },
-    scales: {
-      x: {
-        type: "time",
-        time: { 
-          unit: timeRange === 'live' ? 'second' :
-                timeRange === '15m' ? 'minute' :
-                timeRange === '1h' ? 'minute' :
-                timeRange === '24h' || timeRange === '2d' || timeRange === '3d' || selectedTimeWindow === '24h' || selectedTimeWindow === '2d' || selectedTimeWindow === '3d' ? 'hour' : 'minute',
-          tooltipFormat: timeRange === 'live' ? "HH:mm:ss" : 
-                        (timeRange === '24h' || timeRange === '2d' || timeRange === '3d' || selectedTimeWindow === '24h' || selectedTimeWindow === '2d' || selectedTimeWindow === '3d') ? "MMM dd, HH:mm" : "HH:mm",
-          displayFormats: {
-            second: 'HH:mm:ss',
-            minute: 'HH:mm',
-            hour: 'MMM dd, HH:mm',
-            day: 'MMM dd'
-          },
-          // Add specific min/max for time ranges
-          min: function() {
-            const now = new Date();
-            switch(timeRange) {
-              case 'live':
-                return new Date(now - 2 * 60 * 1000); // 2 minutes
-              case '15m':
-                return new Date(now - 15 * 60 * 1000); // 15 minutes
-              case '1h':
-                return new Date(now - 60 * 60 * 1000); // 1 hour
-              case '2h':
-                return new Date(now - 2 * 60 * 60 * 1000); // 2 hours
-              case '4h':
-                return new Date(now - 4 * 60 * 60 * 1000); // 4 hours
-              case '8h':
-                return new Date(now - 8 * 60 * 60 * 1000); // 8 hours
-              case '16h':
-                return new Date(now - 16 * 60 * 60 * 1000); // 16 hours
-              case '24h':
-                return new Date(now - 24 * 60 * 60 * 1000); // 24 hours
-              default:
-                return undefined;
-            }
-          }(),
-          max: new Date(), // Current time
-          bounds: 'data'
-        },
-        title: { 
-          display: true, 
-          text: "Time", 
-          color: theme.palette.text.primary,
-          font: { weight: 'bold' }
-        },
-        ticks: {
-          maxRotation: window.innerWidth < 600 ? 60 : 45,
-          minRotation: window.innerWidth < 600 ? 60 : 45,
-          source: 'data',
-          autoSkip: true,
-          maxTicksLimit: timeRange === '15m' ? 15 : // Show all 15 minutes
-                        timeRange === 'live' ? 4 : 10, // Adjust other ranges accordingly
-          font: {
-            size: window.innerWidth < 600 ? 8 : 10
-          }
-        },
-        grid: {
-          display: chartConfig.showGrid
-        }
-      },
-      y: {
-        beginAtZero: true,
-        ticks: { 
-          color: theme.palette.text.primary,
-          font: {
-            size: window.innerWidth < 600 ? 8 : 10
-          },
-          maxTicksLimit: window.innerWidth < 600 ? 5 : 10
-        },
-        grid: { 
-          color: chartConfig.showGrid ? "rgba(255,255,255,0.1)" : "transparent",
-          drawBorder: false
-        },
-      },
-    },
-    elements: {
-      point: {
-        radius: chartConfig.showPoints ? 3 : 0,
-        hoverRadius: 6
-      },
-      line: {
-        tension: 0.4
-      }
-    },
-    animation: {
-      duration: 750,
-      animations: {
-        y: {
-          from: (ctx) => {
-            // Only animate the last point
-            if (ctx.type === 'data' && ctx.dataIndex === ctx.dataset.data.length - 1) {
-              return ctx.chart.scales.y.getPixelForValue(0);
-            }
-            return ctx.chart.scales.y.getPixelForValue(ctx.dataset.data[ctx.dataIndex]);
-          },
-          duration: 1000
-        }
-      }
-    },
-    transitions: {
-      active: {
-        animation: {
-          duration: 1000,
-          easing: 'easeInOutQuart'
-        }
-      }
-    }
-  };
-
-  // Update the renderChart function to handle animations for the last point
-  const renderChart = (data, metricKey) => {
-    const config = metricsConfig[metricKey];
-    if (!config) return null;
-
-    const chartData = {
-      labels,
-      datasets: [
-        {
-          label: `${config.label} (${config.unit})`,
-          data,
-          borderColor: config.color,
-          backgroundColor: `${config.color}40`,
-          fill: true,
-          tension: 0.4,
-          borderWidth: 2,
-          pointRadius: chartConfig.showPoints ? 3 : 0,
-          pointHoverRadius: 6,
-          pointBackgroundColor: config.color,
-          pointBorderColor: config.color,
-          pointBorderWidth: 2
-        }
-      ]
-    };
-
-    const chartSpecificOptions = {
-      ...chartOptions,
-      plugins: {
-        ...chartOptions.plugins,
-        title: {
-          ...chartOptions.plugins.title,
-          text: config.label
-        }
-      },
-      scales: {
-        ...chartOptions.scales,
-        y: {
-          ...chartOptions.scales.y,
-          ticks: {
-            ...chartOptions.scales.y.ticks,
-            callback: function(value) {
-              return value + config.unit;
-            }
-          }
-        }
-      }
-    };
-
-    return (
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          bgcolor: 'background.paper',
-          borderRadius: 2,
-          border: 1,
-          borderColor: 'divider',
-          height: 400,
-          position: 'relative'
-        }}
-      >
-        <Box sx={{ 
-          position: 'absolute',
-          top: 8,
-          right: 8,
-          zIndex: 1,
-          display: 'flex',
-          gap: 1
-        }}>
-          {/* Optional: Add any chart-specific controls here */}
-        </Box>
-        
-        {chartType === 'line' ? (
-          <Line 
-            data={chartData} 
-            options={chartSpecificOptions} 
-            ref={chartEl => {
-              if (chartEl) {
-                chartRef.current = chartEl;
-              }
-            }} 
-          />
-        ) : (
-          <Bar 
-            data={chartData} 
-            options={chartSpecificOptions} 
-            ref={chartEl => {
-              if (chartEl) {
-                chartRef.current = chartEl;
-              }
-            }} 
-          />
-        )}
-      </Paper>
-    );
-  };
-
-  // Modify the cycleSummaryType function
-  const cycleSummaryType = () => {
-    setSummaryType(prev => {
-      switch(prev) {
-        case 'latest': return 'avg';
-        case 'avg': return 'min';
-        case 'min': return 'max';
-        case 'max': return 'latest';
-        default: return 'latest';
-      }
-    });
-  };
-
-  // Update the renderSummaryCards function for better mobile display
-  const renderSummaryCards = () => {
-    return (
-      <Grid container spacing={2} sx={{ mb: 3 }}> {/* Reduced spacing on mobile */}
-        {Object.entries(metricsConfig).map(([key, config]) => {
-          // Skip client_id
-          if (key === 'client_id' || key === 'ClientID') return null;
-          
-          // Skip signal and battery metrics unless showBatterySignal is true
-          if ((key === 'signal' || key === 'battery' || key === 'signal_quality') && !showBatterySignal) return null;
-
-          // Get the appropriate value based on summaryType
-          let value;
-          if (summaryType === 'latest') {
-            // Get the last value from the metrics data
-            value = metricsData[key]?.[metricsData[key].length - 1];
-          } else {
-            value = summary[`${summaryType}_${key}`] || summary[key];
-          }
-
-          console.log(`Metric ${key}:`, {
-            value,
-            summaryKey: summaryType === 'latest' ? 'latest' : `${summaryType}_${key}`,
-            rawValue: summary[key]
-          });
-          
-          const displayValue = value !== undefined && !isNaN(value) ? value.toFixed(1) : 'N/A';
-          
-          return (
-            <Grid item xs={6} sm={6} md={3} key={key}> {/* xs:6 to show 2 cards per row on phones */}
-              <Paper 
-                elevation={1}  // Lower elevation for better mobile performance
-                sx={{ 
-                  p: { xs: 1.5, sm: 2 }, // Less padding on mobile
-                  bgcolor: theme.palette.background.paper,
-                  transition: 'transform 0.2s ease',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 3
-                  }
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  {config.icon}
-                  <Typography variant="subtitle1" color="primary"> {/* Smaller heading on mobile */}
-                    {config.label}
-                  </Typography>
-                </Box>
-                <Typography variant="h5" sx={{ mb: 1 }}> {/* h5 instead of h4 on mobile */}
-                  {displayValue}{value !== undefined && !isNaN(value) ? config.unit : ''}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  {summaryType === 'latest' ? 'Latest' :
-                   summaryType === 'avg' ? 'Average' :
-                   summaryType === 'min' ? 'Minimum' :
-                   'Maximum'}
-                </Typography>
-                <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      bgcolor: value !== undefined && !isNaN(value) ? (
-                        config.alertThresholds.max && value > config.alertThresholds.max ? 'error.main' :
-                        config.alertThresholds.min && value < config.alertThresholds.min ? 'warning.main' :
-                        'success.main'
-                      ) : 'grey.500'
-                    }}
-                  />
-                  <Typography variant="caption" color="textSecondary">
-                    {value !== undefined && !isNaN(value) ? (
-                      config.alertThresholds.max && value > config.alertThresholds.max ? 'High' :
-                      config.alertThresholds.min && value < config.alertThresholds.min ? 'Low' :
-                      'Normal'
-                    ) : 'No Data'}
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-          );
-        })}
-      </Grid>
-    );
-  };
-
-  // Update the renderCharts function to exclude client_id
-  const renderCharts = () => (
-    <Grid container spacing={3}>
-      {Object.entries(metricsConfig).map(([key, config]) => {
-        // Skip client_id
-        if (key === 'client_id' || key === 'ClientID') return null;
-        
-        // Skip signal and battery metrics unless showBatterySignal is true
-        if ((key === 'signal' || key === 'battery' || key === 'signal_quality') && !showBatterySignal) return null;
-        
+  const renderTabContent = (tabValue) => {
+    switch (tabValue) {
+      case 0:
         return (
-          <Grid item xs={12} md={6} key={key}>
-            <Paper 
-              sx={{ 
-                p: 2, 
-                bgcolor: theme.palette.background.paper,
-                height: 400,
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              {renderChart(metricsData[key], key)}
-            </Paper>
-          </Grid>
+          <DashboardOverviewTab
+            device={device}
+            metricsData={metricsData}
+            metricsConfig={metricsConfig}
+            lastSeen={device?.last_seen}
+            deviceState={deviceState}
+            timeRange={timeRange}
+            refreshInterval={refreshInterval}
+            toggle1={toggle1}
+            toggle2={toggle2}
+            speedInput={speedInput}
+            onRefresh={fetchGraphData}
+            selectedVariables={selectedVariablesOverview}
+            availableVariables={availableVariables}
+            onVariableChange={(e) => handleVariableChange(e, true)}
+            onTimeRangeChange={handleTimeRangeChange}
+          />
         );
-      })}
-    </Grid>
-  );
-
-  // Add mobile-specific initialization
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      // Set status bar style
-      StatusBar.setBackgroundColor({ color: '#000000' });
-      
-      // Handle back button
-      App.addListener('backButton', (data) => {
-        if (onBack) {
-          onBack();
-        }
-      });
-    }
-  }, []);
-
-  // Add a useEffect to handle chart resizing
-  useEffect(() => {
-    const handleResize = () => {
-      // Manually trigger chart resize if needed
-      if (chartRef.current && chartRef.current.chartInstance) {
-        chartRef.current.chartInstance.resize();
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Clean up the timeout when component unmounts
-  useEffect(() => {
-    return () => {
-      if (fetchTimeout) {
-        clearTimeout(fetchTimeout);
-      }
-    };
-  }, [fetchTimeout]);
-
-  // Add this function before the return statement
-  const handleFetchHistoricalData = async () => {
-    if (!selectedDate) {
-      showSnackbar('Please select a valid date', 'error');
-      return;
-    }
-
-    // Close dialog
-    setDatePickerOpen(false);
-    
-    // Set selected history date for display
-    setSelectedHistoryDate(selectedDate.toISOString());
-    setSelectedTimeWindow(timeWindow);
-    
-    // Show loading
-    setIsLoading(true);
-    
-    try {
-      // Calculate end time as end of the selected day
-      const endTime = new Date(selectedDate);
-      endTime.setHours(23, 59, 59);
-      
-      // Calculate start time based on selected window
-      const startTime = new Date(endTime);
-      
-      // Handle multi-day windows
-      if (timeWindow === '24h') {
-        startTime.setDate(startTime.getDate() - 1); // 1 day back
-      } else if (timeWindow === '2d') {
-        startTime.setDate(startTime.getDate() - 2); // 2 days back
-      } else if (timeWindow === '3d') {
-        startTime.setDate(startTime.getDate() - 3); // 3 days back
-      } else {
-        // Handle hour-based windows as before
-        const hours = parseInt(timeWindow.replace('h', ''));
-        startTime.setHours(endTime.getHours() - hours);
-      }
-      
-      const requestBody = {
-        action: 'get_dashboard_data',
-        client_id: device.client_id,
-        user_email: user.email,
-        time_range: 'custom',
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        points: timeWindow.includes('d') ? 150 : 100 // More points for multi-day views
-      };
-      
-      // Show a loading indicator for longer time ranges
-      if (timeWindow === '2d' || timeWindow === '3d') {
-        setCommandFeedback({
-          show: true,
-          message: `Loading ${timeWindow} of data, please wait...`,
-          loading: true
-        });
-      }
-      
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
-      
-      // Hide loading message
-      setCommandFeedback({
-        show: false,
-        message: '',
-        loading: false
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
-        showSnackbar('No data available for the selected date', 'warning');
-        setIsLoading(false);
-        return;
-      }
-      
-      // Process the historical data
-      const data = result.data;
-      const timestamps = data.map((entry) => new Date(entry.timestamp));
-      setLabels(timestamps);
-      
-      // Process metrics data
-      const firstDataPoint = data[0];
-      const newMetricsConfig = {};
-      Object.keys(firstDataPoint).forEach(key => {
-        if (key !== 'timestamp' && key !== 'client_id') {
-          newMetricsConfig[key] = generateMetricConfig(key);
-        }
-      });
-      setMetricsConfig(newMetricsConfig);
-      
-      const newMetricsData = {};
-      Object.keys(newMetricsConfig).forEach(key => {
-        newMetricsData[key] = data.map(entry => parseFloat(entry[key]));
-      });
-      setMetricsData(newMetricsData);
-      
-      // Show warning if one was returned
-      if (result.summary && result.summary.warning) {
-        showSnackbar(result.summary.warning, 'warning');
-      }
-      
-    } catch (error) {
-      console.error('Error fetching historical data:', error);
-      showSnackbar('Error fetching historical data. Please try again.', 'error');
-      setCommandFeedback({
-        show: false,
-        message: '',
-        loading: false
-      });
-    } finally {
-      setIsLoading(false);
+      case 1:
+        return (
+          <DashboardChartsTab
+            metricsData={metricsData}
+            metricsConfig={metricsConfig}
+            timeRange={timeRange}
+            chartConfig={chartConfig}
+            selectedVariables={selectedVariablesChartsStats}
+            availableVariables={availableVariables}
+            onVariableChange={handleVariableChange}
+            onTimeRangeChange={handleTimeRangeChange}
+            onApply={handleApply}
+          />
+        );
+      case 2:
+        return (
+          <DashboardStatisticsTab
+            metricsData={metricsData}
+            metricsConfig={metricsConfig}
+            deviceState={deviceState}
+            selectedVariables={selectedVariablesChartsStats}
+            availableVariables={availableVariables}
+            onVariableChange={handleVariableChange}
+            timeRange={timeRange}
+            onTimeRangeChange={handleTimeRangeChange}
+            onApply={handleApply}
+          />
+        );
+      case 3:
+        return (
+          <DashboardCommands
+            device={device}
+            deviceState={deviceState}
+            onCommandSend={handleCommandSend}
+            fetchDeviceState={fetchDeviceState}
+            handleCommandSend={handleCommandSend}
+            setSnackbar={setSnackbar}
+          />
+        );
+      case 4:
+        return (
+          <DashboardAlarmsTab
+            metricsConfig={metricsConfig}
+            alarms={alarms}
+            alarmHistory={alarmHistory}
+            onAlarmUpdate={handleAlarmUpdate}
+          />
+        );
+      default:
+        return null;
     }
   };
 
-  // Add these functions to your component:
-
-  // Calculate duration between two dates for display
-  const calculateDuration = (start, end) => {
-    const diffMs = end - start;
-    const diffHours = diffMs / (1000 * 60 * 60);
-    
-    if (diffHours < 0) {
-      return "Invalid time range";
-    } else if (diffHours < 1) {
-      return `${Math.round(diffHours * 60)} minutes`;
-    } else if (diffHours < 24) {
-      return `${Math.floor(diffHours)} hours ${Math.round((diffHours % 1) * 60)} minutes`;
-    } else {
-      const days = Math.floor(diffHours / 24);
-      const hours = Math.floor(diffHours % 24);
-      return `${days} day${days !== 1 ? 's' : ''} ${hours} hour${hours !== 1 ? 's' : ''}`;
-    }
-  };
-
-  // Validates time range and triggers data fetching
-  const validateAndFetchHistoricalData = () => {
-    // Calculate time difference in hours
-    const diffHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
-    
-    // Validation checks
-    if (endDateTime <= startDateTime) {
-      setDateTimeError('End time must be after start time');
-      return;
-    }
-    
-    // Strictly enforce the 24-hour limit
-    if (diffHours > 24) {
-      setDateTimeError('Time range cannot exceed 24 hours (1 day)');
-      return;
-    }
-    
-    // All checks passed, proceed to fetch data
-    setDateTimeError('');
-    setDatePickerOpen(false);
-    fetchPreciseHistoricalData(startDateTime, endDateTime);
-  };
-
-  // New function to fetch data with precise timestamps
-  const fetchPreciseHistoricalData = async (startTime, endTime) => {
-    // Set selected history date for display (we'll keep this for compatibility)
-    setSelectedHistoryDate(startTime.toISOString());
-    setSelectedTimeWindow("custom");
-    
-    // Show loading
-    setIsLoading(true);
-    
-    try {
-      // Calculate appropriate number of data points based on time range
-      const diffHours = (endTime - startTime) / (1000 * 60 * 60);
-      let requestedPoints = 100;
-      
-      if (diffHours > 48) {
-        requestedPoints = 150; // More points for 2-3 day ranges
-      } else if (diffHours > 24) {
-        requestedPoints = 120; // More points for 1-2 day ranges
-      }
-      
-      // Show a loading indicator for longer time ranges
-      if (diffHours > 24) {
-        setCommandFeedback({
-          show: true,
-          message: `Loading ${Math.round(diffHours)} hours of data, please wait...`,
-          loading: true
-        });
-      }
-      
-      const requestBody = {
-        action: 'get_dashboard_data',
-        client_id: device.client_id,
-        user_email: user.email,
-        time_range: 'custom',
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        points: requestedPoints
-      };
-      
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
-      
-      // Hide loading message
-      setCommandFeedback({
-        show: false,
-        message: '',
-        loading: false
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
-        showSnackbar('No data available for the selected time range', 'warning');
-        setIsLoading(false);
-        return;
-      }
-      
-      // Process the historical data
-      const data = result.data;
-      const timestamps = data.map((entry) => new Date(entry.timestamp));
-      setLabels(timestamps);
-      
-      // Process metrics data
-      const firstDataPoint = data[0];
-      const newMetricsConfig = {};
-      Object.keys(firstDataPoint).forEach(key => {
-        if (key !== 'timestamp' && key !== 'client_id') {
-          newMetricsConfig[key] = generateMetricConfig(key);
-        }
-      });
-      setMetricsConfig(newMetricsConfig);
-      
-      const newMetricsData = {};
-      Object.keys(newMetricsConfig).forEach(key => {
-        newMetricsData[key] = data.map(entry => parseFloat(entry[key]));
-      });
-      setMetricsData(newMetricsData);
-      
-      // Show warning if one was returned
-      if (result.summary && result.summary.warning) {
-        showSnackbar(result.summary.warning, 'warning');
-      }
-      
-    } catch (error) {
-      console.error('Error fetching historical data:', error);
-      showSnackbar('Error fetching historical data. Please try again.', 'error');
-      setCommandFeedback({
-        show: false,
-        message: '',
-        loading: false
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (isInitializing) {
+  if (isInitialLoad && isLoading) {
     return <DashboardSkeleton />;
   }
 
@@ -2228,7 +1059,7 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
         minHeight: '100vh',
         bgcolor: 'background.default',
         width: '100%',
-        pt: 0 // Remove any top padding
+        pt: 0
       }}
     >
       <Helmet>
@@ -2237,900 +1068,140 @@ export default function Dashboard({ user, device, onLogout, onBack }) {
       </Helmet>
 
       {/* Settings Drawer */}
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDrawer 
+        open={settingsOpen} 
+        onClose={() => setSettingsOpen(false)}
+        chartConfig={chartConfig}
+        onChartConfigChange={handleChartConfigChange}
+        alertThresholds={alertThresholds}
+        onAlertThresholdChange={handleAlertThresholdChange}
+        showBatterySignal={showBatterySignal}
+        onShowBatterySignalChange={(e) => setShowBatterySignal(e.target.checked)}
+        showClientId={showClientId}
+        onShowClientIdChange={(e) => setShowClientId(e.target.checked)}
+      />
 
-      {/* Updated AppBar with back button and centered title */}
-      <AppBar 
-        position="static" 
-        color="primary" 
-        elevation={0}
-        sx={{
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          width: '100%',
+      {/* AppBar */}
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 2, 
+          display: 'flex', 
+          alignItems: 'center',
+          borderBottom: '1px solid',
+          borderColor: 'divider'
         }}
       >
-        <Toolbar 
-          sx={{ 
-            px: { xs: 1.5, sm: 3 },
-            py: { xs: 1, sm: 0.5 },
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: { xs: 'flex-start', sm: 'center' },
-          }}
-        > 
-          {/* Back Button */}
-          <IconButton
-            edge="start"
-            color="inherit"
-            aria-label="back to devices"
-            onClick={onBack || (() => navigate('/devices'))}
-            sx={{ 
-              mr: 2,
-              display: 'flex',
-              alignItems: 'center',
-              mb: { xs: 1, sm: 0 }
-            }}
-          >
-            <ArrowBackIcon />
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                ml: 0.5, 
-                display: { xs: 'none', sm: 'block' }
-              }}
-            >
-              Devices
-            </Typography>
-          </IconButton>
-          
-          {/* Centered Title with Device Name */}
-          <Typography 
-            variant="h6" 
-            component="div" 
-            sx={{ 
-              flexGrow: 1,
-              mb: { xs: 1, sm: 0 },
-              fontSize: { xs: '1rem', sm: '1.25rem' },
-              textAlign: { xs: 'left', sm: 'center' }, // Center align on larger screens
-              fontWeight: 'medium'
-            }}
-          >
-            Dashboard{device && ` - ${device.device_name}`}
-          </Typography>
+        <IconButton onClick={() => navigate(-1)} sx={{ mr: 2 }}>
+          <ArrowBackIcon />
+        </IconButton>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          {device?.name || 'Device Dashboard'}
+        </Typography>
+        <IconButton onClick={handleSettingsOpen}>
+          <SettingsIcon />
+        </IconButton>
+      </Paper>
 
-          {/* User Controls - Removed refresh icon */}
-          <Box 
-            sx={{ 
-              display: "flex", 
-              alignItems: "center", 
-              gap: { xs: 0.5, sm: 1 },
-              flexWrap: 'wrap',
-              justifyContent: { xs: 'flex-start', sm: 'flex-end' },
-              width: { xs: '100%', sm: 'auto' }
-            }}
-          >
-            {/* Removed the refresh IconButton that was here */}
-            <Box
-              sx={{
-                width: 40,
-                height: 40,
-                bgcolor: theme.palette.primary.main,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Typography variant="h6" sx={{ color: "#fff" }}>
-                {user.email[0].toUpperCase()}
-              </Typography>
-            </Box>
-            <Typography 
-              variant="body2" 
-              noWrap 
-              sx={{ 
-                maxWidth: { xs: '100px', sm: '150px', md: '300px' },
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {user.email}
-            </Typography>
-            <IconButton onClick={() => setSettingsOpen(true)} sx={{ color: theme.palette.text.primary }}>
-              <SettingsIcon />
-            </IconButton>
-            <IconButton
-              color="inherit"
-              onClick={() => {
-                onLogout();
-                navigate('/login');
-              }}
-            >
-              <LogoutIcon />
-            </IconButton>
-          </Box>
-        </Toolbar>
-      </AppBar>
-
-      {/* Main content area with consistent padding */}
       <Container 
         maxWidth={false} 
         disableGutters 
         sx={{ 
-          p: { xs: 2, sm: 3 },  // Match padding with other pages
+          p: { xs: 2, sm: 3 },
           flexGrow: 1,
           width: '100%'
         }}
       >
         <DeviceInfoCard
-          clientID={device.client_id}
-          deviceName={device.device_name}
-          deviceType={device.device_type || device.latest_data?.device || 'Unknown'}
+          clientID={device?.client_id || "Unknown"}
+          deviceName={device?.device_name || "Unknown"}
+          deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
           status={deviceStatus}
           lastOnline={lastSeen ? lastSeen.toLocaleString() : 
-            device.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString() : "N/A"}
-          batteryLevel={metricsData.battery?.[metricsData.battery.length - 1]}
-          signalStrength={metricsData.signal_quality?.[metricsData.signal_quality.length - 1]}
+            device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString() : "N/A"}
+          batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
+          signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
           showClientId={showClientId}
           onToggleClientId={() => setShowClientId(!showClientId)}
+          batteryState={batteryState}
+          lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
         />
 
-        {/* Tabs for different views */}
+        {/* Tabs */}
         <Tabs
-          value={tabValue}
-          onChange={(e, newValue) => setTabValue(newValue)}
-          sx={{ 
-            mb: 3,
+          value={selectedTab}
+          onChange={handleTabChange}
+          variant={isMobile ? "fullWidth" : "standard"}
+          sx={{
             borderBottom: 1,
             borderColor: 'divider',
             '& .MuiTab-root': {
-              textTransform: 'none',
-              fontWeight: 'bold',
-              fontSize: '1rem',
-              minWidth: 120,
-              '&.Mui-selected': {
-                color: theme.palette.primary.main,
-              }
+              minWidth: 'auto',
+              px: 2,
+              py: 1.5
             }
           }}
         >
-          <Tab label="Overview" icon={<ShowChartIcon />} iconPosition="start" />
-          <Tab label="Commands" icon={<SettingsIcon />} iconPosition="start" />
-          <Tab label="History" icon={<HistoryIcon />} iconPosition="start" />
+          <Tab 
+            label="Overview" 
+            icon={<DashboardIcon />} 
+            iconPosition="start" 
+            {...a11yProps(0)}
+          />
+          <Tab 
+            label="Charts" 
+            icon={<ShowChartIcon />} 
+            iconPosition="start" 
+            {...a11yProps(1)}
+          />
+          <Tab 
+            label="Statistics" 
+            icon={<TimelineIcon />} 
+            iconPosition="start" 
+            {...a11yProps(2)}
+          />
+          <Tab 
+            label="Commands" 
+            icon={<BuildIcon />} 
+            iconPosition="start" 
+            {...a11yProps(3)}
+          />
+          <Tab 
+            label="Alarms" 
+            icon={<WarningIcon />} 
+            iconPosition="start" 
+            {...a11yProps(4)}
+          />
         </Tabs>
 
-        {/* Overview Tab */}
-        {tabValue === 0 && (
-          <>
-            {/* Controls Bar */}
-            <Paper sx={{ 
-              p: 1.5,  // Reduced padding
-              mb: 2,  // Reduced margin
-              bgcolor: theme.palette.background.paper,
-              '& .MuiButton-root': {
-                minHeight: 28,  // Consistent height
-                minWidth: 'auto'
-              },
-              '& .MuiFormControlLabel-root': {
-                mr: { xs: 0, sm: 1 },
-                '& .MuiTypography-root': {
-                  fontSize: '0.75rem'  // Smaller label text
-                }
-              }
-            }}>
-              <Box sx={{ 
-                display: 'flex', 
-                flexWrap: 'wrap', 
-                gap: 1,  // Reduced gap
-                alignItems: 'center' 
-              }}>
-                {renderTimeRangeMenu()}
-              </Box>
-            </Paper>
-
-            {/* Summary Statistics */}
-            {renderSummaryCards()}
-
-            {/* Charts */}
-            {renderCharts()}
-          </>
-        )}
-
-        {/* Commands Tab */}
-        {tabValue === 1 && (
-          <>
-            {/* Device Controls */}
-            <Paper sx={{ p: 2, mb: 3, bgcolor: theme.palette.background.paper }}>
-              <Typography variant="h6" gutterBottom>Device Controls</Typography>
-              <Grid container spacing={2}>
-                {/* Toggle Controls */}
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ display: "flex", gap: 3, alignItems: "center" }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={toggle1}
-                      onChange={handleToggle1}
-                      sx={{
-                        "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
-                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
-                      }}
-                    />
-                  }
-                  label="Toggle 1"
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={toggle2}
-                      onChange={handleToggle2}
-                      sx={{
-                        "& .MuiSwitch-switchBase.Mui-checked": { color: theme.palette.primary.main },
-                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: theme.palette.primary.main },
-                      }}
-                    />
-                  }
-                  label="Toggle 2"
-                />
-                  </Box>
-                </Grid>
-
-                {/* Restart Button */}
-                <Grid item xs={12} md={6}>
-                <Button 
-                  variant="contained" 
-                  onClick={handleRestart}
-                    startIcon={<RefreshIcon />}
-                  sx={{ 
-                    bgcolor: theme.palette.secondary.main,
-                    "&:hover": { bgcolor: theme.palette.secondary.dark }
-                  }}
-                >
-                  Restart Device
-                </Button>
-                </Grid>
-
-                {/* Speed Control and Display */}
-                <Grid item xs={12}>
-                  <Box sx={{ 
-                    display: "flex", 
-                    alignItems: "center",
-                    gap: 2,
-                    flexWrap: "wrap"
-                  }}>
-                    {/* Current Speed Display */}
-                    <Paper
-                      elevation={1}
-                      sx={{
-                        px: 2,
-                        py: 1,
-                        bgcolor: theme.palette.background.default,
-                        border: 1,
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        height: 40,
-                        minWidth: 120
-                      }}
-                    >
-                      <Typography variant="body2" color="textSecondary">
-                        Speed Configured:
-                      </Typography>
-                      <Typography variant="h6" color="primary" sx={{ fontWeight: 'medium' }}>
-                        {deviceState.motor_speed}%
-                      </Typography>
-                    </Paper>
-
-                    {/* Speed Input Control */}
-                    <Box sx={{ 
-                      display: "flex", 
-                      gap: 1, 
-                      alignItems: "center",
-                      height: 40
-                    }}>
-                  <TextField
-                    variant="outlined"
-                    size="small"
-                        label="New Speed"
-                        placeholder="0-100"
-                    value={speedInput}
-                    onChange={(e) => setSpeedInput(e.target.value)}
-                    sx={{
-                          width: 100,
-                          "& .MuiOutlinedInput-root": {
-                            height: 40,
-                      bgcolor: theme.palette.background.default,
-                          }
-                    }}
-                  />
-                  <Button 
-                    variant="contained" 
-                    onClick={handleSendSpeed}
-                    disabled={!speedInput.trim()}
-                    sx={{ 
-                          height: 40,
-                          minWidth: 'auto',
-                          px: 2
-                    }}
-                  >
-                        Set
-                  </Button>
-                </Box>
-              </Box>
-                </Grid>
-              </Grid>
-            </Paper>
-
-            {/* Command History */}
-            <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Command History</Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setCommandHistory([])}
-                >
-                  Clear History
-                </Button>
-              </Box>
-              <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-                {commandHistory.length === 0 ? (
-                  <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
-                    No commands sent yet
-                  </Typography>
-                ) : (
-                  commandHistory.map((cmd, index) => (
-                    <Box 
-                      key={index} 
-                      sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        py: 1.5, 
-                        px: 2,
-                        borderBottom: '1px solid', 
-                        borderColor: 'divider',
-                        '&:hover': {
-                          bgcolor: 'action.hover'
-                        }
-                      }}
-                    >
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                          {cmd.action}
-                        </Typography>
-                        {cmd.data && Object.keys(cmd.data).length > 0 && (
-                          <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
-                            {JSON.stringify(cmd.data)}
-                          </Typography>
-                        )}
-                        <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
-                          {cmd.timestamp.toLocaleString()}
-                        </Typography>
-                      </Box>
-                      <Typography 
-                        variant="caption" 
-                        sx={{ 
-                          color: cmd.status === 'success' ? 'success.main' : 
-                                cmd.status === 'pending' ? 'warning.main' : 'error.main',
-                          bgcolor: cmd.status === 'success' ? 'success.light' : 
-                                  cmd.status === 'pending' ? 'warning.light' : 'error.light',
-                          px: 1.5,
-                          py: 0.5,
-                          borderRadius: 1,
-                          fontWeight: 'medium'
-                        }}
-                      >
-                        {cmd.status}
-                      </Typography>
-                    </Box>
-                  ))
-                )}
-              </Box>
-            </Paper>
-          </>
-        )}
-
-        {/* History Tab */}
-        {tabValue === 2 && (
-          <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Data History</Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                {/* Date Picker Section */}
-                <Button
-                  variant="outlined"
-                  startIcon={<HistoryIcon />}
-                  onClick={() => setDatePickerOpen(true)}
-                >
-                  Select Date
-                </Button>
-                
-                {/* Export Button */}
-                <Button
-                  startIcon={<DownloadIcon />}
-                  onClick={(e) => setExportMenuAnchor(e.currentTarget)}
-                >
-                  Export
-                </Button>
-                <Menu
-                  anchorEl={exportMenuAnchor}
-                  open={Boolean(exportMenuAnchor)}
-                  onClose={() => setExportMenuAnchor(null)}
-                >
-                  <MenuItem onClick={() => { handleExportData('csv'); setExportMenuAnchor(null); }}>
-                    Export as CSV
-                  </MenuItem>
-                  <MenuItem onClick={() => { handleExportData('json'); setExportMenuAnchor(null); }}>
-                    Export as JSON
-                  </MenuItem>
-                </Menu>
-              </Box>
-            </Box>
-            
-            {/* Selected Date Display */}
-            {selectedHistoryDate && (
-              <Box sx={{ mb: 2, p: 1, bgcolor: 'background.default', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="body2">
-                    {selectedTimeWindow === "custom" ? (
-                      <>
-                        Viewing data from: <b>{new Date(selectedHistoryDate).toLocaleString()}</b> to <b>{endDateTime.toLocaleString()}</b>
-                      </>
-                    ) : (
-                      <>
-                        Viewing data from: <b>{new Date(selectedHistoryDate).toLocaleDateString()}</b> 
-                        {selectedTimeWindow && selectedTimeWindow === '24h' && ` (1 day window)`}
-                        {selectedTimeWindow && selectedTimeWindow === '2d' && ` (2 day window)`}
-                        {selectedTimeWindow && selectedTimeWindow === '3d' && ` (3 day window)`}
-                        {selectedTimeWindow && !['24h', '2d', '3d', 'custom'].includes(selectedTimeWindow) && ` (${selectedTimeWindow} window)`}
-                      </>
-                    )}
-                  </Typography>
-                  {((selectedTimeWindow === '2d' || selectedTimeWindow === '3d') || 
-                     (selectedTimeWindow === 'custom' && (endDateTime - new Date(selectedHistoryDate)) > 24 * 60 * 60 * 1000)) && (
-                    <Typography variant="caption" color="text.secondary">
-                      Large data ranges are aggregated for performance
-                    </Typography>
-                  )}
-                </Box>
-                <Button 
-                  size="small" 
-                  onClick={() => {
-                    setSelectedHistoryDate(null);
-                    setSelectedTimeWindow(null);
-                    // Reset to current data
-                    fetchData();
-                  }}
-                >
-                  Return to Current
-                </Button>
-              </Box>
-            )}
-            
-            {/* Chart Section */}
-            <Box sx={{ height: 400 }}>
-              {selectedHistoryDate ? (
-                // Show all metrics in historical view
-                <Grid container spacing={2}>
-                  {Object.entries(metricsConfig).map(([key, config]) => {
-                    if (key === 'client_id' || key === 'ClientID') return null;
-                    return (
-                      <Grid item xs={12} md={6} key={key}>
-                        {renderChart(metricsData[key], key)}
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-              ) : (
-                // Default view - temperature chart
-                renderChart(temperatureData, "temperature")
-              )}
-            </Box>
-            
-            {/* Date Picker Dialog */}
-            <Dialog 
-              open={datePickerOpen} 
-              onClose={() => setDatePickerOpen(false)}
-              maxWidth="md"
-              PaperProps={{ sx: { borderRadius: 2 } }}
-            >
-              <DialogTitle sx={{ 
-                bgcolor: 'primary.main', 
-                color: 'white',
-                pb: 1
-              }}>
-                Select Historical Time Range
-              </DialogTitle>
-              <DialogContent sx={{ pt: 3 }}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: { xs: 'column', sm: 'row' }, 
-                  gap: 3, 
-                  width: '100%', 
-                  minWidth: { sm: 500 }
-                }}>
-                  {/* Start Date & Time */}
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2" gutterBottom color="primary.main" fontWeight="medium">
-                      Start Date & Time
-                    </Typography>
-                    <TextField
-                      label="Date"
-                      type="date"
-                      value={startDateTime.toISOString().split('T')[0]}
-                      onChange={(e) => {
-                        const newDate = new Date(startDateTime);
-                        const [year, month, day] = e.target.value.split('-');
-                        newDate.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day));
-                        setStartDateTime(newDate);
-                        setDateTimeError('');
-                      }}
-                      InputLabelProps={{ shrink: true }}
-                      fullWidth
-                      margin="dense"
-                    />
-                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                      <TextField
-                        label="Hour"
-                        type="number"
-                        value={startDateTime.getHours()}
-                        onChange={(e) => {
-                          const newDate = new Date(startDateTime);
-                          newDate.setHours(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)));
-                          setStartDateTime(newDate);
-                          setDateTimeError('');
-                        }}
-                        InputProps={{ 
-                          inputProps: { min: 0, max: 23 }
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                        fullWidth
-                        margin="dense"
-                      />
-                      <TextField
-                        label="Minute"
-                        type="number"
-                        value={startDateTime.getMinutes()}
-                        onChange={(e) => {
-                          const newDate = new Date(startDateTime);
-                          newDate.setMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)));
-                          setStartDateTime(newDate);
-                          setDateTimeError('');
-                        }}
-                        InputProps={{ 
-                          inputProps: { min: 0, max: 59 }
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                        fullWidth
-                        margin="dense"
-                      />
-                    </Box>
-                  </Box>
-
-                  {/* End Date & Time */}
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2" gutterBottom color="primary.main" fontWeight="medium">
-                      End Date & Time
-                    </Typography>
-                    <TextField
-                      label="Date"
-                      type="date"
-                      value={endDateTime.toISOString().split('T')[0]}
-                      onChange={(e) => {
-                        const newDate = new Date(endDateTime);
-                        const [year, month, day] = e.target.value.split('-');
-                        newDate.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day));
-                        setEndDateTime(newDate);
-                        setDateTimeError('');
-                      }}
-                      InputLabelProps={{ shrink: true }}
-                      fullWidth
-                      margin="dense"
-                    />
-                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                      <TextField
-                        label="Hour"
-                        type="number"
-                        value={endDateTime.getHours()}
-                        onChange={(e) => {
-                          const newDate = new Date(endDateTime);
-                          newDate.setHours(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)));
-                          setEndDateTime(newDate);
-                          setDateTimeError('');
-                        }}
-                        InputProps={{ 
-                          inputProps: { min: 0, max: 23 }
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                        fullWidth
-                        margin="dense"
-                      />
-                      <TextField
-                        label="Minute"
-                        type="number"
-                        value={endDateTime.getMinutes()}
-                        onChange={(e) => {
-                          const newDate = new Date(endDateTime);
-                          newDate.setMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)));
-                          setEndDateTime(newDate);
-                          setDateTimeError('');
-                        }}
-                        InputProps={{ 
-                          inputProps: { min: 0, max: 59 }
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                        fullWidth
-                        margin="dense"
-                      />
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* Quick Selection Buttons */}
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle2" gutterBottom color="primary.main" fontWeight="medium">
-                    Quick Range Selection
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    <Button 
-                      size="small" 
-                      variant="outlined"
-                      onClick={() => {
-                        const end = new Date();
-                        const start = new Date(end);
-                        start.setHours(end.getHours() - 4);
-                        setStartDateTime(start);
-                        setEndDateTime(end);
-                      }}
-                    >
-                      Last 4 Hours
-                    </Button>
-                    <Button 
-                      size="small" 
-                      variant="outlined"
-                      onClick={() => {
-                        const end = new Date();
-                        const start = new Date(end);
-                        start.setHours(end.getHours() - 8);
-                        setStartDateTime(start);
-                        setEndDateTime(end);
-                      }}
-                    >
-                      Last 8 Hours
-                    </Button>
-                    <Button 
-                      size="small" 
-                      variant="outlined"
-                      onClick={() => {
-                        const end = new Date();
-                        const start = new Date(end);
-                        start.setHours(end.getHours() - 16);
-                        setStartDateTime(start);
-                        setEndDateTime(end);
-                      }}
-                    >
-                      Last 16 Hours
-                    </Button>
-                    <Button 
-                      size="small" 
-                      variant="outlined"
-                      onClick={() => {
-                        const end = new Date();
-                        const start = new Date(end);
-                        start.setDate(end.getDate() - 1);  // Exactly 24 hours
-                        setStartDateTime(start);
-                        setEndDateTime(end);
-                      }}
-                    >
-                      Last 24 Hours (Max)
-                    </Button>
-                  </Box>
-                </Box>
-
-                {/* Error Message */}
-                {dateTimeError && (
-                  <Alert severity="error" sx={{ mt: 2 }}>
-                    {dateTimeError}
-                  </Alert>
-                )}
-
-                {/* Duration Display */}
-                <Box sx={{ mt: 3, p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
-                  {/* Calculate diffHours here */}
-                  {(() => {
-                    const diffHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
-                    return (
-                      <>
-                        <Typography variant="body2">
-                          Selected duration: {calculateDuration(startDateTime, endDateTime)}
-                        </Typography>
-                        <Typography 
-                          variant="caption" 
-                          color={diffHours > 24 ? "error.main" : "text.secondary"} 
-                          fontWeight={diffHours > 24 ? "bold" : "normal"}
-                        >
-                          Maximum allowed: 24 hours (1 day)
-                          {diffHours > 24 && " - Current selection exceeds limit"}
-                        </Typography>
-                      </>
-                    );
-                  })()}
-      </Box>
-              </DialogContent>
-              <DialogActions sx={{ px: 3, pb: 2 }}>
-                <Button onClick={() => setDatePickerOpen(false)}>Cancel</Button>
-                <Button 
-                  onClick={validateAndFetchHistoricalData} 
-                  variant="contained" 
-                  color="primary"
-                  startIcon={<HistoryIcon />}
-                >
-                  View Data
-                </Button>
-              </DialogActions>
-            </Dialog>
-          </Paper>
-        )}
+        {/* Tab Content */}
+        <TabPanel value={selectedTab} index={0}>
+          {renderTabContent(selectedTab)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={1}>
+          {renderTabContent(selectedTab)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={2}>
+          {renderTabContent(selectedTab)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={3}>
+          {renderTabContent(selectedTab)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={4}>
+          {renderTabContent(selectedTab)}
+        </TabPanel>
       </Container>
 
-      {/* Alerts */}
-      <Snackbar
-        open={showAlerts}
-        autoHideDuration={6000}
-        onClose={() => setShowAlerts(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert onClose={() => setShowAlerts(false)} severity="warning" sx={{ width: '100%' }}>
-          {alerts[0]}
-        </Alert>
-      </Snackbar>
-
-      {/* Command Status Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
           {snackbar.message}
         </Alert>
       </Snackbar>
-
-      {/* Add this after your existing Controls Bar */}
-      {dataRangeWarning && (
-        <Alert 
-          severity="warning" 
-          sx={{ mb: 2 }}
-          onClose={() => setDataRangeWarning(null)}
-        >
-          {dataRangeWarning}
-        </Alert>
-      )}
-
-      {/* Add these Menu components right after your Controls Bar */}
-      <Box sx={{ 
-        display: 'flex', 
-        gap: 1,
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        mb: 1
-      }}>
-        {/* Time Range Menu */}
-        <Menu
-          anchorEl={timeRangeAnchor}
-          open={Boolean(timeRangeAnchor)}
-          onClose={() => setTimeRangeAnchor(null)}
-          PaperProps={{
-            sx: {
-              mt: 0.5,
-              minWidth: 120,
-              boxShadow: theme.shadows[3]
-            }
-          }}
-        >
-          {TIME_RANGES.map((range) => (
-            <MenuItem
-              key={range.value}
-              onClick={() => {
-                if (range.value === 'custom') {
-                  setDatePickerOpen(true);  // Using setDatePickerOpen instead of setCustomDateOpen
-                } else {
-                  // Use the handler function instead of directly setting
-                  handleTimeRangeChange(range.value);
-                }
-              }}
-              selected={timeRange === range.value}
-              sx={{ 
-                fontSize: '0.875rem',
-                minHeight: 32,
-                py: 0.5
-              }}
-            >
-              {range.label}
-            </MenuItem>
-          ))}
-        </Menu>
-
-        {/* Chart Options Menu */}
-        <Menu
-          anchorEl={chartMenuAnchor}
-          open={Boolean(chartMenuAnchor)}
-          onClose={() => setChartMenuAnchor(null)}
-          PaperProps={{
-            sx: {
-              mt: 0.5,
-              minWidth: 160,
-              boxShadow: theme.shadows[3]
-            }
-          }}
-        >
-          <MenuItem
-            onClick={() => {
-              setChartType(chartType === 'line' ? 'bar' : 'line');
-              setChartMenuAnchor(null);
-            }}
-            sx={{ fontSize: '0.875rem', minHeight: 32, py: 0.5 }}
-          >
-            {chartType === 'line' ? 'Switch to Bar Chart' : 'Switch to Line Chart'}
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setChartConfig(prev => ({ ...prev, showGrid: !prev.showGrid }));
-              setChartMenuAnchor(null);
-            }}
-            sx={{ fontSize: '0.875rem', minHeight: 32, py: 0.5 }}
-          >
-            {chartConfig.showGrid ? 'Hide Grid' : 'Show Grid'}
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setChartConfig(prev => ({ ...prev, showPoints: !prev.showPoints }));
-              setChartMenuAnchor(null);
-            }}
-            sx={{ fontSize: '0.875rem', minHeight: 32, py: 0.5 }}
-          >
-            {chartConfig.showPoints ? 'Hide Points' : 'Show Points'}
-          </MenuItem>
-        </Menu>
-      </Box>
-
-      {/* Add this component near the end of your return statement, just before the closing </Box> */}
-      {/* Add this right after your existing Snackbar components */}
-      <Snackbar
-        open={commandFeedback.show}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{
-          '& .MuiPaper-root': {
-            bgcolor: 'background.paper',
-            color: 'text.primary',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            px: 2,
-            minWidth: 250
-          }
-        }}
-      >
-        <Paper elevation={3}>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2,
-            p: 1.5
-          }}>
-            {commandFeedback.loading && (
-              <CircularProgress size={20} color="primary" />
-            )}
-            <Typography variant="body2">
-              {commandFeedback.message}
-            </Typography>
-          </Box>
-        </Paper>
-      </Snackbar>
     </Box>
   );
-}
+} 
