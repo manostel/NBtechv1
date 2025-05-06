@@ -111,6 +111,7 @@ const STATUS_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.co
 const VARIABLES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-variables";
 const COMMAND_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/send-command";
 const BATTERY_STATE_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
+const FETCH_ALARMS_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-alarms";
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -146,6 +147,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [metricsData, setMetricsData] = useState(null);
   const [deviceState, setDeviceState] = useState(null);
   const [alarms, setAlarms] = useState([]);
+  const [triggeredAlarms, setTriggeredAlarms] = useState([]);
   const [alarmHistory, setAlarmHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -600,6 +602,33 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
+  const fetchAlarms = async () => {
+    try {
+      const response = await fetch(FETCH_ALARMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch alarms');
+      }
+
+      const data = await response.json();
+      console.log('Fetched alarms data:', data);
+      setAlarms(data.alarms || []);
+      setTriggeredAlarms(data.triggered_alarms || []);
+      console.log('Set triggered alarms:', data.triggered_alarms || []);
+    } catch (err) {
+      console.error('Error fetching alarms:', err);
+      setError(err.message);
+    }
+  };
+
   const fetchInitialData = async () => {
     if (!device || !device.client_id || !isMounted.current) {
       return;
@@ -648,6 +677,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           await fetchInitialData();
           // Make initial call to fetch battery state
           await fetchBatteryState();
+          await fetchAlarms();
         } finally {
           isFetching.current = false;
         }
@@ -976,25 +1006,19 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   };
 
   const renderTabContent = (tabValue) => {
+    console.log('Rendering tab content with triggeredAlarms:', triggeredAlarms);
     switch (tabValue) {
       case 0:
         return (
           <DashboardOverviewTab
-            device={device}
             metricsData={metricsData}
             metricsConfig={metricsConfig}
-            lastSeen={device?.last_seen}
-            deviceState={deviceState}
-            timeRange={timeRange}
-            refreshInterval={refreshInterval}
-            toggle1={toggle1}
-            toggle2={toggle2}
-            speedInput={speedInput}
-            onRefresh={fetchGraphData}
             selectedVariables={selectedVariablesOverview}
             availableVariables={availableVariables}
-            onVariableChange={(e) => handleVariableChange(e, true)}
-            onTimeRangeChange={handleTimeRangeChange}
+            deviceState={deviceState}
+            isLoading={isLoading}
+            onVariableChange={(event) => handleVariableChange(event, true)}
+            triggeredAlarms={triggeredAlarms}
           />
         );
       case 1:
@@ -1002,11 +1026,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           <DashboardChartsTab
             metricsData={metricsData}
             metricsConfig={metricsConfig}
-            timeRange={timeRange}
-            chartConfig={chartConfig}
             selectedVariables={selectedVariablesChartsStats}
             availableVariables={availableVariables}
-            onVariableChange={handleVariableChange}
+            isLoading={isLoading}
+            onVariableChange={(event) => handleVariableChange(event, false)}
+            timeRange={timeRange}
+            chartConfig={chartConfig}
             onTimeRangeChange={handleTimeRangeChange}
             onApply={handleApply}
           />
@@ -1041,6 +1066,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           <DashboardAlarmsTab
             device={device}
             metricsConfig={metricsConfig}
+            onAlarmToggle={fetchAlarms}
           />
         );
       default:

@@ -40,7 +40,7 @@ import {
 const MANAGE_ALARMS_API_URL = "https://ueqnh8082k.execute-api.eu-central-1.amazonaws.com/default/manage-alarms";
 const FETCH_ALARMS_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-alarms";
 
-const DashboardAlarmsTab = ({ device, metricsConfig }) => {
+const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
   const theme = useTheme();
   const [alarms, setAlarms] = useState([]);
   const [triggeredAlarms, setTriggeredAlarms] = useState([]);
@@ -216,6 +216,10 @@ const DashboardAlarmsTab = ({ device, metricsConfig }) => {
       }
 
       await fetchAlarms();
+      // Call the callback to refresh alarms in parent component
+      if (onAlarmToggle) {
+        onAlarmToggle();
+      }
       setSnackbar({
         open: true,
         message: `Alarm ${currentEnabled ? 'disabled' : 'enabled'} successfully`,
