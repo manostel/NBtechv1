@@ -28,7 +28,9 @@ def validate_command(command):
         "TOGGLE_2_ON",
         "TOGGLE_2_OFF",
         "GET_STATE",
-        "SET_SPEED"
+        "SET_SPEED",
+        "POWER_SAVING_ON",
+        "POWER_SAVING_OFF"
     ]
     return command in valid_commands
 
@@ -58,7 +60,7 @@ def lambda_handler(event, context):
         # Validate the command
         if not validate_command(command):
             return create_cors_response(400, {
-                "error": f"Invalid command. Must be one of: RESTART, TOGGLE_1_ON, TOGGLE_1_OFF, TOGGLE_2_ON, TOGGLE_2_OFF, GET_STATE, SET_SPEED"
+                "error": f"Invalid command. Must be one of: RESTART, TOGGLE_1_ON, TOGGLE_1_OFF, TOGGLE_2_ON, TOGGLE_2_OFF, GET_STATE, SET_SPEED, POWER_SAVING_ON, POWER_SAVING_OFF"
             })
 
         # Define MQTT topics

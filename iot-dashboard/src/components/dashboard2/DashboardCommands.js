@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Paper, Typography, Switch, TextField, Button, CircularProgress, Snackbar } from '@mui/material';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 
 const COMMAND_API_URL = 'https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command';
 const STATUS_API_URL = 'https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-status';
@@ -16,6 +17,7 @@ const DashboardCommands = ({
   const [led1State, setLed1State] = useState(false);
   const [led2State, setLed2State] = useState(false);
   const [motorSpeed, setMotorSpeed] = useState('');
+  const [powerSavingMode, setPowerSavingMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -31,6 +33,7 @@ const DashboardCommands = ({
       setLed1State(deviceState.led1_state === 1);
       setLed2State(deviceState.led2_state === 1);
       setMotorSpeed(deviceState.motor_speed?.toString() || "0");
+      setPowerSavingMode(deviceState.power_saving === 1);
     }
   }, [deviceState]);
 
@@ -111,6 +114,36 @@ const DashboardCommands = ({
       setSnackbar({
         open: true,
         message: error.message || 'Failed to update switch state',
+        severity: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePowerSavingChange = async (isOn) => {
+    setIsLoading(true);
+    try {
+      const command = isOn ? 'POWER_SAVING_ON' : 'POWER_SAVING_OFF';
+      
+      // Send the command
+      await handleCommandSend(command);
+      
+      // Wait for 5 seconds to allow the device to process the command
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Fetch the latest state using the function from Dashboard2.js
+      const latestState = await fetchDeviceState();
+      
+      // Update the UI with the new state
+      if (latestState) {
+        setPowerSavingMode(latestState.power_saving === 1);
+      }
+    } catch (error) {
+      console.error('Error in handlePowerSavingChange:', error);
+      setSnackbar({
+        open: true,
+        message: error.message || 'Failed to update power saving mode',
         severity: 'error'
       });
     } finally {
@@ -261,6 +294,21 @@ const DashboardCommands = ({
             checked={led2State}
             onChange={(e) => handleSwitchChange(2, e.target.checked)}
             disabled={isLoading}
+          />
+        </Box>
+      </Paper>
+
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Power Saving Mode
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <Typography sx={{ mr: 2 }}>Power Saving</Typography>
+          <Switch
+            checked={powerSavingMode}
+            onChange={(e) => handlePowerSavingChange(e.target.checked)}
+            disabled={isLoading}
+            color="primary"
           />
         </Box>
       </Paper>

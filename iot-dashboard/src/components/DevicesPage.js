@@ -53,6 +53,7 @@ const DEVICES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.c
 const DEVICE_DATA_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
 const DEVICE_PREFERENCES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-preferences";
 const BATTERY_STATE_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
+const INACTIVE_TIMEOUT_MINUTES = 7; // Device is considered offline after 7 minutes of inactivity
 
 const DeviceSkeleton = () => (
   <Paper sx={{ p: 2, height: '100%' }}>
@@ -91,8 +92,6 @@ const EditDeviceDialog = ({ device, onClose }) => {
 const saveDeviceOrder = (devices, userEmail) => {
   localStorage.setItem(`deviceOrder_${userEmail}`, JSON.stringify(devices));
 };
-
-const INACTIVE_TIMEOUT_MINUTES = 1; // Configure timeout period
 
 // Add this new component for the loading skeleton
 const DeviceCardSkeleton = () => {

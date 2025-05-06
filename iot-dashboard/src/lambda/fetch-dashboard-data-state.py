@@ -46,7 +46,8 @@ def get_latest_state(client_id):
             'timestamp': latest_state['timestamp'],
             'led1_state': int(latest_state['led1_state']),  # Convert to int
             'led2_state': int(latest_state['led2_state']),  # Convert to int
-            'motor_speed': int(latest_state['motor_speed'])  # Convert to int
+            'motor_speed': int(latest_state['motor_speed']),  # Convert to int
+            'power_saving': int(latest_state['power_saving'])  # Convert to int
         }
 
     except Exception as e:

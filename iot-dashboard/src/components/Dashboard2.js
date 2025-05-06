@@ -454,7 +454,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         // Update device status based on timestamp
         const lastTimestamp = new Date(latestData.timestamp);
         const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
-        const deviceStatus = timeDiffSeconds <= 120 ? "Active" : "Inactive";
+        
+        // Device is active if last seen within 7 minutes
+        setDeviceStatus(timeDiffSeconds <= 420 ? "Active" : "Inactive");
 
         // Update metrics data with latest values
         setMetricsData(prevData => ({
@@ -464,7 +466,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         }));
 
         // Update device info
-        setDeviceStatus(deviceStatus);
         setLastSeen(lastTimestamp);
         setClientID(device.client_id);
         setDeviceName(device.name || "Unknown");

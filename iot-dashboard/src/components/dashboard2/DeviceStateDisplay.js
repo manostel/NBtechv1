@@ -225,6 +225,18 @@ const DeviceStateDisplay = ({ deviceState, isLoading }) => {
             />
           </Tooltip>
         </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <Tooltip title="Power Saving Mode Status">
+            <StateCard
+              title="Power Saving Mode"
+              value={deviceState.power_saving === 1}
+              icon={<PowerIcon />}
+              color={theme.palette.primary.main}
+              isBoolean={true}
+              isLoading={isLoading}
+            />
+          </Tooltip>
+        </Grid>
       </Grid>
     </Box>
   );
