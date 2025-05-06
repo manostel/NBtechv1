@@ -100,14 +100,18 @@ const DashboardCommands = ({
       // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
       
-      // Fetch the latest state using the function from Dashboard2.js
+      // First verification
       const latestState = await fetchDeviceState();
       
-      // Update the UI with the new state
-      if (latestState) {
-        setLed1State(latestState.led1_state);
-        setLed2State(latestState.led2_state);
-        setMotorSpeed(latestState.motor_speed);
+      // Additional verification after 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const finalState = await fetchDeviceState();
+      
+      // Update the UI with the final state
+      if (finalState) {
+        setLed1State(finalState.led1_state);
+        setLed2State(finalState.led2_state);
+        setMotorSpeed(finalState.motor_speed);
       }
     } catch (error) {
       console.error('Error in handleSwitchChange:', error);
@@ -132,12 +136,16 @@ const DashboardCommands = ({
       // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
       
-      // Fetch the latest state using the function from Dashboard2.js
+      // First verification
       const latestState = await fetchDeviceState();
       
-      // Update the UI with the new state
-      if (latestState) {
-        setPowerSavingMode(latestState.power_saving === 1);
+      // Additional verification after 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const finalState = await fetchDeviceState();
+      
+      // Update the UI with the final state
+      if (finalState) {
+        setPowerSavingMode(finalState.power_saving === 1);
       }
     } catch (error) {
       console.error('Error in handlePowerSavingChange:', error);
@@ -181,12 +189,16 @@ const DashboardCommands = ({
       // Wait 5 seconds for device to process command
       await new Promise(resolve => setTimeout(resolve, 6000));
       
-      // Fetch the latest state
+      // First verification
       const latestState = await fetchDeviceState();
       
-      // Update the UI with the new state
-      if (latestState) {
-        setMotorSpeed(latestState.motor_speed?.toString() || "0");
+      // Additional verification after 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const finalState = await fetchDeviceState();
+      
+      // Update the UI with the final state
+      if (finalState) {
+        setMotorSpeed(finalState.motor_speed?.toString() || "0");
         setCommandFeedback({
           show: true,
           message: 'Speed command confirmed!',
@@ -238,14 +250,18 @@ const DashboardCommands = ({
       // Wait for device to process command
       await new Promise(resolve => setTimeout(resolve, 5000));
       
-      // Fetch the latest state
+      // First verification
       const latestState = await fetchDeviceState();
       
-      // Update the UI with the new state
-      if (latestState) {
-        setLed1State(latestState.led1_state);
-        setLed2State(latestState.led2_state);
-        setMotorSpeed(latestState.motor_speed);
+      // Additional verification after 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const finalState = await fetchDeviceState();
+      
+      // Update the UI with the final state
+      if (finalState) {
+        setLed1State(finalState.led1_state);
+        setLed2State(finalState.led2_state);
+        setMotorSpeed(finalState.motor_speed);
         setCommandFeedback({
           show: true,
           message: 'Restart command confirmed!',
@@ -285,7 +301,7 @@ const DashboardCommands = ({
           <Switch
             checked={led1State}
             onChange={(e) => handleSwitchChange(1, e.target.checked)}
-            disabled={isLoading}
+            disabled={isLoading || isVerifying}
           />
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -293,7 +309,7 @@ const DashboardCommands = ({
           <Switch
             checked={led2State}
             onChange={(e) => handleSwitchChange(2, e.target.checked)}
-            disabled={isLoading}
+            disabled={isLoading || isVerifying}
           />
         </Box>
       </Paper>
@@ -307,7 +323,7 @@ const DashboardCommands = ({
           <Switch
             checked={powerSavingMode}
             onChange={(e) => handlePowerSavingChange(e.target.checked)}
-            disabled={isLoading}
+            disabled={isLoading || isVerifying}
             color="primary"
           />
         </Box>
@@ -323,20 +339,25 @@ const DashboardCommands = ({
             type="number"
             value={motorSpeed}
             onChange={(e) => setMotorSpeed(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || isVerifying}
             sx={{ flex: 1 }}
           />
           <Button
             type="submit"
             variant="contained"
-            disabled={isLoading}
+            disabled={isLoading || isVerifying}
           >
-            Set Speed
+            {isVerifying ? <CircularProgress size={24} /> : 'Set Speed'}
           </Button>
         </Box>
         {deviceState?.motor_speed !== undefined && (
           <Typography sx={{ mt: 1 }}>
             Current Speed: {deviceState.motor_speed}%
+          </Typography>
+        )}
+        {error && (
+          <Typography color="error" sx={{ mt: 1 }}>
+            {error}
           </Typography>
         )}
       </Paper>
@@ -350,9 +371,9 @@ const DashboardCommands = ({
           color="secondary"
           startIcon={<RestartAltIcon />}
           onClick={handleRestart}
-          disabled={isLoading}
+          disabled={isLoading || isVerifying}
         >
-          Restart Device
+          {isVerifying ? <CircularProgress size={24} /> : 'Restart Device'}
         </Button>
       </Paper>
 
@@ -371,12 +392,6 @@ const DashboardCommands = ({
         }}>
           <CircularProgress />
         </Box>
-      )}
-
-      {error && (
-        <Typography color="error" sx={{ mt: 2 }}>
-          {error}
-        </Typography>
       )}
 
       <Snackbar
