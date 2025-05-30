@@ -130,7 +130,30 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
         throw new Error('Failed to create alarm');
       }
 
-      await fetchAlarms();
+      // Fetch updated alarms immediately
+      const alarmsResponse = await fetch(FETCH_ALARMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!alarmsResponse.ok) {
+        throw new Error('Failed to fetch updated alarms');
+      }
+
+      const data = await alarmsResponse.json();
+      setAlarms(data.alarms || []);
+      setTriggeredAlarms(data.triggered_alarms || []);
+      
+      // Call the callback to refresh alarms in parent component
+      if (onAlarmToggle) {
+        onAlarmToggle();
+      }
+
       setNewAlarmDialog(false);
       setNewAlarm({
         variable_name: '',

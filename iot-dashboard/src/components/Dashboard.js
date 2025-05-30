@@ -904,7 +904,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   const handleAlarmUpdate = (updatedAlarms) => {
     setAlarms(updatedAlarms);
-    // Here you would typically send the updated alarms to your backend
+    // Immediately fetch and update triggered alarms
+    fetchAlarms();
   };
 
   const handleCommandSend = async (command, params = {}) => {
