@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, Typography, Box, CircularProgress, IconButton } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
@@ -8,7 +8,8 @@ import PropTypes from 'prop-types';
 
 export default function DeviceInfoCard({ 
   clientID, 
-  device, 
+  deviceName,
+  deviceType,
   status, 
   lastOnline, 
   isLoading, 
@@ -20,6 +21,44 @@ export default function DeviceInfoCard({
   lastTimestamp
 }) {
   const theme = useTheme();
+  const [deviceInfo, setDeviceInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchDeviceInfo = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-start-time', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: clientID
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch device info');
+        }
+        
+        const data = await response.json();
+        setDeviceInfo(data);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching device info:', err);
+        setError('Failed to load device information');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDeviceInfo();
+    // Refresh every minute
+    const interval = setInterval(fetchDeviceInfo, 60000);
+    return () => clearInterval(interval);
+  }, [clientID]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -35,62 +74,104 @@ export default function DeviceInfoCard({
   // Convert Active/Inactive to Online/Offline for display
   const displayStatus = status === "Active" ? "Online" : "Offline";
 
+  const formatUptime = (uptime) => {
+    if (!uptime) return 'N/A';
+    const parts = [];
+    if (uptime.days > 0) parts.push(`${uptime.days}d`);
+    if (uptime.hours > 0) parts.push(`${uptime.hours}h`);
+    if (uptime.minutes > 0) parts.push(`${uptime.minutes}m`);
+    if (uptime.seconds > 0) parts.push(`${uptime.seconds}s`);
+    return parts.join(' ');
+  };
+
+  if (loading) {
+    return (
+      <Card sx={{ minWidth: 275, mb: 2 }}>
+        <CardContent>
+          <Box display="flex" justifyContent="center" alignItems="center" minHeight={100}>
+            <CircularProgress />
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card sx={{ minWidth: 275, mb: 2 }}>
+        <CardContent>
+          <Typography color="error">{error}</Typography>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card sx={{ mb: 3, bgcolor: theme.palette.background.paper }}>
+    <Card sx={{ minWidth: 275, mb: 2 }}>
       <CardContent>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              {isLoading ? "Loading..." : device}
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" color="textSecondary">
-                ID: {isLoading ? "..." : (showClientId ? clientID : '••••••••••')}
+        {/* Main content area below Device Name/Type */}
+        <Box display="flex" justifyContent="space-between" width="100%" alignItems="flex-end">
+
+          {/* Left side: ID and Timing Information */}
+          <Box display="flex" flexDirection="column" gap={1}>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography variant="body2" color="text.secondary">
+                ID: {showClientId ? clientID : '••••••••••••'}
               </Typography>
-              <IconButton
-                size="small"
-                onClick={onToggleClientId}
-                sx={{ 
-                  color: theme.palette.text.secondary,
-                  padding: 0.5
-                }}
-              >
-                {showClientId ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+              <IconButton onClick={onToggleClientId} size="small">
+                {showClientId ? <VisibilityOff /> : <Visibility />}
               </IconButton>
             </Box>
+            <Box display="flex" flexDirection="column" gap={0}>
+              <Typography variant="body2" color="text.secondary">
+                Startup time: {deviceInfo?.timestamp ? new Date(deviceInfo.timestamp).toLocaleString() : 'N/A'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Last updated data: {lastOnline || 'N/A'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Last Uptime: {displayStatus !== "Offline" ? formatUptime(deviceInfo?.uptime) : 'N/A'}
+              </Typography>
+            </Box>
           </Box>
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-            {isLoading ? (
-              <CircularProgress size={20} />
-            ) : (
-              <>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                  <Box
-                    sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      bgcolor: getStatusColor(displayStatus)
-                    }}
-                  />
-                  <Typography variant="subtitle1" color="textSecondary" sx={{ fontWeight: 'medium' }}>
-                    {displayStatus}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <BatteryIndicator 
-                    value={batteryLevel || 0} 
-                    batteryState={batteryState}
-                  />
-                  <SignalIndicator value={signalStrength || 0} />
-                </Box>
-              </>
-            )}
+
+          {/* Right side: Status and Indicators */}
+          <Box display="flex" flexDirection="column" alignItems="flex-end" justifyContent="flex-end" gap={1}>
+
+            {/* Status row - Positioned between indicators below */}
+            <Box display="flex" justifyContent="center" width="100%" pb={1}>
+              {/* Status dot and text */}
+              <Box display="flex" alignItems="center" gap={1}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: getStatusColor(displayStatus),
+                  }}
+                />
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: getStatusColor(displayStatus),
+                    fontWeight: 'bold',
+                    lineHeight: 'normal',
+                  }}
+                >
+                  {displayStatus}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Indicators row - Battery and Signal */}
+            <Box display="flex" alignItems="flex-end" gap={2}>
+              <BatteryIndicator value={deviceInfo?.battery || batteryLevel || 0} batteryState={batteryState} />
+              <SignalIndicator value={deviceInfo?.signal_quality || signalStrength || 0} />
+            </Box>
+
           </Box>
+
         </Box>
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-          Last Online: {isLoading ? "..." : lastOnline}
-        </Typography>
       </CardContent>
     </Card>
   );
@@ -98,7 +179,8 @@ export default function DeviceInfoCard({
 
 DeviceInfoCard.propTypes = {
   clientID: PropTypes.string,
-  device: PropTypes.string,
+  deviceName: PropTypes.string,
+  deviceType: PropTypes.string,
   status: PropTypes.string,
   lastOnline: PropTypes.string,
   isLoading: PropTypes.bool,
@@ -112,7 +194,8 @@ DeviceInfoCard.propTypes = {
 
 DeviceInfoCard.defaultProps = {
   clientID: '',
-  device: '',
+  deviceName: '',
+  deviceType: '',
   status: 'Offline',
   lastOnline: 'Never',
   isLoading: false,

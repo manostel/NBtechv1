@@ -40,6 +40,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  DialogContentText,
   FormControl,
   InputLabel,
   Select,
@@ -183,6 +184,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [deviceStatus, setDeviceStatus] = useState("Offline");
   const [clientID, setClientID] = useState("Unknown");
   const [deviceName, setDeviceName] = useState("Unknown");
+  const [deviceType, setDeviceType] = useState("N/A");
   const [toggle1, setToggle1] = useState(false);
   const [toggle2, setToggle2] = useState(false);
   const [speedInput, setSpeedInput] = useState(0);
@@ -266,6 +268,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   // Add a ref to track if we're already fetching
   const isFetching = useRef(false);
+
+  // Shared state for charts and statistics tabs
+  const [sharedChartsData, setSharedChartsData] = useState([]);
+
+  // State for logout confirmation dialog
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (metricsConfig) {
@@ -473,7 +481,24 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         // Update device info
         setLastSeen(lastTimestamp);
         setClientID(device.client_id);
-        setDeviceName(device.name || "Unknown");
+        
+        // Set device name and type from the latest data
+        if (latestData.device_name) {
+          setDeviceName(latestData.device_name);
+        } else if (device.name) {
+          setDeviceName(device.name);
+        }
+        
+        if (latestData.device) {
+          setDeviceType(latestData.device);
+        } else if (device.device) {
+          setDeviceType(device.device);
+        }
+
+        console.log('Updated device info:', {
+          name: latestData.device_name || device.name,
+          type: latestData.device || device.device
+        });
       }
     } catch (error) {
       console.error('Error fetching latest data:', error);
@@ -1074,6 +1099,20 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
+  // Logout confirmation dialog handlers
+  const handleLogoutClick = () => {
+    setLogoutConfirmOpen(true);
+  };
+
+  const handleLogoutConfirm = () => {
+    onLogout(); // Perform the actual logout
+    setLogoutConfirmOpen(false); // Close the dialog
+  };
+
+  const handleLogoutCancel = () => {
+    setLogoutConfirmOpen(false);
+  };
+
   if (isInitialLoad && isLoading) {
     return <DashboardSkeleton />;
   }
@@ -1109,26 +1148,65 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       />
 
       {/* AppBar */}
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          p: 2, 
-          display: 'flex', 
-          alignItems: 'center',
-          borderBottom: '1px solid',
-          borderColor: 'divider'
-        }}
+      <AppBar position="static" color="default" elevation={1}>
+        <Toolbar>
+          <IconButton
+            edge="start"
+            color="inherit"
+            aria-label="back"
+            onClick={onBack}
+            sx={{ mr: 2 }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Typography variant="h6" component="div">
+              {device?.device_name || "Unknown"}
+            </Typography>
+            <Typography variant="subtitle2" color="text.secondary">
+              {device?.device || "N/A"}
+            </Typography>
+          </Box>
+          <IconButton
+            edge="end"
+            color="inherit"
+            aria-label="settings"
+            onClick={handleSettingsOpen}
+          >
+            <SettingsIcon />
+          </IconButton>
+          <IconButton
+            edge="end"
+            color="inherit"
+            aria-label="logout"
+            onClick={handleLogoutClick}
+            sx={{ ml: 1 }}
+          >
+            <LogoutIcon />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog
+        open={logoutConfirmOpen}
+        onClose={handleLogoutCancel}
+        aria-labelledby="logout-dialog-title"
+        aria-describedby="logout-dialog-description"
       >
-        <IconButton onClick={() => navigate(-1)} sx={{ mr: 2 }}>
-          <ArrowBackIcon />
-        </IconButton>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          {device?.name || 'Device Dashboard'}
-        </Typography>
-        <IconButton onClick={handleSettingsOpen}>
-          <SettingsIcon />
-        </IconButton>
-      </Paper>
+        <DialogTitle id="logout-dialog-title">{"Confirm Logout"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="logout-dialog-description">
+            Are you sure you want to log out?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleLogoutCancel}>Cancel</Button>
+          <Button onClick={handleLogoutConfirm} autoFocus>
+            Logout
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Container 
         maxWidth={false} 

@@ -202,6 +202,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [openClientIdConfirmDialog, setOpenClientIdConfirmDialog] = useState(false);
   const [configureDialogOpen, setConfigureDialogOpen] = useState(false);
   const [configuringDevice, setConfiguringDevice] = useState(null);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   useEffect(() => {
     // Initial fetch of all data
@@ -357,13 +358,27 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   };
 
   const handleDeviceClick = (dev) => {
-    onSelectDevice(dev);
+    // Ensure the device object includes the 'device' property (device type)
+    const deviceWithResolvedType = {
+      ...dev,
+      device: dev.device || "SIM7080" // Use existing device type if available, otherwise default to SIM7080
+    };
+    onSelectDevice(deviceWithResolvedType);
     navigate("/dashboard");
   };
 
   const handleLogout = () => {
+    setLogoutConfirmOpen(true);
+  };
+
+  const handleLogoutConfirm = () => {
     onLogout();
     navigate('/login');
+    setLogoutConfirmOpen(false);
+  };
+
+  const handleLogoutCancel = () => {
+    setLogoutConfirmOpen(false);
   };
 
   const handleAddDevice = async () => {
@@ -1709,6 +1724,28 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                 }}
             />
         )}
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog
+        open={logoutConfirmOpen}
+        onClose={handleLogoutCancel}
+        aria-labelledby="logout-dialog-title"
+        aria-describedby="logout-dialog-description"
+      >
+        <DialogTitle id="logout-dialog-title">{"Confirm Logout"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="logout-dialog-description">
+            Are you sure you want to log out?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleLogoutCancel}>Cancel</Button>
+          <Button onClick={handleLogoutConfirm} autoFocus>
+            Logout
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 } 
