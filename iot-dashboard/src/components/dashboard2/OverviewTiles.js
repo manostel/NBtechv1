@@ -19,10 +19,40 @@ const getSeverityIcon = (severity) => {
   }
 };
 
-const OverviewTile = ({ title, value, unit, icon, color, isLoading, alarmActive, alarmSeverity, alarmDescription }) => {
+const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAlarmsList }) => {
   const theme = useTheme();
   
-  console.log(`OverviewTile ${title} alarmActive:`, alarmActive, 'severity:', alarmSeverity);
+  const alarmActive = Array.isArray(triggeredAlarmsList) && triggeredAlarmsList.length > 0;
+
+  const getHighestSeverity = (alarms) => {
+    if (!alarms || alarms.length === 0) return 'info';
+    if (alarms.some(alarm => alarm.severity?.toLowerCase() === 'error')) return 'error';
+    if (alarms.some(alarm => alarm.severity?.toLowerCase() === 'warning')) return 'warning';
+    return 'info';
+  };
+
+  const getTooltipTitle = (alarms) => {
+    if (!alarms || alarms.length === 0) return 'No alarms triggered';
+    if (alarms.length === 1) return alarms[0].description || 'Alarm triggered';
+    return (
+      <>
+        <Typography color="inherit">Multiple Alarms Triggered:</Typography>
+        {alarms.map((alarm, index) => (
+          <Box key={index} sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+            {getSeverityIcon(alarm.severity)}
+            <Typography variant="caption" display="block" color="inherit" sx={{ ml: 0.5 }}>
+              {alarm.description || `Alarm ${index + 1} triggered`}
+            </Typography>
+          </Box>
+        ))}
+      </>
+    );
+  };
+
+  const overallAlarmSeverity = getHighestSeverity(triggeredAlarmsList);
+  const tooltipTitle = getTooltipTitle(triggeredAlarmsList);
+
+  console.log(`OverviewTile ${title} alarmActive:`, alarmActive, 'severity:', overallAlarmSeverity);
   
   return (
     <Paper 
@@ -50,12 +80,12 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, alarmActive,
         </Typography>
         {alarmActive && (
           <Tooltip 
-            title={alarmDescription || 'Alarm triggered'} 
+            title={tooltipTitle}
             arrow
             placement="top"
           >
             <Box sx={{ ml: 1, cursor: 'help' }}>
-              {getSeverityIcon(alarmSeverity)}
+              {getSeverityIcon(overallAlarmSeverity)}
             </Box>
           </Tooltip>
         )}
@@ -117,21 +147,12 @@ const OverviewTiles = ({
             return null;
           }
 
-          // Check if an alarm is triggered for this variable
-          const triggeredAlarm = Array.isArray(triggeredAlarms) && triggeredAlarms.find(alarm => {
-            console.log('Variable name comparison:', {
-              alarmVariable: alarm.variable_name,
-              tileVariable: variable,
-              matches: alarm.variable_name === variable
-            });
-            return alarm.variable_name === variable;
-          });
+          // Find ALL triggered alarms for this variable
+          const triggeredAlarmsList = Array.isArray(triggeredAlarms) 
+            ? triggeredAlarms.filter(alarm => alarm.variable_name === variable)
+            : [];
 
-          const alarmActive = !!triggeredAlarm;
-          const alarmSeverity = triggeredAlarm?.severity;
-          const alarmDescription = triggeredAlarm?.description;
-
-          console.log(`Tile ${variable} alarm status:`, alarmActive, 'severity:', alarmSeverity);
+          console.log(`Tile ${variable} triggered alarms:`, triggeredAlarmsList.length);
 
           return (
             <Grid item xs={12} sm={6} md={4} lg={3} key={variable}>
@@ -142,9 +163,7 @@ const OverviewTiles = ({
                 icon={config.icon}
                 color={config.color}
                 isLoading={isLoading}
-                alarmActive={alarmActive}
-                alarmSeverity={alarmSeverity}
-                alarmDescription={alarmDescription}
+                triggeredAlarmsList={triggeredAlarmsList}
               />
             </Grid>
           );
@@ -161,9 +180,16 @@ OverviewTile.propTypes = {
   icon: PropTypes.node,
   color: PropTypes.string,
   isLoading: PropTypes.bool,
-  alarmActive: PropTypes.bool,
-  alarmSeverity: PropTypes.string,
-  alarmDescription: PropTypes.string
+  triggeredAlarmsList: PropTypes.arrayOf(PropTypes.shape({
+    alarm_id: PropTypes.string,
+    variable_name: PropTypes.string,
+    condition: PropTypes.string,
+    threshold: PropTypes.number,
+    description: PropTypes.string,
+    enabled: PropTypes.bool,
+    severity: PropTypes.string,
+    current_value: PropTypes.number,
+  })),
 };
 
 OverviewTiles.propTypes = {
