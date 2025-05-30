@@ -1,19 +1,10 @@
 import React from 'react';
-import { Grid, Paper, Typography, Box, CircularProgress } from '@mui/material';
+import { Grid, Paper, Typography, Box, CircularProgress, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import PropTypes from 'prop-types';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
 import InfoIcon from '@mui/icons-material/Info';
-
-// Helper to normalize variable names for comparison
-const normalize = str => {
-  if (!str) return '';
-  return str.toLowerCase()
-    .replace(/[_ ]/g, '')
-    .replace('signalquality', 'signal_quality')
-    .replace('thermistortemp', 'thermistor_temp');
-};
 
 const getSeverityIcon = (severity) => {
   switch (severity?.toLowerCase()) {
@@ -28,7 +19,7 @@ const getSeverityIcon = (severity) => {
   }
 };
 
-const OverviewTile = ({ title, value, unit, icon, color, isLoading, alarmActive, alarmSeverity }) => {
+const OverviewTile = ({ title, value, unit, icon, color, isLoading, alarmActive, alarmSeverity, alarmDescription }) => {
   const theme = useTheme();
   
   console.log(`OverviewTile ${title} alarmActive:`, alarmActive, 'severity:', alarmSeverity);
@@ -58,9 +49,15 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, alarmActive,
           {title}
         </Typography>
         {alarmActive && (
-          <Box sx={{ ml: 1 }}>
-            {getSeverityIcon(alarmSeverity)}
-          </Box>
+          <Tooltip 
+            title={alarmDescription || 'Alarm triggered'} 
+            arrow
+            placement="top"
+          >
+            <Box sx={{ ml: 1, cursor: 'help' }}>
+              {getSeverityIcon(alarmSeverity)}
+            </Box>
+          </Tooltip>
         )}
       </Box>
       {isLoading ? (
@@ -120,26 +117,19 @@ const OverviewTiles = ({
             return null;
           }
 
-          // Check if an alarm is triggered for this variable (normalize names)
+          // Check if an alarm is triggered for this variable
           const triggeredAlarm = Array.isArray(triggeredAlarms) && triggeredAlarms.find(alarm => {
-            const normalizedAlarmVar = normalize(alarm.variable_name);
-            const normalizedTileVar = normalize(variable);
             console.log('Variable name comparison:', {
-              alarmOriginal: alarm.variable_name,
-              alarmNormalized: normalizedAlarmVar,
-              tileOriginal: variable,
-              tileNormalized: normalizedTileVar,
-              matches: normalizedAlarmVar === normalizedTileVar,
-              triggeredAlarms: triggeredAlarms.map(a => ({
-                original: a.variable_name,
-                normalized: normalize(a.variable_name)
-              }))
+              alarmVariable: alarm.variable_name,
+              tileVariable: variable,
+              matches: alarm.variable_name === variable
             });
-            return normalizedAlarmVar === normalizedTileVar;
+            return alarm.variable_name === variable;
           });
 
           const alarmActive = !!triggeredAlarm;
           const alarmSeverity = triggeredAlarm?.severity;
+          const alarmDescription = triggeredAlarm?.description;
 
           console.log(`Tile ${variable} alarm status:`, alarmActive, 'severity:', alarmSeverity);
 
@@ -154,6 +144,7 @@ const OverviewTiles = ({
                 isLoading={isLoading}
                 alarmActive={alarmActive}
                 alarmSeverity={alarmSeverity}
+                alarmDescription={alarmDescription}
               />
             </Grid>
           );
@@ -171,7 +162,8 @@ OverviewTile.propTypes = {
   color: PropTypes.string,
   isLoading: PropTypes.bool,
   alarmActive: PropTypes.bool,
-  alarmSeverity: PropTypes.string
+  alarmSeverity: PropTypes.string,
+  alarmDescription: PropTypes.string
 };
 
 OverviewTiles.propTypes = {
