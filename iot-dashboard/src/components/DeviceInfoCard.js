@@ -18,47 +18,66 @@ export default function DeviceInfoCard({
   showClientId,
   onToggleClientId,
   batteryState,
-  lastTimestamp
+  lastTimestamp,
+  deviceStartTimeInfo
 }) {
   const theme = useTheme();
-  const [deviceInfo, setDeviceInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentUptimeDisplay, setCurrentUptimeDisplay] = useState('N/A');
 
+  // Convert Active/Inactive to Online/Offline for display
+  const displayStatus = status === "Active" ? "Online" : "Offline";
+
+  // Effect to update uptime display based on deviceStartTimeInfo and status
   useEffect(() => {
-    const fetchDeviceInfo = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-start-time', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            client_id: clientID
-          })
-        });
+    let intervalId;
+
+    // Check if device is online and we have a valid startup timestamp
+    if (displayStatus !== "Offline" && deviceStartTimeInfo?.timestamp) {
+      const startupTime = new Date(deviceStartTimeInfo.timestamp);
+
+      // Ensure the startup time is not in the future
+      if (startupTime > new Date()) {
+         setCurrentUptimeDisplay('N/A (Future Timestamp)');
+         return;
+      }
+
+      const updateUptime = () => {
+        const now = new Date();
+        // Calculate elapsed time since the startup timestamp
+        const diffMs = now - startupTime;
+
+        const seconds = Math.floor(diffMs / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        const remainingSeconds = seconds % 60;
+        const remainingMinutes = minutes % 60;
+        const remainingHours = hours % 24;
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch device info');
-        }
-        
-        const data = await response.json();
-        setDeviceInfo(data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching device info:', err);
-        setError('Failed to load device information');
-      } finally {
-        setLoading(false);
+        const uptimeParts = { days, hours: remainingHours, minutes: remainingMinutes, seconds: remainingSeconds };
+        setCurrentUptimeDisplay(formatUptime(uptimeParts));
+      };
+
+      // Initial update
+      updateUptime();
+
+      // Set up interval to update every second
+      intervalId = setInterval(updateUptime, 1000);
+
+    } else {
+      // If offline or no timestamp, display N/A
+      setCurrentUptimeDisplay('N/A');
+    }
+
+    // Cleanup interval on component unmount or when dependencies change
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
       }
     };
-
-    fetchDeviceInfo();
-    // Refresh every minute
-    const interval = setInterval(fetchDeviceInfo, 60000);
-    return () => clearInterval(interval);
-  }, [clientID]);
+  }, [displayStatus, deviceStartTimeInfo?.timestamp]); // Re-run effect if displayStatus or timestamp changes
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -71,9 +90,6 @@ export default function DeviceInfoCard({
     }
   };
 
-  // Convert Active/Inactive to Online/Offline for display
-  const displayStatus = status === "Active" ? "Online" : "Offline";
-
   const formatUptime = (uptime) => {
     if (!uptime) return 'N/A';
     const parts = [];
@@ -83,18 +99,6 @@ export default function DeviceInfoCard({
     if (uptime.seconds > 0) parts.push(`${uptime.seconds}s`);
     return parts.join(' ');
   };
-
-  if (loading) {
-    return (
-      <Card sx={{ minWidth: 275, mb: 2 }}>
-        <CardContent>
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight={100}>
-            <CircularProgress />
-          </Box>
-        </CardContent>
-      </Card>
-    );
-  }
 
   if (error) {
     return (
@@ -124,13 +128,13 @@ export default function DeviceInfoCard({
             </Box>
             <Box display="flex" flexDirection="column" gap={0}>
               <Typography variant="body2" color="text.secondary">
-                Startup time: {deviceInfo?.timestamp ? new Date(deviceInfo.timestamp).toLocaleString() : 'N/A'}
+                Startup time: {deviceStartTimeInfo?.timestamp ? new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A (Future Timestamp)' : new Date(deviceStartTimeInfo.timestamp).toLocaleString() : 'N/A'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Last updated data: {lastOnline || 'N/A'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Last Uptime: {displayStatus !== "Offline" ? formatUptime(deviceInfo?.uptime) : 'N/A'}
+                Last Uptime: {currentUptimeDisplay}
               </Typography>
             </Box>
           </Box>
@@ -165,8 +169,8 @@ export default function DeviceInfoCard({
 
             {/* Indicators row - Battery and Signal */}
             <Box display="flex" alignItems="flex-end" gap={2}>
-              <BatteryIndicator value={deviceInfo?.battery || batteryLevel || 0} batteryState={batteryState} />
-              <SignalIndicator value={deviceInfo?.signal_quality || signalStrength || 0} />
+              <BatteryIndicator value={batteryLevel} batteryState={batteryState} />
+              <SignalIndicator value={signalStrength} />
             </Box>
 
           </Box>
@@ -189,7 +193,10 @@ DeviceInfoCard.propTypes = {
   showClientId: PropTypes.bool,
   onToggleClientId: PropTypes.func,
   batteryState: PropTypes.string,
-  lastTimestamp: PropTypes.string
+  lastTimestamp: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+  deviceStartTimeInfo: PropTypes.shape({
+    timestamp: PropTypes.string,
+  }),
 };
 
 DeviceInfoCard.defaultProps = {
@@ -204,5 +211,6 @@ DeviceInfoCard.defaultProps = {
   showClientId: false,
   onToggleClientId: () => {},
   batteryState: 'idle',
-  lastTimestamp: null
+  lastTimestamp: null,
+  deviceStartTimeInfo: null,
 };

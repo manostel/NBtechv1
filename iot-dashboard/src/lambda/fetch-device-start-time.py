@@ -39,30 +39,11 @@ def get_latest_start_time(client_id):
 
         latest_start = response['Items'][0]
         
-        # Calculate uptime
-        start_time = datetime.strptime(latest_start['timestamp'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
-        uptime_seconds = int((now - start_time).total_seconds())
-        
-        # Calculate days, hours, minutes, seconds
-        days = uptime_seconds // (24 * 3600)
-        hours = (uptime_seconds % (24 * 3600)) // 3600
-        minutes = (uptime_seconds % 3600) // 60
-        seconds = uptime_seconds % 60
-
-        # Format the response to match what DeviceInfoCard expects
+        # We only need the timestamp for the frontend to calculate uptime live
         return {
             'client_id': latest_start['client_id'],
             'device': latest_start['device'],
-            'startTime': latest_start['timestamp'],
-            'uptime': {
-                'days': days,
-                'hours': hours,
-                'minutes': minutes,
-                'seconds': seconds
-            },
-            'battery': 100,  # Default value, should be updated from actual data
-            'signal_quality': 100  # Default value, should be updated from actual data
+            'timestamp': latest_start['timestamp'],
         }
 
     except Exception as e:
@@ -104,9 +85,9 @@ def lambda_handler(event, context):
             }
 
         # Get the latest start time
-        latest_start = get_latest_start_time(client_id)
+        start_time_info = get_latest_start_time(client_id)
         
-        if not latest_start:
+        if not start_time_info:
             return {
                 'statusCode': 404,
                 'headers': get_cors_headers(),
@@ -114,10 +95,11 @@ def lambda_handler(event, context):
             }
 
         # Return the start time data
+        # Use the decimal_default function for serialization
         return {
             'statusCode': 200,
             'headers': get_cors_headers(),
-            'body': json.dumps(latest_start)
+            'body': json.dumps(start_time_info)
         }
 
     except Exception as e:
@@ -125,5 +107,5 @@ def lambda_handler(event, context):
         return {
             'statusCode': 500,
             'headers': get_cors_headers(),
-            'body': json.dumps({"error": f"Internal server error: {str(e)}"})
+            'body': json.dumps({"error": f"Internal server error: {str(e)}"}) # Use decimal_default here too
         } 

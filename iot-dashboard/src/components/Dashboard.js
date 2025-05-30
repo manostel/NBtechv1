@@ -275,6 +275,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   // State for logout confirmation dialog
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
+  // State for device start time and uptime
+  const [deviceStartTimeInfo, setDeviceStartTimeInfo] = useState(null);
+
   useEffect(() => {
     if (metricsConfig) {
       const variables = Object.keys(metricsConfig);
@@ -703,6 +706,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           // Make initial call to fetch battery state
           await fetchBatteryState();
           await fetchAlarms();
+          // Fetch device start time and uptime
+          await fetchDeviceStartTimeInfo();
         } finally {
           isFetching.current = false;
         }
@@ -1045,6 +1050,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             isLoading={isLoading}
             onVariableChange={(event) => handleVariableChange(event, true)}
             triggeredAlarms={triggeredAlarms}
+            deviceStartTimeInfo={deviceStartTimeInfo}
           />
         );
       case 1:
@@ -1112,6 +1118,50 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   const handleLogoutCancel = () => {
     setLogoutConfirmOpen(false);
+  };
+
+  // Add a new fetch function for device start time and uptime
+  const fetchDeviceStartTimeInfo = async () => {
+    if (!device || !device.client_id) {
+      console.warn('No device or client_id available for start time fetch');
+      return;
+    }
+
+    try {
+      console.log(`Fetching device start time for device: ${device.client_id}`);
+      
+      const response = await fetch('https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-start-time', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result || (result.timestamp === undefined && result.uptime === undefined)) {
+        console.warn('Invalid response format from start time API:', result);
+        // Don't throw an error, just set to null or handle appropriately
+        setDeviceStartTimeInfo(null);
+        return;
+      }
+
+      console.log('Successfully fetched device start time info:', result);
+      setDeviceStartTimeInfo(result);
+
+    } catch (error) {
+      console.error('Error fetching device start time info:', error);
+      // Do not set error state for this fetch as it's not critical for the whole dashboard
+      setDeviceStartTimeInfo(null);
+    }
   };
 
   if (isInitialLoad && isLoading) {
@@ -1231,6 +1281,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           onToggleClientId={() => setShowClientId(!showClientId)}
           batteryState={batteryState}
           lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
+          deviceStartTimeInfo={deviceStartTimeInfo}
         />
 
         {/* Tabs */}
