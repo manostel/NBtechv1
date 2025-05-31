@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Grid, Typography, Paper, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
-import { Error as ErrorIcon, Warning as WarningIcon, Info as InfoIcon } from '@mui/icons-material';
+import { Error as ErrorIcon, Warning as WarningIcon, Info as InfoIcon, ShowChart as ShowChartIcon } from '@mui/icons-material';
 import OverviewTiles from './OverviewTiles';
 import VariableSelector from './VariableSelector';
 import DeviceStateDisplay from './DeviceStateDisplay';
@@ -98,13 +98,19 @@ const DashboardOverviewTab = ({
 
   return (
     <Box sx={{ p: 2 }}>
-      {/* Variable Selector */}
-      <VariableSelector
-        variables={availableVariables}
-        selectedVariables={selectedVariables}
-        onVariableChange={onVariableChange}
-        showTitle={true}
-      />
+      {/* Metrics Title and Variable Selector */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ShowChartIcon sx={{ color: 'success.main' }} />
+          <Typography variant="h6">Metrics</Typography>
+        </Box>
+        <VariableSelector
+          variables={availableVariables}
+          selectedVariables={selectedVariables}
+          onVariableChange={onVariableChange}
+          showTitle={false}
+        />
+      </Box>
 
       {/* Overview Tiles */}
       <Box sx={{ mt: 3 }}>
