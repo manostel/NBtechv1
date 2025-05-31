@@ -17,7 +17,7 @@ def decimal_default(obj):
 def get_cors_headers():
     """Return CORS headers for the response"""
     return {
-        'Access-Control-Allow-Origin': 'http://localhost:3000',
+        'Access-Control-Allow-Origin': '*' ,
         'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
         'Access-Control-Allow-Methods': 'OPTIONS,POST',
         'Access-Control-Allow-Credentials': 'true',
@@ -107,5 +107,5 @@ def lambda_handler(event, context):
         return {
             'statusCode': 500,
             'headers': get_cors_headers(),
-            'body': json.dumps({"error": f"Internal server error: {str(e)}"}) # Use decimal_default here too
+            'body': json.dumps({"error": f"Internal server error: {str(e)}"})
         } 
