@@ -104,12 +104,12 @@ const DashboardOverviewTab = ({
           <ShowChartIcon sx={{ color: 'success.main' }} />
           <Typography variant="h6">Metrics</Typography>
         </Box>
-        <VariableSelector
-          variables={availableVariables}
-          selectedVariables={selectedVariables}
-          onVariableChange={onVariableChange}
+      <VariableSelector
+        variables={availableVariables}
+        selectedVariables={selectedVariables}
+        onVariableChange={onVariableChange}
           showTitle={false}
-        />
+      />
       </Box>
 
       {/* Overview Tiles */}
@@ -120,7 +120,7 @@ const DashboardOverviewTab = ({
           selectedVariables={selectedVariables}
           isLoading={isLoading}
           triggeredAlarms={triggeredAlarms}
-        />
+              />
       </Box>
 
       {/* Device State Display */}

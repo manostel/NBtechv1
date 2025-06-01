@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Grid, 
@@ -54,6 +54,9 @@ const DEVICE_DATA_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazona
 const DEVICE_PREFERENCES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-preferences";
 const BATTERY_STATE_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
 const INACTIVE_TIMEOUT_MINUTES = 7; // Device is considered offline after 7 minutes of inactivity
+const DEVICE_DATA_UPDATE_INTERVAL = 2 * 60 * 1000; // 2 minutes in milliseconds
+const DEVICE_STATUS_UPDATE_INTERVAL = 70 * 1000; // 70 seconds in milliseconds
+const BATTERY_STATE_UPDATE_INTERVAL = 15 * 1000; // 15 seconds in milliseconds
 
 const DeviceSkeleton = () => (
   <Paper sx={{ p: 2, height: '100%' }}>
@@ -163,6 +166,165 @@ const DeviceCardSkeleton = () => {
     );
 };
 
+const ConfigureDeviceDialog = React.memo(({ 
+    device, 
+    onClose, 
+    deviceData, 
+    setDeviceData, 
+    user, 
+    showSnackbar 
+}) => {
+    const [metricsConfig, setMetricsConfig] = useState(() => {
+        // Initialize with current preferences, defaulting to true for any undefined metrics
+        const currentConfig = deviceData[device.client_id]?.metrics_visibility || {};
+        const availableMetrics = Object.entries(deviceData[device.client_id]?.latest_data || {})
+            .filter(([key, value]) => {
+                const skipFields = [
+                    'timestamp', 'client_id', 'device_name', 'user_email',
+                    'signal_quality', 'battery', 'metrics_visibility', 'display_order',
+                    'device', 'device_id', 'ClientID', 'last_seen', 'created_at', 'status'
+                ];
+                return !skipFields.includes(key) && value !== null && typeof value !== 'object';
+            })
+            .reduce((acc, [key]) => {
+                acc[key] = currentConfig[key] ?? true;
+                return acc;
+            }, {});
+        return availableMetrics;
+    });
+
+    const handleSaveConfig = useCallback(async () => {
+        try {
+            const response = await fetch(DEVICE_PREFERENCES_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    action: 'update_preferences',
+                    user_email: user.email,
+                    client_id: device.client_id,
+                    metrics_visibility: metricsConfig
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update metrics configuration');
+            }
+
+            // Get the current device data
+            const currentData = deviceData[device.client_id];
+            if (currentData?.latest_data) {
+                // Keep the existing latest_data but update the metrics_visibility
+                setDeviceData(prev => ({
+                    ...prev,
+                    [device.client_id]: {
+                        ...prev[device.client_id],
+                        metrics_visibility: metricsConfig
+                    }
+                }));
+            }
+
+            onClose();
+            showSnackbar('Device configuration updated successfully', 'success');
+        } catch (error) {
+            console.error('Error updating metrics configuration:', error);
+            showSnackbar('Failed to update configuration', 'error');
+        }
+    }, [device.client_id, metricsConfig, onClose, user.email, deviceData, setDeviceData, showSnackbar]);
+
+    const handleCheckboxChange = useCallback((key) => (e) => {
+        setMetricsConfig(prev => ({
+            ...prev,
+            [key]: e.target.checked
+        }));
+    }, []);
+    
+    const availableMetrics = useMemo(() => 
+        Object.entries(deviceData[device.client_id]?.latest_data || {})
+            .filter(([key, value]) => {
+                const skipFields = [
+                    'timestamp', 'client_id', 'device_name', 'user_email',
+                    'signal_quality', 'battery', 'metrics_visibility', 'display_order',
+                    'device', 'device_id', 'ClientID', 'last_seen', 'created_at', 'status'
+                ];
+                return !skipFields.includes(key) && value !== null && typeof value !== 'object';
+            }), [device.client_id, deviceData]);
+
+    const visibleMetrics = useMemo(() => 
+        availableMetrics.filter(([key]) => metricsConfig[key]),
+        [availableMetrics, metricsConfig]
+    );
+
+    return (
+        <Dialog 
+            open={true} 
+            onClose={onClose} 
+            maxWidth="sm" 
+            fullWidth
+            disableEscapeKeyDown
+            disableBackdropClick
+        >
+            <DialogTitle>Configure Device Metrics</DialogTitle>
+            <DialogContent>
+                <DialogContentText sx={{ mb: 2 }}>
+                    Select which metrics you want to display on the device tile.
+                </DialogContentText>
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {availableMetrics.map(([key, value]) => (
+                        <FormControlLabel
+                            key={key}
+                            control={
+                                <Checkbox
+                                    checked={metricsConfig[key]}
+                                    onChange={handleCheckboxChange(key)}
+                                />
+                            }
+                            label={
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                    <Typography>
+                                        {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                                    </Typography>
+                                    <Typography color="text.secondary">
+                                        Current: {typeof value === 'number' ? value.toFixed(1) : value}
+                                        {key === 'temperature' ? '°C' : key === 'humidity' ? '%' : ''}
+                                    </Typography>
+                                </Box>
+                            }
+                        />
+                    ))}
+                </Box>
+
+                {/* Preview Section */}
+                <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
+                    Preview
+                </Typography>
+                <Box sx={{ 
+                    p: 2,
+                    bgcolor: 'background.default',
+                    borderRadius: 1
+                }}>
+                    {visibleMetrics.map(([key, value]) => (
+                        <Typography key={key} variant="body2" sx={{ mb: 0.5 }}>
+                            {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {
+                                typeof value === 'number' ? value.toFixed(1) : value
+                            }{key === 'temperature' ? '°C' : key === 'humidity' ? '%' : ''}
+                        </Typography>
+                    ))}
+                </Box>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button onClick={handleSaveConfig} variant="contained" color="primary">
+                    Save Configuration
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+});
+
 export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -203,7 +365,10 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [configureDialogOpen, setConfigureDialogOpen] = useState(false);
   const [configuringDevice, setConfiguringDevice] = useState(null);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [deviceStatuses, setDeviceStatuses] = useState({});
+  const [isUpdating, setIsUpdating] = useState(false);
 
+  // Update the useEffect for periodic updates
   useEffect(() => {
     // Initial fetch of all data
     const initializeDevices = async () => {
@@ -221,21 +386,87 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
     initializeDevices();
 
-    // Set up polling for device data
+    // Set up polling for device data (every 15 seconds)
     const deviceDataInterval = setInterval(() => {
         updateDevicesData();
-    }, 55000);
-
-    // Set up polling for battery states
-    const batteryStateInterval = setInterval(() => {
-        fetchBatteryStates();
-    }, 150000);
+    }, DEVICE_DATA_UPDATE_INTERVAL);
 
     return () => {
         clearInterval(deviceDataInterval);
-        clearInterval(batteryStateInterval);
     };
-  }, [user.email]);
+}, [user.email]);
+
+  const getDeviceStatus = (deviceData) => {
+    try {
+        if (!deviceData?.latest_data?.timestamp) {
+            return { status: 'Offline', lastSeen: null };
+        }
+        
+        const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
+        const now = new Date();
+        
+        if (isNaN(lastUpdateTime.getTime())) {
+            return { status: 'Offline', lastSeen: null };
+        }
+        
+        const diffInMinutes = (now - lastUpdateTime) / (1000 * 60);
+        
+        // Consider device offline if no update in last 7 minutes
+        return {
+            status: diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Online' : 'Offline',
+            lastSeen: lastUpdateTime
+        };
+    } catch (error) {
+        console.error('Error calculating device status:', error);
+        return { status: 'Offline', lastSeen: null };
+    }
+  };
+
+  const updateDeviceStatus = useCallback((deviceId, newStatus) => {
+    setDeviceStatuses(prev => {
+      // Only update if status has been different for at least 5 seconds
+      const currentStatus = prev[deviceId]?.status;
+      const lastUpdate = prev[deviceId]?.lastUpdate;
+      const now = Date.now();
+      
+      if (currentStatus === newStatus || 
+          (lastUpdate && now - lastUpdate < 5000)) {
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        [deviceId]: {
+          status: newStatus,
+          lastUpdate: now
+        }
+      };
+    });
+  }, []);
+
+  const fetchBatteryState = async (clientId) => {
+    try {
+      const batteryStateResponse = await fetch(BATTERY_STATE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: clientId
+        })
+      });
+
+      if (batteryStateResponse.ok) {
+        const batteryResult = await batteryStateResponse.json();
+        return batteryResult.battery_state;
+      }
+      return 'idle';
+    } catch (error) {
+      console.error(`Error fetching battery state for device ${clientId}:`, error);
+      return 'idle';
+    }
+  };
 
   const fetchDeviceData = async (device) => {
     try {
@@ -253,65 +484,87 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       });
 
       if (!dataResponse.ok) {
-        throw new Error(`Failed to fetch data for device ${device.client_id}: ${dataResponse.statusText}`);
+        console.error(`Failed to fetch data for device ${device.client_id}:`, dataResponse.statusText);
+        return null;
       }
 
       const dataResult = await dataResponse.json();
       const deviceData = JSON.parse(dataResult.body).device_data;
 
-      // Fetch battery state
-      const batteryStateResponse = await fetch(BATTERY_STATE_URL, {
+      // Validate timestamp
+      if (deviceData?.latest_data?.timestamp) {
+        const timestamp = new Date(deviceData.latest_data.timestamp);
+        if (isNaN(timestamp.getTime())) {
+          console.error('Invalid timestamp received:', deviceData.latest_data.timestamp);
+          return null;
+        }
+      }
+
+      // Get preferences
+      const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
+          action: 'get_device_preferences',
+          user_email: user.email,
           client_id: device.client_id
         })
       });
 
-      let batteryState = 'idle';
-      if (batteryStateResponse.ok) {
-        const batteryResult = await batteryStateResponse.json();
-        batteryState = batteryResult.battery_state;
+      let metricsVisibility = {};
+      if (preferencesResponse.ok) {
+        const preferencesData = await preferencesResponse.json();
+        metricsVisibility = preferencesData.preferences?.metrics_visibility || {};
       }
 
+      // Filter latest_data based on preferences
+      if (deviceData?.latest_data) {
+        const filteredLatestData = { ...deviceData.latest_data };
+        Object.keys(filteredLatestData).forEach(key => {
+          if (!metricsVisibility[key] && key !== 'timestamp' && key !== 'client_id') {
+            delete filteredLatestData[key];
+          }
+        });
+        deviceData.latest_data = filteredLatestData;
+      }
+
+      const batteryState = await fetchBatteryState(device.client_id);
       return {
         ...device,
         ...deviceData,
+        metrics_visibility: metricsVisibility,
         battery_state: batteryState
       };
 
     } catch (error) {
       console.error(`Error fetching data for device ${device.client_id}:`, error);
-      return {
-        ...device,
-        battery_state: 'idle'
-      };
+      return null;
     }
   };
 
   const fetchDevices = async () => {
     try {
         // Fetch basic device information
-      const response = await fetch(DEVICES_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
+        const response = await fetch(DEVICES_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
                 action: "get_devices",
-          user_email: user.email
-        })
-      });
-      
-      if (!response.ok) {
+                user_email: user.email
+            })
+        });
+        
+        if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
+        }
+        
+        const data = await response.json();
         const fetchedDevices = data.devices || [];
 
         // Sort and set devices
@@ -324,29 +577,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         // Initialize device data with preferences
         const initialDeviceData = {};
         for (const device of sortedDevices) {
-            // Get device data
+            // Get device data and preferences in one go
             const deviceData = await fetchDeviceData(device);
-            
-            // Get preferences
-            const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-                    action: 'get_device_preferences',
-                    user_email: user.email,
-                    client_id: device.client_id
-        })
-      });
-
-            if (preferencesResponse.ok) {
-                const preferencesData = await preferencesResponse.json();
-                deviceData.metrics_visibility = preferencesData.preferences?.metrics_visibility || {};
+            if (deviceData) {
+                initialDeviceData[device.client_id] = deviceData;
             }
-
-            initialDeviceData[device.client_id] = deviceData;
         }
 
         setDeviceData(initialDeviceData);
@@ -459,15 +694,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       setError(err.message);
         showSnackbar('Failed to delete device: ' + err.message, 'error');
     }
-  };
-
-  const getDeviceStatus = (deviceData) => {
-    if (!deviceData?.latest_data?.timestamp) return 'Offline';
-    
-    const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
-    const now = new Date();
-    const diffInMinutes = (now - lastUpdateTime) / (1000 * 60);
-    return diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Online' : 'Offline';
   };
 
   const getStatusColor = (status) => {
@@ -912,201 +1138,119 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     setConfigureDialogOpen(true);
   };
 
-  // Add this new dialog component
-  const ConfigureDeviceDialog = ({ device, onClose }) => {
-    const [metricsConfig, setMetricsConfig] = useState({});
-    
-    useEffect(() => {
-        // Initialize metrics config from current device data
-        const currentConfig = deviceData[device.client_id]?.metrics_visibility || {};
-        setMetricsConfig(currentConfig);
-    }, [device.client_id]);
-
-    const handleSaveConfig = async () => {
-        try {
-            const response = await fetch(DEVICE_PREFERENCES_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({
-                    action: 'update_preferences',
-                    user_email: user.email,
-                    client_id: device.client_id,
-                    metrics_visibility: metricsConfig
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update metrics configuration');
-            }
-
-            // Update local state
-            setDeviceData(prev => ({
-                ...prev,
-                [device.client_id]: {
-                    ...prev[device.client_id],
-                    metrics_visibility: metricsConfig
-                }
-            }));
-
-            onClose();
-            showSnackbar('Device configuration updated successfully', 'success');
-        } catch (error) {
-            console.error('Error updating metrics configuration:', error);
-            showSnackbar('Failed to update configuration', 'error');
-        }
-    };
-
-    const availableMetrics = Object.entries(deviceData[device.client_id]?.latest_data || {})
-        .filter(([key, value]) => {
-            const skipFields = [
-                'timestamp', 'client_id', 'device_name', 'user_email',
-                'signal_quality', 'battery', 'metrics_visibility', 'display_order',
-                'device', 'device_id', 'ClientID', 'last_seen', 'created_at', 'status'
-            ];
-            return !skipFields.includes(key) && value !== null && typeof value !== 'object';
-        });
-
-  return (
-        <Dialog open={true} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Configure Device Metrics</DialogTitle>
-            <DialogContent>
-                <DialogContentText sx={{ mb: 2 }}>
-                    Select which metrics you want to display on the device tile.
-                </DialogContentText>
-                
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    {availableMetrics.map(([key, value]) => (
-                        <FormControlLabel
-                            key={key}
-                            control={
-                                <Checkbox
-                                    checked={metricsConfig[key] ?? true}
-                                    onChange={(e) => setMetricsConfig(prev => ({
-                                        ...prev,
-                                        [key]: e.target.checked
-                                    }))}
-                                />
-                            }
-                            label={
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <Typography>
-                                        {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
-                                    </Typography>
-                                    <Typography color="text.secondary">
-                                        Current: {typeof value === 'number' ? value.toFixed(1) : value}
-                                        {key === 'temperature' ? '°C' : key === 'humidity' ? '%' : ''}
-                                    </Typography>
-                                </Box>
-                            }
-                        />
-                    ))}
-                </Box>
-
-                {/* Preview Section */}
-                <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
-                    Preview
-                </Typography>
-                <Box sx={{ 
-                    p: 2,
-                    bgcolor: 'background.default',
-                    borderRadius: 1
-                }}>
-                    {availableMetrics
-                        .filter(([key]) => metricsConfig[key] ?? true)
-                        .map(([key, value]) => (
-                            <Typography key={key} variant="body2" sx={{ mb: 0.5 }}>
-                                {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {
-                                    typeof value === 'number' ? value.toFixed(1) : value
-                                }{key === 'temperature' ? '°C' : key === 'humidity' ? '%' : ''}
-                            </Typography>
-                        ))
-                    }
-                </Box>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button onClick={handleSaveConfig} variant="contained" color="primary">
-                    Save Configuration
-                </Button>
-            </DialogActions>
-        </Dialog>
-    );
-  };
-
-  // Add new function for updating only device data
+  // Update the updateDevicesData function
   const updateDevicesData = async () => {
     try {
-        const updatedDeviceData = { ...deviceData };
+        const updatedData = {};
+        let hasUpdates = false;
 
-        // Fetch latest data for each device
         for (const device of devices) {
-            const dataResponse = await fetch(DEVICE_DATA_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({
-                    action: 'get_device_data',
-                    client_id: device.client_id,
-                    user_email: user.email
-                })
-            });
+            try {
+                // Fetch device data
+                const dataResponse = await fetch(DEVICE_DATA_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        action: 'get_device_data',
+                        client_id: device.client_id,
+                        user_email: user.email
+                    })
+                });
 
-            if (!dataResponse.ok) {
-                throw new Error(`Failed to fetch data for device ${device.client_id}`);
+                if (!dataResponse.ok) continue;
+
+                const dataResult = await dataResponse.json();
+                const parsedBody = JSON.parse(dataResult.body);
+                const newDeviceData = parsedBody.device_data;
+
+                if (!newDeviceData) continue;
+
+                // Get preferences
+                const preferencesResponse = await fetch(DEVICE_PREFERENCES_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        action: 'get_device_preferences',
+                        user_email: user.email,
+                        client_id: device.client_id
+                    })
+                });
+
+                let metricsVisibility = {};
+                if (preferencesResponse.ok) {
+                    const preferencesData = await preferencesResponse.json();
+                    metricsVisibility = preferencesData.preferences?.metrics_visibility || {};
+                }
+
+                // Get battery state
+                const batteryState = await fetchBatteryState(device.client_id);
+
+                // Get current device data
+                const currentDeviceData = deviceData[device.client_id] || {};
+                const currentLatestData = currentDeviceData.latest_data || {};
+
+                // Check device status
+                const lastUpdateTime = new Date(newDeviceData.timestamp);
+                const now = new Date();
+                const diffInMinutes = (now - lastUpdateTime) / (1000 * 60);
+                const status = diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Online' : 'Offline';
+
+                // Only update if we have new data
+                if (newDeviceData.timestamp) {
+                    updatedData[device.client_id] = {
+                        ...currentDeviceData,
+                        ...device,
+                        latest_data: {
+                            ...currentLatestData, // Keep existing data as fallback
+                            ...newDeviceData, // Update with new data
+                            // Ensure we have all required fields with fallbacks
+                            client_id: device.client_id,
+                            timestamp: newDeviceData.timestamp,
+                            temperature: newDeviceData.temperature ?? currentLatestData.temperature,
+                            humidity: newDeviceData.humidity ?? currentLatestData.humidity,
+                            pressure: newDeviceData.pressure ?? currentLatestData.pressure,
+                            motor_speed: newDeviceData.motor_speed ?? currentLatestData.motor_speed,
+                            battery: newDeviceData.battery ?? currentLatestData.battery,
+                            signal_quality: newDeviceData.signal_quality ?? currentLatestData.signal_quality,
+                            device: newDeviceData.device ?? currentLatestData.device
+                        },
+                        metrics_visibility: metricsVisibility,
+                        battery_state: batteryState,
+                        status: status,
+                        lastSeen: lastUpdateTime
+                    };
+                    hasUpdates = true;
+                }
+            } catch (error) {
+                console.error(`Error fetching data for device ${device.client_id}:`, error);
             }
-
-            const result = await dataResponse.json();
-            const newData = JSON.parse(result.body).device_data;
-
-            // Update only the latest_data while preserving battery_state
-            updatedDeviceData[device.client_id] = {
-                ...updatedDeviceData[device.client_id],
-                latest_data: newData,
-                battery_state: updatedDeviceData[device.client_id]?.battery_state || 'idle' // Preserve existing battery state
-            };
         }
 
-        setDeviceData(updatedDeviceData);
-    } catch (error) {
-        console.error('Error updating device data:', error);
-    }
-  };
-
-  // Add new function to fetch battery states
-  const fetchBatteryStates = async () => {
-    try {
-      const updatedDeviceData = { ...deviceData };
-      
-      for (const device of devices) {
-        const batteryStateResponse = await fetch(BATTERY_STATE_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            client_id: device.client_id
-          })
-        });
-
-        if (batteryStateResponse.ok) {
-          const batteryResult = await batteryStateResponse.json();
-          // Preserve all existing data and only update the battery_state
-          updatedDeviceData[device.client_id] = {
-            ...updatedDeviceData[device.client_id],
-            battery_state: batteryResult.battery_state
-          };
+        if (hasUpdates) {
+            // Single state update with all changes
+            setDeviceData(prev => {
+                const mergedData = { ...prev };
+                Object.entries(updatedData).forEach(([clientId, data]) => {
+                    mergedData[clientId] = {
+                        ...prev[clientId],
+                        ...data,
+                        latest_data: {
+                            ...prev[clientId]?.latest_data,
+                            ...data.latest_data
+                        }
+                    };
+                });
+                return mergedData;
+            });
         }
-      }
-
-      setDeviceData(updatedDeviceData);
     } catch (error) {
-      console.error('Error fetching battery states:', error);
+        console.error('Error updating devices data:', error);
     }
   };
 
@@ -1298,7 +1442,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                     p: 2,
                                             bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
                                             cursor: 'pointer',
-                    transition: 'transform 0.2s ease',
+                    transition: 'all 0.3s ease',
                     '&:hover': {
                       transform: 'translateY(-4px)',
                                                 boxShadow: theme.shadows[6],
@@ -1318,7 +1462,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                       left: 0,
                       right: 0,
                       height: '4px',
-                      backgroundColor: getStatusColor(deviceStatus),
+                      backgroundColor: getStatusColor(deviceStatus.status),
                       transition: 'background-color 0.3s ease',
                     }
                   }}
@@ -1330,16 +1474,24 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                                 {device.device_name || 'Unknown Device'}
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {isUpdating && (
+                            <CircularProgress size={12} sx={{ mr: 1 }} />
+                        )}
                         <Box
                           sx={{
                             width: 8,
                             height: 8,
                             borderRadius: '50%',
-                                                        backgroundColor: getStatusColor(deviceStatus)
+                                                        backgroundColor: getStatusColor(deviceStatus.status)
                           }}
                         />
-                        <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus) }}>
-                          {deviceStatus}
+                        <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus.status) }}>
+                          {deviceStatus.status}
+                          {deviceStatus.status === 'Offline' && deviceStatus.lastSeen && (
+                              <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                                  (Last seen: {deviceStatus.lastSeen.toLocaleString()})
+                              </Typography>
+                          )}
                         </Typography>
                       </Box>
                     </Box>
@@ -1382,11 +1534,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                         {/* Metrics */}
                                         <Box sx={{ mt: 1 }}>
                                             {Object.entries(latestData).map(([key, value]) => {
-                                                // Check visibility based on preferences
-                                                const isVisible = currentDeviceData.metrics_visibility?.[key] ?? true;
+                                                // Skip if value is null, undefined, or an object
+                                                if (value === null || value === undefined || typeof value === 'object') return null;
 
-                                                // Skip non-metric fields or if not visible
-                                                if (!isVisible || [
+                                                // Skip if the metric is in the excluded list
+                                                const excludedFields = [
                                                     'timestamp',
                                                     'client_id',
                                                     'device_name',
@@ -1401,10 +1553,12 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                                     'last_seen',
                                                     'created_at',
                                                     'status'
-                                                ].includes(key)) return null;
+                                                ];
+                                                if (excludedFields.includes(key)) return null;
 
-                                                // Skip if value is an object or null
-                                                if (value === null || typeof value === 'object') return null;
+                                                // Check if the metric should be visible based on preferences
+                                                const metricsVisibility = currentDeviceData.metrics_visibility || {};
+                                                if (metricsVisibility[key] === false) return null;
 
                                                 // Format the value
                                                 const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
@@ -1413,15 +1567,15 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                                                 return (
                                                     <Typography key={key} variant="body2" color="textSecondary">
                                                         {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
-                    </Typography>
+                                                    </Typography>
                                                 );
                                             })}
                   </Box>
 
                                         {/* Last Updated */}
                                         <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1 }}>
-                                            Last Updated: {deviceData[device.client_id]?.latest_data?.timestamp ? 
-                                                new Date(deviceData[device.client_id].latest_data.timestamp).toLocaleString() : 
+                                            Last Updated: {latestData.timestamp ? 
+                                                new Date(latestData.timestamp).toLocaleString() : 
                                                 'Never'
                                             }
                   </Typography>
@@ -1722,6 +1876,10 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                     setConfigureDialogOpen(false);
                     setConfiguringDevice(null);
                 }}
+                deviceData={deviceData}
+                setDeviceData={setDeviceData}
+                user={user}
+                showSnackbar={showSnackbar}
             />
         )}
 

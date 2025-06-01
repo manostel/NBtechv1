@@ -223,11 +223,11 @@ const DashboardCommands = ({
         console.log('Updating UI with final state:', finalState);
         // Only update if the speed matches what we sent
         if (finalState.motor_speed === speed) {
-          setCommandFeedback({
-            show: true,
-            message: 'Speed command confirmed!',
-            loading: false
-          });
+        setCommandFeedback({
+          show: true,
+          message: 'Speed command confirmed!',
+          loading: false
+        });
         } else {
           setCommandFeedback({
             show: true,
@@ -271,7 +271,7 @@ const DashboardCommands = ({
       });
 
       console.log('Sending restart command');
-      
+
       // Send the command
       await handleCommandSend('RESTART');
       console.log('Command sent successfully');

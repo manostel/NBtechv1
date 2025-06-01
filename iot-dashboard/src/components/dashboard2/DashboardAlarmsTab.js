@@ -154,10 +154,10 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
         onAlarmToggle();
       }
 
-      setNewAlarmDialog(false);
-      setNewAlarm({
+    setNewAlarmDialog(false);
+    setNewAlarm({
         variable_name: '',
-        condition: 'above',
+      condition: 'above',
         threshold: '',
         description: '',
         enabled: true,
@@ -332,9 +332,9 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
               {alarms.map(alarm => {
                 console.log('Rendering alarm:', alarm);
                 return (
-                  <ListItem
+                <ListItem
                     key={alarm.alarm_id}
-                    secondaryAction={
+                  secondaryAction={
                       <Box>
                         <Switch
                           edge="end"
@@ -347,15 +347,15 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
                           onClick={() => handleDeleteAlarm(alarm.alarm_id)}
                           disabled={isLoading}
                         >
-                          <DeleteIcon />
-                        </IconButton>
+                      <DeleteIcon />
+                    </IconButton>
                       </Box>
-                    }
-                  >
-                    <ListItemIcon>
-                      {getSeverityIcon(alarm.severity)}
-                    </ListItemIcon>
-                    <ListItemText
+                  }
+                >
+                  <ListItemIcon>
+                    {getSeverityIcon(alarm.severity)}
+                  </ListItemIcon>
+                  <ListItemText
                       primary={
                         <Typography>
                           {metricsConfig[alarm.variable_name]?.label || alarm.variable_name} {alarm.condition} {alarm.threshold}{metricsConfig[alarm.variable_name]?.unit || ''}
@@ -379,8 +379,8 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
                           </Typography>
                         </Box>
                       }
-                    />
-                  </ListItem>
+                  />
+                </ListItem>
                 );
               })}
             </List>
@@ -455,17 +455,17 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
                   <MenuItem key={key} value={key}>
                     {config.label}
                   </MenuItem>
-                ))}
+              ))}
               </Select>
             </FormControl>
 
             <FormControl fullWidth>
               <InputLabel>Condition</InputLabel>
               <Select
-                value={newAlarm.condition}
-                onChange={(e) => setNewAlarm({ ...newAlarm, condition: e.target.value })}
+              value={newAlarm.condition}
+              onChange={(e) => setNewAlarm({ ...newAlarm, condition: e.target.value })}
                 label="Condition"
-              >
+            >
                 <MenuItem value="above">Above</MenuItem>
                 <MenuItem value="below">Below</MenuItem>
               </Select>

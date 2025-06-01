@@ -426,7 +426,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       console.log('Successfully fetched battery state:', result.battery_state);
       // Only update battery state if it's different
       if (batteryState !== result.battery_state) {
-        setBatteryState(result.battery_state);
+      setBatteryState(result.battery_state);
       }
     } catch (error) {
       console.error('Error fetching battery state:', error);
@@ -1208,12 +1208,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             onClick={onBack}
             sx={{ mr: 2 }}
           >
-            <ArrowBackIcon />
-          </IconButton>
+          <ArrowBackIcon />
+        </IconButton>
           <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Typography variant="h6" component="div">
               {device?.device_name || "Unknown"}
-            </Typography>
+        </Typography>
             <Typography variant="subtitle2" color="text.secondary">
               {device?.device || "N/A"}
             </Typography>
@@ -1224,8 +1224,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             aria-label="settings"
             onClick={handleSettingsOpen}
           >
-            <SettingsIcon />
-          </IconButton>
+          <SettingsIcon />
+        </IconButton>
           <IconButton
             edge="end"
             color="inherit"

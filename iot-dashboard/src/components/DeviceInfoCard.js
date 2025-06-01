@@ -146,14 +146,14 @@ export default function DeviceInfoCard({
             <Box display="flex" justifyContent="center" width="100%" pb={1}>
               {/* Status dot and text */}
               <Box display="flex" alignItems="center" gap={1}>
-                <Box
-                  sx={{
+                  <Box
+                    sx={{
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
                     backgroundColor: getStatusColor(displayStatus),
-                  }}
-                />
+                    }}
+                  />
                 <Typography
                   variant="body2"
                   sx={{
@@ -162,16 +162,16 @@ export default function DeviceInfoCard({
                     lineHeight: 'normal',
                   }}
                 >
-                  {displayStatus}
-                </Typography>
-              </Box>
+                    {displayStatus}
+                  </Typography>
+                </Box>
             </Box>
 
             {/* Indicators row - Battery and Signal */}
             <Box display="flex" alignItems="flex-end" gap={2}>
               <BatteryIndicator value={batteryLevel} batteryState={batteryState} />
               <SignalIndicator value={signalStrength} />
-            </Box>
+                </Box>
 
           </Box>
 
