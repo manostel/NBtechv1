@@ -134,7 +134,7 @@ export default function DeviceInfoCard({
                 Last updated data: {lastOnline || 'N/A'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Last Uptime: {currentUptimeDisplay}
+                Uptime: {currentUptimeDisplay}
               </Typography>
             </Box>
           </Box>
