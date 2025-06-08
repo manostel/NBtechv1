@@ -29,6 +29,8 @@ import {
   FormControlLabel,
   Collapse,
   Tooltip,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import { 
   Settings as SettingsIcon,
@@ -48,6 +50,9 @@ import { Helmet } from 'react-helmet';
 import SettingsDrawer from "./SettingsDrawer";
 import { useCustomTheme } from "./ThemeContext";
 import { useTheme as useMuiTheme } from '@mui/material/styles';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const DEVICES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
@@ -325,6 +330,253 @@ const ConfigureDeviceDialog = React.memo(({
     );
 });
 
+// Fix for default marker icons in Leaflet with React
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Move getDeviceStatus outside the main component
+const getDeviceStatus = (deviceData) => {
+  try {
+    if (!deviceData?.latest_data?.timestamp) {
+      return { status: 'Offline', lastSeen: null };
+    }
+    
+    const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
+    const now = new Date();
+    
+    if (isNaN(lastUpdateTime.getTime())) {
+      return { status: 'Offline', lastSeen: null };
+    }
+    
+    const diffInMinutes = (now - lastUpdateTime) / (1000 * 60);
+    
+    return {
+      status: diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Online' : 'Offline',
+      lastSeen: lastUpdateTime
+    };
+  } catch (error) {
+    console.error('Error calculating device status:', error);
+    return { status: 'Offline', lastSeen: null };
+  }
+};
+
+// Add this new component for the Map View
+const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
+  const theme = useTheme();
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [isSatelliteView, setIsSatelliteView] = useState(false);
+  
+  // Add CSS for popup styling
+  useEffect(() => {
+    // Add custom CSS for popup styling
+    const style = document.createElement('style');
+    style.textContent = `
+      .leaflet-popup-content-wrapper {
+        background-color: ${theme.palette.background.paper} !important;
+        color: ${theme.palette.text.primary} !important;
+      }
+      .leaflet-popup-tip {
+        background-color: ${theme.palette.background.paper} !important;
+      }
+      .leaflet-popup-close-button {
+        color: ${theme.palette.text.primary} !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, [theme.palette.mode]);
+
+  // Mock GPS coordinates for devices (in a real app, these would come from device data)
+  const deviceLocations = useMemo(() => {
+    // Only Serres locations
+    const locations = [
+      [41.0856, 23.5497], // Serres Agricultural Field 1
+      [41.0923, 23.5621], // Serres Agricultural Field 2
+    ];
+
+    return devices.reduce((acc, device, index) => {
+      acc[device.client_id] = locations[index % locations.length];
+      return acc;
+    }, {});
+  }, [devices]);
+
+  const getMarkerColor = (device) => {
+    const status = getDeviceStatus(deviceData[device.client_id]);
+    return status.status === 'Online' 
+      ? theme.palette.mode === 'dark' ? '#66bb6a' : '#4CAF50'  // Lighter green in dark mode
+      : theme.palette.mode === 'dark' ? '#ef5350' : '#F44336'; // Lighter red in dark mode
+  };
+
+  const createCustomIcon = (color) => {
+    const borderColor = theme.palette.mode === 'dark' ? '#424242' : 'white';
+    const shadowColor = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)';
+    const highlightColor = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.3)';
+    
+    return L.divIcon({
+      className: 'custom-icon',
+      html: `<div style="
+        position: relative;
+        width: 32px;
+        height: 32px;
+        transform: translate(-50%, -50%);
+      ">
+        <div style="
+          position: absolute;
+          top: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 18px;
+          height: 18px;
+          background: ${color};
+          border: 2px solid ${borderColor};
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          box-shadow: 0 2px 4px ${shadowColor};
+        "></div>
+      </div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+  };
+
+  const renderMetricValue = (value, metric) => {
+    if (value === undefined || value === null) return 'No data';
+    return value.toString();
+  };
+
+  // List of metrics to exclude from the popup
+  const excludedMetrics = ['status', 'last_seen', 'timestamp', 'client_id', 'device_name', 'user_email'];
+
+  return (
+    <Box sx={{ height: 'calc(100vh - 200px)', width: '100%', position: 'relative' }}>
+      <Box sx={{ 
+        position: 'absolute', 
+        top: 10, 
+        right: 10, 
+        zIndex: 1000,
+        bgcolor: theme.palette.background.paper,
+        borderRadius: 1,
+        boxShadow: theme.shadows[2],
+        p: 1
+      }}>
+        <Button
+          variant={isSatelliteView ? "contained" : "outlined"}
+          size="small"
+          onClick={() => setIsSatelliteView(!isSatelliteView)}
+          sx={{
+            color: theme.palette.mode === 'dark' ? 'white' : 'inherit',
+            borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.23)' : 'inherit',
+            '&:hover': {
+              borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
+            }
+          }}
+        >
+          {isSatelliteView ? 'Satellite Imagery' : 'Street Map'}
+        </Button>
+      </Box>
+      <MapContainer
+        center={[41.0890, 23.5559]}
+        zoom={13}
+        style={{ 
+          height: '100%', 
+          width: '100%',
+          filter: theme.palette.mode === 'dark' ? 'brightness(0.8) contrast(1.2)' : 'none'
+        }}
+      >
+        {isSatelliteView ? (
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://www.esri.com/">Esri</a>'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          />
+        ) : (
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        )}
+        {devices.map((device) => {
+          const deviceInfo = deviceData[device.client_id];
+          const metricsVisibility = deviceInfo?.metrics_visibility || {};
+          const latestData = deviceInfo?.latest_data || {};
+
+          return (
+            <Marker
+              key={device.client_id}
+              position={deviceLocations[device.client_id]}
+              icon={createCustomIcon(getMarkerColor(device))}
+              eventHandlers={{
+                click: () => setSelectedDevice(device),
+              }}
+            >
+              <Popup>
+                <Box sx={{ 
+                  p: 1, 
+                  minWidth: 200,
+                  bgcolor: theme.palette.background.paper,
+                  color: theme.palette.text.primary
+                }}>
+                  <Typography variant="h6" gutterBottom>
+                    {device.device_name}
+                  </Typography>
+                  
+                  {/* Always show battery and signal indicators */}
+                  <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                    <BatteryIndicator 
+                      value={latestData.battery || 0} 
+                      batteryState={deviceInfo?.battery_state}
+                    />
+                    <SignalIndicator 
+                      value={latestData.signal_quality || 0} 
+                    />
+                  </Box>
+
+                  {/* Show metrics based on preferences, excluding status and last_seen */}
+                  {Object.entries(metricsVisibility).map(([metric, isVisible]) => {
+                    if (isVisible && 
+                        !excludedMetrics.includes(metric) && 
+                        metric !== 'battery' && 
+                        metric !== 'signal_quality' &&
+                        latestData[metric] !== undefined) {
+                      return (
+                        <Typography key={metric} variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          {metric.split('_').map(word => 
+                            word.charAt(0).toUpperCase() + word.slice(1)
+                          ).join(' ')}: {renderMetricValue(latestData[metric], metric)}
+                        </Typography>
+                      );
+                    }
+                    return null;
+                  })}
+
+                  <Button 
+                    variant="contained" 
+                    size="small" 
+                    fullWidth 
+                    sx={{ mt: 1 }}
+                    onClick={() => {
+                      onDeviceClick(device);
+                      setSelectedDevice(null);
+                    }}
+                  >
+                    View Details
+                  </Button>
+                </Box>
+              </Popup>
+            </Marker>
+          );
+        })}
+      </MapContainer>
+    </Box>
+  );
+};
+
 export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -367,6 +619,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [deviceStatuses, setDeviceStatuses] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
   // Update the useEffect for periodic updates
   useEffect(() => {
@@ -395,32 +648,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         clearInterval(deviceDataInterval);
     };
 }, [user.email]);
-
-  const getDeviceStatus = (deviceData) => {
-    try {
-        if (!deviceData?.latest_data?.timestamp) {
-            return { status: 'Offline', lastSeen: null };
-        }
-        
-        const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
-        const now = new Date();
-        
-        if (isNaN(lastUpdateTime.getTime())) {
-            return { status: 'Offline', lastSeen: null };
-        }
-        
-        const diffInMinutes = (now - lastUpdateTime) / (1000 * 60);
-        
-        // Consider device offline if no update in last 7 minutes
-        return {
-            status: diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Online' : 'Offline',
-            lastSeen: lastUpdateTime
-        };
-    } catch (error) {
-        console.error('Error calculating device status:', error);
-        return { status: 'Offline', lastSeen: null };
-    }
-  };
 
   const updateDeviceStatus = useCallback((deviceId, newStatus) => {
     setDeviceStatuses(prev => {
@@ -1001,20 +1228,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     }));
   };
 
-  // Add function to render metric value with unit
-  const renderMetricValue = (value, metric) => {
-    const units = {
-      temperature: '°C',
-      humidity: '%',
-      battery_level: '%',
-      signal_strength: '%',
-      // Add more units as needed
-    };
-
-    const unit = units[metric] || '';
-    return `${value}${unit}`;
-  };
-
   const handleMetricsVisibilityChange = (device, metric) => {
     setTempMetricsVisibility(prev => ({
         ...prev,
@@ -1254,433 +1467,415 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     }
   };
 
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
   return (
-    <Box sx={{ 
-        bgcolor: theme.palette.mode === 'dark' ? 'background.default' : 'background.default',
-        minHeight: '100vh',
-        width: '100vw',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        transition: 'all 0.3s ease',
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        zIndex: 1,
-        '&::before': {
-            content: '""',
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: theme.palette.mode === 'dark' ? 'background.default' : 'background.default',
-            transition: 'background-color 0.3s ease',
-            zIndex: -1
-        }
-    }}>
-        <CssBaseline />
-        <AppBar position="static" sx={{ bgcolor: 'background.paper', color: 'text.primary' }}>
+    <Box sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <Helmet>
+        <title>Devices - IoT Dashboard</title>
+      </Helmet>
+      
+      <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            IoT Devices Dashboard
+            Devices
           </Typography>
-          <IconButton
-            color="inherit"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="settings"
-          >
-            <SettingsIcon />
+          <IconButton color="inherit" onClick={toggleTheme}>
+            {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
           </IconButton>
-          <IconButton
-            color="inherit"
-            onClick={handleLogout}
-            aria-label="logout"
-          >
+          <IconButton color="inherit" onClick={handleLogout}>
             <LogoutIcon />
           </IconButton>
         </Toolbar>
       </AppBar>
 
-        <Box sx={{ 
-            p: 3,
-            bgcolor: 'background.default'
-        }}>
-        <Helmet>
-          <title>Devices | IoT Dashboard</title>
-        </Helmet>
-        
-            <Box 
+      <Tabs value={activeTab} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tab label="List View" />
+        <Tab label="Map View" />
+      </Tabs>
+
+      {activeTab === 0 ? (
+        <Box sx={{ p: 2, flexGrow: 1, overflow: 'auto' }}>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              justifyContent: 'space-between',
+              mb: 4,
+              pb: 2,
+              borderBottom: 1,
+              borderColor: 'divider'
+            }}
+          >
+            <Box>
+              <Typography 
+                variant="h4" 
+                gutterBottom={false}
                 sx={{ 
-                    display: 'flex', 
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    alignItems: { xs: 'flex-start', sm: 'center' },
-                    justifyContent: 'space-between',
-                    mb: 4,
-                    pb: 2,
-                    borderBottom: 1,
-                    borderColor: 'divider'
+                  fontWeight: 600,
+                  color: 'primary.main',
+                  mb: 1
                 }}
-            >
-                <Box>
-                    <Typography 
-                        variant="h4" 
-                        gutterBottom={false}
-                        sx={{ 
-                            fontWeight: 600,
-                            color: 'primary.main',
-                            mb: 1
-                        }}
-                    >
-          Your Devices
-        </Typography>
-                    <Box 
-                        sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            gap: 1
-                        }}
-                    >
-                        <Typography 
-                            variant="subtitle1" 
-                            color="text.secondary"
-                            sx={{ 
-                                display: 'flex', 
-                                alignItems: 'center',
-                                gap: 1
-                            }}
-                        >
-                            <Box 
-                                component="span" 
-                                sx={{ 
-                                    width: 8, 
-                                    height: 8, 
-                                    borderRadius: '50%', 
-                                    bgcolor: 'success.main',
-                                    display: 'inline-block'
-                                }} 
-                            />
-                            {user.email}
-        </Typography>
-                    </Box>
-                </Box>
-
-                <Box 
-                    sx={{ 
-                        display: 'flex', 
-                        gap: 1,
-                        mt: { xs: 2, sm: 0 }
-                    }}
-                >
-                    <Button 
-                        variant={sortOrder === "asc" ? "contained" : "outlined"}
-                        size="small"
-                        onClick={() => handleSortChange("asc")}
-                        sx={{ minWidth: 120 }}
-                    >
-                        Sort A-Z
-                    </Button>
-                    <Button 
-                        variant={sortOrder === "desc" ? "contained" : "outlined"}
-                        size="small"
-                        onClick={() => handleSortChange("desc")}
-                        sx={{ minWidth: 120 }}
-                    >
-                        Sort Z-A
-                    </Button>
-                </Box>
-            </Box>
-
-        <Grid container spacing={3}>
-                {isLoading ? (
-                    // Show 6 skeleton cards while loading
-                    Array.from(new Array(6)).map((_, index) => (
-                        <DeviceCardSkeleton key={index} />
-                    ))
-                ) : sortedDevices.length === 0 ? (
-                    // Show empty state
-                    <Grid item xs={12}>
-                        <Paper 
-                            sx={{ 
-                                p: 4, 
-                                textAlign: 'center',
-                                bgcolor: 'background.paper',
-                                color: 'text.primary'
-                            }}
-                        >
-                            <AddIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-                            <Typography variant="h6" gutterBottom>
-                                No Devices Found
-                            </Typography>
-                            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                                Get started by adding your first device
-                            </Typography>
-                            <Button 
-                                variant="contained" 
-                                color="primary"
-                                startIcon={<AddIcon />}
-                                onClick={() => setAddDeviceOpen(true)}
-                            >
-                                Add New Device
-                            </Button>
-                        </Paper>
-                    </Grid>
-                ) : (
-                    // Show devices
-                    <>
-                        {sortedDevices.map((device) => {
-                            // Safely get device data and latest data
-                            const currentDeviceData = deviceData[device.client_id] || {};
-                            const latestData = currentDeviceData.latest_data || {};
-                            const deviceStatus = getDeviceStatus(currentDeviceData);
-
-            return (
-              <Grid item xs={12} sm={6} md={4} key={device.client_id}>
-                <Paper
-                  sx={{
-                    p: 2,
-                                            bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
-                                            cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                                                boxShadow: theme.shadows[6],
-                                                bgcolor: theme.palette.mode === 'dark' 
-                                                    ? 'action.hover' 
-                                                    : 'background.paper'
-                    },
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '4px',
-                      backgroundColor: getStatusColor(deviceStatus.status),
-                      transition: 'background-color 0.3s ease',
-                    }
+              >
+                Your Devices
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  gap: 1
+                }}
+              >
+                <Typography 
+                  variant="subtitle1" 
+                  color="text.secondary"
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    gap: 1
                   }}
-                  onClick={() => handleDeviceClick(device)}
                 >
-                                        {/* Device Header */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="h6">
-                                                {device.device_name || 'Unknown Device'}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        {isUpdating && (
-                            <CircularProgress size={12} sx={{ mr: 1 }} />
-                        )}
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                                                        backgroundColor: getStatusColor(deviceStatus.status)
-                          }}
-                        />
-                        <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus.status) }}>
-                          {deviceStatus.status}
-                          {deviceStatus.status === 'Offline' && deviceStatus.lastSeen && (
-                              <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
-                                  (Last seen: {deviceStatus.lastSeen.toLocaleString()})
-                              </Typography>
-                          )}
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                                        {/* Device ID */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="body2" color="textSecondary">
-                                                ID: {showId[device.client_id] ? device.client_id : '••••••••••'}
-                    </Typography>
-                                            <IconButton 
-                                                size="small" 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowId(prev => ({
-                                                        ...prev,
-                                                        [device.client_id]: !prev[device.client_id]
-                                                    }));
-                                                }}
-                                            >
-                                                {showId[device.client_id] ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                                            </IconButton>
-                  </Box>
-
-                                        {/* Device Type - Updated */}
-                                        {latestData.device && (
-                                            <Typography variant="body2" color="textSecondary" gutterBottom>
-                                                Device Type: {latestData.device}
-                                            </Typography>
-                                        )}
-
-                                        {/* Indicators */}
-                                        <Box sx={{ display: 'flex', gap: 2, my: 2 }}>
-                                            <BatteryIndicator 
-                                              value={Number(latestData.battery) || 0} 
-                                              batteryState={currentDeviceData.battery_state || 'idle'} 
-                                            />
-                                            <SignalIndicator value={Number(latestData.signal_quality) || 0} />
-                  </Box>
-
-                                        {/* Metrics */}
-                                        <Box sx={{ mt: 1 }}>
-                                            {Object.entries(latestData).map(([key, value]) => {
-                                                // Skip if value is null, undefined, or an object
-                                                if (value === null || value === undefined || typeof value === 'object') return null;
-
-                                                // Skip if the metric is in the excluded list
-                                                const excludedFields = [
-                                                    'timestamp',
-                                                    'client_id',
-                                                    'device_name',
-                                                    'user_email',
-                                                    'signal_quality',
-                                                    'battery',
-                                                    'metrics_visibility',
-                                                    'display_order',
-                                                    'device',
-                                                    'device_id',
-                                                    'ClientID',
-                                                    'last_seen',
-                                                    'created_at',
-                                                    'status'
-                                                ];
-                                                if (excludedFields.includes(key)) return null;
-
-                                                // Check if the metric should be visible based on preferences
-                                                const metricsVisibility = currentDeviceData.metrics_visibility || {};
-                                                if (metricsVisibility[key] === false) return null;
-
-                                                // Format the value
-                                                const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
-                                                const unit = key === 'temperature' ? '°C' : key === 'humidity' ? '%' : '';
-
-                                                return (
-                                                    <Typography key={key} variant="body2" color="textSecondary">
-                                                        {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
-                                                    </Typography>
-                                                );
-                                            })}
-                  </Box>
-
-                                        {/* Last Updated */}
-                                        <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1 }}>
-                                            Last Updated: {latestData.timestamp ? 
-                                                new Date(latestData.timestamp).toLocaleString() : 
-                                                'Never'
-                                            }
-                  </Typography>
-
-                                        {/* Actions */}
-                                        <Box sx={{ 
-                      display: 'flex', 
-                                            justifyContent: 'flex-end', 
-                      gap: 1, 
-                      mt: 1,
-                      pt: 1,
-                                            borderTop: `1px solid ${theme.palette.divider}`
-                                        }}>
-                                            <Tooltip title="Configure Metrics">
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleConfigureClick(device);
-                                                    }}
-                                                >
-                                                    <SettingsIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Edit Device">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditClick(device);
-                      }}
-                    >
-                                                    <EditIcon fontSize="small" />
-                    </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Delete Device">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClick(device);
-                      }}
-                    >
-                                                    <DeleteIcon fontSize="small" />
-                    </IconButton>
-                                            </Tooltip>
-                  </Box>
-                </Paper>
-              </Grid>
-            );
-          })}
-
-          {/* Add Device Card */}
-          <Grid item xs={12} sm={6} md={4}>
-            <Paper
-              sx={{
-                p: 2,
-                                    bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                                        boxShadow: theme.shadows[6],
-                },
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '300px',
-                border: '2px dashed',
-                borderColor: 'primary.main',
-                '&:hover': {
-                  borderColor: 'primary.dark',
-                  bgcolor: 'action.hover'
-                }
-              }}
-              onClick={() => setAddDeviceOpen(true)}
-            >
-              <Box sx={{ textAlign: 'center' }}>
-                <AddIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                <Typography variant="h6" color="primary">
-                  Add New Device
-                </Typography>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                  Click to register a new device
+                  <Box 
+                    component="span" 
+                    sx={{ 
+                      width: 8, 
+                      height: 8, 
+                      borderRadius: '50%', 
+                      bgcolor: 'success.main',
+                      display: 'inline-block'
+                    }} 
+                  />
+                  {user.email}
                 </Typography>
               </Box>
-            </Paper>
-          </Grid>
-                    </>
-                )}
-        </Grid>
-      </Box>
+            </Box>
 
-      {/* Add Device Dialog */}
-        <Dialog 
-            open={addDeviceOpen} 
-            onClose={() => setAddDeviceOpen(false)}
-            PaperProps={{
-                sx: {
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                gap: 1,
+                mt: { xs: 2, sm: 0 }
+              }}
+            >
+              <Button 
+                variant={sortOrder === "asc" ? "contained" : "outlined"}
+                size="small"
+                onClick={() => handleSortChange("asc")}
+                sx={{ minWidth: 120 }}
+              >
+                Sort A-Z
+              </Button>
+              <Button 
+                variant={sortOrder === "desc" ? "contained" : "outlined"}
+                size="small"
+                onClick={() => handleSortChange("desc")}
+                sx={{ minWidth: 120 }}
+              >
+                Sort Z-A
+              </Button>
+            </Box>
+          </Box>
+
+          <Grid container spacing={3}>
+            {isLoading ? (
+              // Show 6 skeleton cards while loading
+              Array.from(new Array(6)).map((_, index) => (
+                <DeviceCardSkeleton key={index} />
+              ))
+            ) : sortedDevices.length === 0 ? (
+              // Show empty state
+              <Grid item xs={12}>
+                <Paper 
+                  sx={{ 
+                    p: 4, 
+                    textAlign: 'center',
                     bgcolor: 'background.paper',
                     color: 'text.primary'
-                }
-            }}
-        >
+                  }}
+                >
+                  <AddIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+                  <Typography variant="h6" gutterBottom>
+                    No Devices Found
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                    Get started by adding your first device
+                  </Typography>
+                  <Button 
+                    variant="contained" 
+                    color="primary"
+                    startIcon={<AddIcon />}
+                    onClick={() => setAddDeviceOpen(true)}
+                  >
+                    Add New Device
+                  </Button>
+                </Paper>
+              </Grid>
+            ) : (
+              // Show devices
+              <>
+                {sortedDevices.map((device) => {
+                  // Safely get device data and latest data
+                  const currentDeviceData = deviceData[device.client_id] || {};
+                  const latestData = currentDeviceData.latest_data || {};
+                  const deviceStatus = getDeviceStatus(currentDeviceData);
+
+                  return (
+                    <Grid item xs={12} sm={6} md={4} key={device.client_id}>
+                      <Paper
+                        sx={{
+                          p: 2,
+                          bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: theme.shadows[6],
+                            bgcolor: theme.palette.mode === 'dark' 
+                              ? 'action.hover' 
+                              : 'background.paper'
+                          },
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 1,
+                          position: 'relative',
+                          overflow: 'hidden',
+                          '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '4px',
+                            backgroundColor: getStatusColor(deviceStatus.status),
+                            transition: 'background-color 0.3s ease',
+                          }
+                        }}
+                        onClick={() => handleDeviceClick(device)}
+                      >
+                        {/* Device Header */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="h6">
+                            {device.device_name || 'Unknown Device'}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            {isUpdating && (
+                              <CircularProgress size={12} sx={{ mr: 1 }} />
+                            )}
+                            <Box
+                              sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                backgroundColor: getStatusColor(deviceStatus.status)
+                              }}
+                            />
+                            <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus.status) }}>
+                              {deviceStatus.status}
+                              {deviceStatus.status === 'Offline' && deviceStatus.lastSeen && (
+                                <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                                  (Last seen: {deviceStatus.lastSeen.toLocaleString()})
+                                </Typography>
+                              )}
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        {/* Device ID */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          <Typography variant="body2" color="textSecondary">
+                            ID: {showId[device.client_id] ? device.client_id : '••••••••••'}
+                          </Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowId(prev => ({
+                                ...prev,
+                                [device.client_id]: !prev[device.client_id]
+                              }));
+                            }}
+                          >
+                            {showId[device.client_id] ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                          </IconButton>
+                        </Box>
+
+                        {/* Device Type - Updated */}
+                        {latestData.device && (
+                          <Typography variant="body2" color="textSecondary" gutterBottom>
+                            Device Type: {latestData.device}
+                          </Typography>
+                        )}
+
+                        {/* Indicators */}
+                        <Box sx={{ display: 'flex', gap: 2, my: 2 }}>
+                          <BatteryIndicator 
+                            value={Number(latestData.battery) || 0} 
+                            batteryState={currentDeviceData.battery_state || 'idle'} 
+                          />
+                          <SignalIndicator value={Number(latestData.signal_quality) || 0} />
+                        </Box>
+
+                        {/* Metrics */}
+                        <Box sx={{ mt: 1 }}>
+                          {Object.entries(latestData).map(([key, value]) => {
+                            // Skip if value is null, undefined, or an object
+                            if (value === null || value === undefined || typeof value === 'object') return null;
+
+                            // Skip if the metric is in the excluded list
+                            const excludedFields = [
+                              'timestamp',
+                              'client_id',
+                              'device_name',
+                              'user_email',
+                              'signal_quality',
+                              'battery',
+                              'metrics_visibility',
+                              'display_order',
+                              'device',
+                              'device_id',
+                              'ClientID',
+                              'last_seen',
+                              'created_at',
+                              'status'
+                            ];
+                            if (excludedFields.includes(key)) return null;
+
+                            // Check if the metric should be visible based on preferences
+                            const metricsVisibility = currentDeviceData.metrics_visibility || {};
+                            if (metricsVisibility[key] === false) return null;
+
+                            // Format the value
+                            const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
+                            const unit = key === 'temperature' ? '°C' : key === 'humidity' ? '%' : '';
+
+                            return (
+                              <Typography key={key} variant="body2" color="textSecondary">
+                                {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
+                              </Typography>
+                            );
+                          })}
+                        </Box>
+
+                        {/* Last Updated */}
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1 }}>
+                          Last Updated: {latestData.timestamp ? 
+                            new Date(latestData.timestamp).toLocaleString() : 
+                            'Never'
+                          }
+                        </Typography>
+
+                        {/* Actions */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          justifyContent: 'flex-end', 
+                          gap: 1, 
+                          mt: 1,
+                          pt: 1,
+                          borderTop: `1px solid ${theme.palette.divider}`
+                        }}>
+                          <Tooltip title="Configure Metrics">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleConfigureClick(device);
+                              }}
+                            >
+                              <SettingsIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Edit Device">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(device);
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete Device">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(device);
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  );
+                })}
+
+                {/* Add Device Card */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: theme.shadows[6],
+                      },
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: '300px',
+                      border: '2px dashed',
+                      borderColor: 'primary.main',
+                      '&:hover': {
+                        borderColor: 'primary.dark',
+                        bgcolor: 'action.hover'
+                      }
+                    }}
+                    onClick={() => setAddDeviceOpen(true)}
+                  >
+                    <Box sx={{ textAlign: 'center' }}>
+                      <AddIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                      <Typography variant="h6" color="primary">
+                        Add New Device
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                        Click to register a new device
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              </>
+            )}
+          </Grid>
+        </Box>
+      ) : (
+        <MapView 
+          devices={devices} 
+          deviceData={deviceData} 
+          onDeviceClick={handleDeviceClick}
+          getDeviceStatus={getDeviceStatus}
+        />
+      )}
+
+      {/* Add Device Dialog */}
+      <Dialog 
+        open={addDeviceOpen} 
+        onClose={() => setAddDeviceOpen(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            color: 'text.primary'
+          }
+        }}
+      >
         <DialogTitle>Add New Device</DialogTitle>
         <DialogContent>
           <TextField
@@ -1690,21 +1885,21 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             fullWidth
             value={newDeviceName}
             onChange={(e) => setNewDeviceName(e.target.value)}
-                    sx={{ mb: 2 }}
-                />
+            sx={{ mb: 2 }}
+          />
           <TextField
             margin="dense"
             label="Client ID"
             fullWidth
-                    value={newClientId}
-                    onChange={(e) => setNewClientId(e.target.value)}
+            value={newClientId}
+            onChange={(e) => setNewClientId(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
-                <Button onClick={() => setAddDeviceOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddDevice} variant="contained" color="primary">
-                    Add Device
-                </Button>
+          <Button onClick={() => setAddDeviceOpen(false)}>Cancel</Button>
+          <Button onClick={handleAddDevice} variant="contained" color="primary">
+            Add Device
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -1712,17 +1907,17 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
-            PaperProps={{
-                sx: {
-                    bgcolor: 'background.paper',
-                    color: 'text.primary'
-                }
-            }}
-        >
-            <DialogTitle>Delete Device</DialogTitle>
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            color: 'text.primary'
+          }
+        }}
+      >
+        <DialogTitle>Delete Device</DialogTitle>
         <DialogContent>
-                <DialogContentText>
-                    Are you sure you want to delete this device? This action cannot be undone.
+          <DialogContentText>
+            Are you sure you want to delete this device? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -1736,7 +1931,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       <SettingsDrawer 
         open={settingsOpen} 
         onClose={() => setSettingsOpen(false)}
-            user={user}
+        user={user}
       />
 
       {/* Snackbar for notifications */}
@@ -1744,144 +1939,144 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-            <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
           {snackbar.message}
         </Alert>
       </Snackbar>
 
-        {/* Edit Device Dialog */}
-        <Dialog 
-            open={openEditDialog} 
-            onClose={handleCloseEditDialog}
-        >
-            <DialogTitle>Edit Device</DialogTitle>
-            <DialogContent>
-                <DialogContentText>
-                    Update device name or client ID.
-                </DialogContentText>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    label="Device Name"
-                    type="text"
-                    fullWidth
-                    variant="outlined"
-                    value={editDeviceName}
-                    onChange={(e) => setEditDeviceName(e.target.value)}
-                    sx={{ mb: 2 }}
-                />
-                <TextField
-                    margin="dense"
-                    label="Client ID"
-                    type="text"
-                    fullWidth
-                    variant="outlined"
-                    value={newClientId || editingDevice?.client_id || ''}
-                    onChange={handleClientIdChange}
-                    onBlur={handleClientIdBlur}
-                    sx={{ mb: 2 }}
-                    helperText="Warning: Changing Client ID will create a new device and delete the old one"
-                />
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={handleCloseEditDialog}>Cancel</Button>
-                <Button onClick={handleSave} variant="contained" color="primary">
-                    Save
-                </Button>
-            </DialogActions>
-        </Dialog>
+      {/* Edit Device Dialog */}
+      <Dialog 
+        open={openEditDialog} 
+        onClose={handleCloseEditDialog}
+      >
+        <DialogTitle>Edit Device</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Update device name or client ID.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Device Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={editDeviceName}
+            onChange={(e) => setEditDeviceName(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            label="Client ID"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={newClientId || editingDevice?.client_id || ''}
+            onChange={handleClientIdChange}
+            onBlur={handleClientIdBlur}
+            sx={{ mb: 2 }}
+            helperText="Warning: Changing Client ID will create a new device and delete the old one"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditDialog}>Cancel</Button>
+          <Button onClick={handleSave} variant="contained" color="primary">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        {/* Add Client ID Change Warning Dialog */}
-        <Dialog 
-            open={clientIdWarningOpen} 
-            onClose={() => setClientIdWarningOpen(false)}
-            PaperProps={{
-                sx: {
-                    bgcolor: 'background.paper',
-                    color: 'text.primary'
-                }
-            }}
-        >
-            <DialogTitle>Warning: Changing Client ID</DialogTitle>
-            <DialogContent>
-                <DialogContentText>
-                    You are about to change the device's Client ID from "{editingDevice?.client_id}" to "{newClientId}". 
-                    This action will:
-                </DialogContentText>
-                <Box component="ul" sx={{ mt: 1, mb: 2 }}>
-                    <Box component="li">
-                        <DialogContentText>
-                            Create a new device entry with the new Client ID
-                        </DialogContentText>
-                    </Box>
-                    <Box component="li">
-                        <DialogContentText>
-                            Delete the old device entry
-                        </DialogContentText>
-                    </Box>
-                    <Box component="li">
-                        <DialogContentText>
-                            Potentially affect any existing data or connections
-                        </DialogContentText>
-                    </Box>
-                </Box>
-                <DialogContentText>
-                    Are you sure you want to proceed with this change?
-                </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={() => setClientIdWarningOpen(false)}>Cancel</Button>
-                <Button onClick={handleClientIdChangeConfirm} color="warning" variant="contained">
-                    Proceed with Change
-                </Button>
-            </DialogActions>
-        </Dialog>
+      {/* Add Client ID Change Warning Dialog */}
+      <Dialog 
+        open={clientIdWarningOpen} 
+        onClose={() => setClientIdWarningOpen(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            color: 'text.primary'
+          }
+        }}
+      >
+        <DialogTitle>Warning: Changing Client ID</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            You are about to change the device's Client ID from "{editingDevice?.client_id}" to "{newClientId}". 
+            This action will:
+          </DialogContentText>
+          <Box component="ul" sx={{ mt: 1, mb: 2 }}>
+            <Box component="li">
+              <DialogContentText>
+                Create a new device entry with the new Client ID
+              </DialogContentText>
+            </Box>
+            <Box component="li">
+              <DialogContentText>
+                Delete the old device entry
+              </DialogContentText>
+            </Box>
+            <Box component="li">
+              <DialogContentText>
+                Potentially affect any existing data or connections
+              </DialogContentText>
+            </Box>
+          </Box>
+          <DialogContentText>
+            Are you sure you want to proceed with this change?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClientIdWarningOpen(false)}>Cancel</Button>
+          <Button onClick={handleClientIdChangeConfirm} color="warning" variant="contained">
+            Proceed with Change
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        <ClientIdConfirmDialog />
+      <ClientIdConfirmDialog />
 
-        {/* Configure Device Dialog */}
-        <Dialog
-            open={configureDialogOpen}
-            onClose={() => setConfigureDialogOpen(false)}
-            PaperProps={{
-                sx: {
-                    bgcolor: 'background.paper',
-                    color: 'text.primary'
-                }
-            }}
-        >
-            <DialogTitle>Configure Device</DialogTitle>
-            <DialogContent>
-                {/* Implement the logic to configure the device */}
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={() => setConfigureDialogOpen(false)}>Cancel</Button>
-                <Button onClick={() => {
-                    // Handle save configuration
-                    setConfigureDialogOpen(false);
-                    showSnackbar('Device configuration updated successfully', 'success');
-                }} variant="contained" color="primary">
-                    Save
-                </Button>
-            </DialogActions>
-        </Dialog>
+      {/* Configure Device Dialog */}
+      <Dialog
+        open={configureDialogOpen}
+        onClose={() => setConfigureDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            color: 'text.primary'
+          }
+        }}
+      >
+        <DialogTitle>Configure Device</DialogTitle>
+        <DialogContent>
+          {/* Implement the logic to configure the device */}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfigureDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => {
+            // Handle save configuration
+            setConfigureDialogOpen(false);
+            showSnackbar('Device configuration updated successfully', 'success');
+          }} variant="contained" color="primary">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        {/* Configure Device Dialog */}
-        {configureDialogOpen && configuringDevice && (
-            <ConfigureDeviceDialog
-                device={configuringDevice}
-                onClose={() => {
-                    setConfigureDialogOpen(false);
-                    setConfiguringDevice(null);
-                }}
-                deviceData={deviceData}
-                setDeviceData={setDeviceData}
-                user={user}
-                showSnackbar={showSnackbar}
-            />
-        )}
+      {/* Configure Device Dialog */}
+      {configureDialogOpen && configuringDevice && (
+        <ConfigureDeviceDialog
+          device={configuringDevice}
+          onClose={() => {
+            setConfigureDialogOpen(false);
+            setConfiguringDevice(null);
+          }}
+          deviceData={deviceData}
+          setDeviceData={setDeviceData}
+          user={user}
+          showSnackbar={showSnackbar}
+        />
+      )}
 
       {/* Logout Confirmation Dialog */}
       <Dialog
@@ -1903,7 +2098,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           </Button>
         </DialogActions>
       </Dialog>
-
     </Box>
   );
 } 
