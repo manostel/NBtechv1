@@ -395,10 +395,13 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
 
   // Mock GPS coordinates for devices (in a real app, these would come from device data)
   const deviceLocations = useMemo(() => {
-    // Only Serres locations
+    // Multiple device locations
     const locations = [
-      [41.0856, 23.5497], // Serres Agricultural Field 1
-      [41.0923, 23.5621], // Serres Agricultural Field 2
+      [37.9838, 23.7275], // Athens Center
+      [37.9785, 23.7167], // Syntagma Square
+      [37.9677, 23.7281], // Acropolis
+      [37.9750, 23.7411], // Omonia Square
+      [37.9715, 23.7256], // Monastiraki
     ];
 
     return devices.reduce((acc, device, index) => {
@@ -406,6 +409,36 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
       return acc;
     }, {});
   }, [devices]);
+
+  // Calculate center point based on device locations
+  const mapCenter = useMemo(() => {
+    const locations = Object.values(deviceLocations);
+    if (locations.length === 0) return [37.7461, 22.2372]; // Default to Peloponnese center if no devices
+
+    // Calculate average latitude and longitude
+    const sumLat = locations.reduce((sum, [lat]) => sum + lat, 0);
+    const sumLng = locations.reduce((sum, [_, lng]) => sum + lng, 0);
+    return [sumLat / locations.length, sumLng / locations.length];
+  }, [deviceLocations]);
+
+  // Calculate appropriate zoom level based on device spread
+  const calculateZoom = useMemo(() => {
+    const locations = Object.values(deviceLocations);
+    if (locations.length <= 1) return 9; // Default zoom if 0 or 1 device
+
+    // Calculate the spread of coordinates
+    const lats = locations.map(([lat]) => lat);
+    const lngs = locations.map(([_, lng]) => lng);
+    const latSpread = Math.max(...lats) - Math.min(...lats);
+    const lngSpread = Math.max(...lngs) - Math.min(...lngs);
+    const maxSpread = Math.max(latSpread, lngSpread);
+
+    // Adjust zoom level based on spread
+    if (maxSpread > 1) return 7;
+    if (maxSpread > 0.5) return 8;
+    if (maxSpread > 0.1) return 9;
+    return 10;
+  }, [deviceLocations]);
 
   const getMarkerColor = (device) => {
     const status = getDeviceStatus(deviceData[device.client_id]);
@@ -482,8 +515,8 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
         </Button>
       </Box>
       <MapContainer
-        center={[41.0890, 23.5559]}
-        zoom={13}
+        center={mapCenter}
+        zoom={calculateZoom}
         style={{ 
           height: '100%', 
           width: '100%',
@@ -1477,21 +1510,51 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         <title>Devices - IoT Dashboard</title>
       </Helmet>
       
-      <AppBar position="static">
+      <AppBar position="static" color="default" elevation={1}>
         <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Devices
-          </Typography>
-          <IconButton color="inherit" onClick={toggleTheme}>
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Typography variant="h6" component="div">
+              Devices
+            </Typography>
+            <Typography variant="subtitle2" color="text.secondary">
+              {user.email}
+            </Typography>
+          </Box>
+          <IconButton
+            edge="end"
+            color="inherit"
+            aria-label="theme"
+            onClick={toggleTheme}
+            sx={{ ml: 1 }}
+          >
             {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
           </IconButton>
-          <IconButton color="inherit" onClick={handleLogout}>
+          <IconButton
+            edge="end"
+            color="inherit"
+            aria-label="logout"
+            onClick={handleLogout}
+            sx={{ ml: 1 }}
+          >
             <LogoutIcon />
           </IconButton>
         </Toolbar>
       </AppBar>
 
-      <Tabs value={activeTab} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      <Tabs 
+        value={activeTab} 
+        onChange={handleTabChange} 
+        variant="standard"
+        sx={{
+          borderBottom: 1,
+          borderColor: 'divider',
+          '& .MuiTab-root': {
+            minWidth: 'auto',
+            px: 2,
+            py: 1.5
+          }
+        }}
+      >
         <Tab label="List View" />
         <Tab label="Map View" />
       </Tabs>
@@ -1510,49 +1573,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
               borderColor: 'divider'
             }}
           >
-            <Box>
-              <Typography 
-                variant="h4" 
-                gutterBottom={false}
-                sx={{ 
-                  fontWeight: 600,
-                  color: 'primary.main',
-                  mb: 1
-                }}
-              >
-                Your Devices
-              </Typography>
-              <Box 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center',
-                  gap: 1
-                }}
-              >
-                <Typography 
-                  variant="subtitle1" 
-                  color="text.secondary"
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center',
-                    gap: 1
-                  }}
-                >
-                  <Box 
-                    component="span" 
-                    sx={{ 
-                      width: 8, 
-                      height: 8, 
-                      borderRadius: '50%', 
-                      bgcolor: 'success.main',
-                      display: 'inline-block'
-                    }} 
-                  />
-                  {user.email}
-                </Typography>
-              </Box>
-            </Box>
-
             <Box 
               sx={{ 
                 display: 'flex', 
