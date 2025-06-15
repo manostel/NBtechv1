@@ -123,9 +123,13 @@ function TabPanel({ children, value, index, ...other }) {
       id={`dashboard-tabpanel-${index}`}
       aria-labelledby={`dashboard-tab-${index}`}
       {...other}
+      style={{
+        height: '100%',
+        overflow: 'auto'
+      }}
     >
       {value === index && (
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 1.5 }}>
           {children}
         </Box>
       )}
@@ -1264,9 +1268,15 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         maxWidth={false} 
         disableGutters 
         sx={{ 
-          p: { xs: 2, sm: 3 },
+          p: { xs: 1, sm: 2 },
           flexGrow: 1,
-          width: '100%'
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          '& > *': {
+            maxWidth: '1200px',
+            mx: 'auto'
+          }
         }}
       >
         <DeviceInfoCard
@@ -1286,68 +1296,114 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         />
 
         {/* Tabs */}
-        <Tabs
-          value={selectedTab}
-          onChange={handleTabChange}
-          variant={isMobile ? "fullWidth" : "standard"}
-          sx={{
-            borderBottom: 1,
-            borderColor: 'divider',
-            '& .MuiTab-root': {
-              minWidth: 'auto',
-              px: 2,
-              py: 1.5
-            }
-          }}
-        >
-          <Tab 
-            label="Overview" 
-            icon={<DashboardIcon />} 
-            iconPosition="start" 
-            {...a11yProps(0)}
-          />
-          <Tab 
-            label="Charts" 
-            icon={<ShowChartIcon />} 
-            iconPosition="start" 
-            {...a11yProps(1)}
-          />
-          <Tab 
-            label="Statistics" 
-            icon={<TimelineIcon />} 
-            iconPosition="start" 
-            {...a11yProps(2)}
-          />
-          <Tab 
-            label="Commands" 
-            icon={<BuildIcon />} 
-            iconPosition="start" 
-            {...a11yProps(3)}
-          />
-          <Tab 
-            label="Alarms" 
-            icon={<WarningIcon />} 
-            iconPosition="start" 
-            {...a11yProps(4)}
-          />
-        </Tabs>
+        <Box sx={{ 
+          borderBottom: 1, 
+          borderColor: 'divider',
+          position: 'relative',
+          bgcolor: 'background.paper',
+          zIndex: 1
+        }}>
+          <Tabs
+            value={selectedTab}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+            sx={{
+              '& .MuiTab-root': {
+                minWidth: 'auto',
+                px: 1.5,
+                py: 1,
+                fontSize: '0.875rem',
+                transition: 'all 0.3s ease',
+                '& .MuiSvgIcon-root': {
+                  fontSize: '1.25rem',
+                  mr: 0.5,
+                  transition: 'all 0.3s ease'
+                },
+                '&.Mui-selected': {
+                  transform: 'scale(1.05)',
+                  '& .MuiSvgIcon-root': {
+                    transform: 'scale(1.1)'
+                  }
+                }
+              },
+              '& .MuiTabs-scrollButtons': {
+                width: 32,
+                height: 32,
+                '&.Mui-disabled': {
+                  opacity: 0.3
+                }
+              },
+              '& .MuiTabs-indicator': {
+                transition: 'all 0.3s ease'
+              }
+            }}
+          >
+            <Tab 
+              label="Overview" 
+              icon={<DashboardIcon />} 
+              iconPosition="start" 
+              {...a11yProps(0)}
+            />
+            <Tab 
+              label="Charts" 
+              icon={<ShowChartIcon />} 
+              iconPosition="start" 
+              {...a11yProps(1)}
+            />
+            <Tab 
+              label="Statistics" 
+              icon={<TimelineIcon />} 
+              iconPosition="start" 
+              {...a11yProps(2)}
+            />
+            <Tab 
+              label="Commands" 
+              icon={<BuildIcon />} 
+              iconPosition="start" 
+              {...a11yProps(3)}
+            />
+            <Tab 
+              label="Alarms" 
+              icon={<WarningIcon />} 
+              iconPosition="start" 
+              {...a11yProps(4)}
+            />
+          </Tabs>
+        </Box>
 
         {/* Tab Content */}
-        <TabPanel value={selectedTab} index={0}>
-          {renderTabContent(selectedTab)}
-        </TabPanel>
-        <TabPanel value={selectedTab} index={1}>
-          {renderTabContent(selectedTab)}
-        </TabPanel>
-        <TabPanel value={selectedTab} index={2}>
-          {renderTabContent(selectedTab)}
-        </TabPanel>
-        <TabPanel value={selectedTab} index={3}>
-          {renderTabContent(selectedTab)}
-        </TabPanel>
-        <TabPanel value={selectedTab} index={4}>
-          {renderTabContent(selectedTab)}
-        </TabPanel>
+        <Box sx={{ 
+          mt: 2,
+          height: 'calc(100% - 120px)',
+          overflow: 'hidden',
+          position: 'relative'
+        }}>
+          <Box sx={{
+            display: 'flex',
+            width: '500%',
+            height: '100%',
+            transform: `translateX(-${selectedTab * 20}%)`,
+            transition: 'transform 0.3s ease-in-out'
+          }}>
+            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
+              {renderTabContent(0)}
+            </Box>
+            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
+              {renderTabContent(1)}
+            </Box>
+            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
+              {renderTabContent(2)}
+            </Box>
+            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
+              {renderTabContent(3)}
+            </Box>
+            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
+              {renderTabContent(4)}
+            </Box>
+          </Box>
+        </Box>
       </Container>
 
       <Snackbar

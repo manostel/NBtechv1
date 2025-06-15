@@ -372,16 +372,13 @@ const DashboardChartsTab = ({
   };
 
   const renderCharts = () => {
-    // If we have data, show charts for the selected variables
     if (metricsData?.data && metricsData.data.length > 0) {
-      // Get the variables that actually exist in the data
       const dataVariables = Object.keys(metricsData.data[0]).filter(key => key !== 'timestamp');
       
-      // Only render charts for variables that exist in the data
       if (combinedView) {
         return (
           <Grid item xs={12}>
-            <Paper sx={{ p: 3, height: '400px', bgcolor: theme.palette.background.paper }}>
+            <Paper sx={{ p: 1.5, height: '300px', bgcolor: theme.palette.background.paper }}>
               <Box sx={{ height: '100%' }}>
                 {renderCombinedChart(metricsData.data)}
               </Box>
@@ -401,12 +398,12 @@ const DashboardChartsTab = ({
           if (!chart) return null;
 
           return (
-            <Grid item xs={12} key={key}>
-              <Paper sx={{ p: 3, height: '400px', bgcolor: theme.palette.background.paper }}>
-                <Typography variant="h6" gutterBottom>
+            <Grid item xs={12} sm={6} key={key}>
+              <Paper sx={{ p: 1.5, height: '300px', bgcolor: theme.palette.background.paper }}>
+                <Typography variant="subtitle2" gutterBottom>
                   {config.label} ({config.unit})
                 </Typography>
-                <Box sx={{ height: 'calc(100% - 40px)' }}>
+                <Box sx={{ height: 'calc(100% - 24px)' }}>
                   {chart}
                 </Box>
               </Paper>
@@ -419,11 +416,10 @@ const DashboardChartsTab = ({
       }
     }
 
-    // If we don't have any data, show the "No data" message
     return (
       <Grid item xs={12}>
-        <Paper sx={{ p: 3, textAlign: 'center', bgcolor: theme.palette.background.paper }}>
-          <Typography variant="h6" color="text.secondary">
+        <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: theme.palette.background.paper }}>
+          <Typography variant="subtitle2" color="text.secondary">
             No data available. Please select variables and click Apply to fetch data.
           </Typography>
         </Paper>
@@ -432,14 +428,15 @@ const DashboardChartsTab = ({
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 1.5 }}>
       <Box sx={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: 2,
-        mb: 3 
+        gap: 1.5,
+        mb: 2,
+        flexWrap: 'wrap'
       }}>
-        <Box sx={{ flex: 1 }}>
+        <Box sx={{ flex: 1, minWidth: '200px' }}>
           <SharedControls
             selectedVariables={selectedVariables}
             availableVariables={availableVariables}
@@ -461,7 +458,7 @@ const DashboardChartsTab = ({
           label="Combined View"
           sx={{
             m: 0,
-            height: '40px',
+            height: '32px',
             alignItems: 'center',
             '& .MuiFormControlLabel-label': {
               color: theme.palette.text.secondary,
@@ -470,7 +467,7 @@ const DashboardChartsTab = ({
           }}
         />
       </Box>
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {renderCharts()}
       </Grid>
     </Box>

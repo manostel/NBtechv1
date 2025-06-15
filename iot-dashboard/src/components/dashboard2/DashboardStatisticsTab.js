@@ -89,16 +89,18 @@ const DashboardStatisticsTab = ({
   );
 
   return (
-    <Box sx={{ p: 3 }}>
-      <SharedControls
-        selectedVariables={selectedVariables}
-        availableVariables={availableVariables}
-        onVariableChange={onVariableChange}
-        timeRange={timeRange}
-        onTimeRangeChange={onTimeRangeChange}
-        onApply={onApply}
-      />
-      <Grid container spacing={2}>
+    <Box sx={{ p: 1.5 }}>
+      <Box sx={{ mb: 1.5 }}>
+        <SharedControls
+          selectedVariables={selectedVariables}
+          availableVariables={availableVariables}
+          onVariableChange={onVariableChange}
+          timeRange={timeRange}
+          onTimeRangeChange={onTimeRangeChange}
+          onApply={onApply}
+        />
+      </Box>
+      <Grid container spacing={1.5}>
         {selectedVariables.map((key) => {
           const config = metricsConfig[key];
           if (!config) return null;
@@ -108,11 +110,11 @@ const DashboardStatisticsTab = ({
 
           return (
             <Grid item xs={12} key={key}>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>
+              <Box sx={{ mb: 1.5 }}>
+                <Typography variant="subtitle2" gutterBottom>
                   {config.label}
                 </Typography>
-                <Grid container spacing={2}>
+                <Grid container spacing={1}>
                   <Grid item xs={12} sm={6} md={3}>
                     <StatCard
                       title="Average"
@@ -150,7 +152,7 @@ const DashboardStatisticsTab = ({
                     />
                   </Grid>
                 </Grid>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+                <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5, display: 'block' }}>
                   Based on {stats.count} data points
                 </Typography>
               </Box>

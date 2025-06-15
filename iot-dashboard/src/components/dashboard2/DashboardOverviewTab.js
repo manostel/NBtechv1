@@ -97,37 +97,46 @@ const DashboardOverviewTab = ({
   }
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 1.5 }}>
       {/* Metrics Title and Variable Selector */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <ShowChartIcon sx={{ color: 'success.main' }} />
-          <Typography variant="h6">Metrics</Typography>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 2,
+        flexWrap: 'wrap',
+        gap: 1
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <ShowChartIcon sx={{ color: 'success.main', fontSize: '1.25rem' }} />
+          <Typography variant="subtitle1">Metrics</Typography>
         </Box>
-      <VariableSelector
-        variables={availableVariables}
-        selectedVariables={selectedVariables}
-        onVariableChange={onVariableChange}
+        <VariableSelector
+          variables={availableVariables}
+          selectedVariables={selectedVariables}
+          onVariableChange={onVariableChange}
           showTitle={false}
-      />
+        />
       </Box>
 
       {/* Overview Tiles */}
-      <Box sx={{ mt: 3 }}>
+      <Box sx={{ mt: 2 }}>
         <OverviewTiles
           metricsData={metricsData}
           metricsConfig={metricsConfig}
           selectedVariables={selectedVariables}
           isLoading={isLoading}
           triggeredAlarms={triggeredAlarms}
-              />
+        />
       </Box>
 
       {/* Device State Display */}
-      <DeviceStateDisplay
-        deviceState={deviceState}
-        isLoading={isLoading}
-      />
+      <Box sx={{ mt: 2 }}>
+        <DeviceStateDisplay
+          deviceState={deviceState}
+          isLoading={isLoading}
+        />
+      </Box>
     </Box>
   );
 };
