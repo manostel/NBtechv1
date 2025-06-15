@@ -74,7 +74,8 @@ import {
   Timeline as TimelineIcon,
   Assessment as AssessmentIcon,
   Build as BuildIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  Bluetooth as BluetoothIcon
 } from '@mui/icons-material';
 import DashboardHeader from "./dashboard2/DashboardHeader";
 import DashboardContent from "./dashboard2/DashboardContent";

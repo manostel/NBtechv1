@@ -43,6 +43,7 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   ShowChart as ShowChartIcon,
+  Bluetooth as BluetoothIcon,
 } from '@mui/icons-material';
 import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
@@ -53,6 +54,7 @@ import { useTheme as useMuiTheme } from '@mui/material/styles';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import BluetoothControl from './BluetoothControl';
 
 const DEVICES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
@@ -369,6 +371,7 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
   const theme = useTheme();
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [isSatelliteView, setIsSatelliteView] = useState(false);
+  const [selectedDeviceForBluetooth, setSelectedDeviceForBluetooth] = useState(null);
   
   // Add CSS for popup styling
   useEffect(() => {
@@ -606,6 +609,14 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
           );
         })}
       </MapContainer>
+
+      {/* Bluetooth Configuration Dialog */}
+      {selectedDeviceForBluetooth && (
+        <BluetoothControl
+          device={selectedDeviceForBluetooth}
+          onClose={() => setSelectedDeviceForBluetooth(null)}
+        />
+      )}
     </Box>
   );
 };
@@ -653,6 +664,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [deviceStatuses, setDeviceStatuses] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedDeviceForBluetooth, setSelectedDeviceForBluetooth] = useState(null);
 
   // Update the useEffect for periodic updates
   useEffect(() => {
@@ -1680,7 +1692,17 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                           <Typography variant="h6">
                             {device.device_name || 'Unknown Device'}
                           </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <IconButton
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDeviceForBluetooth(device);
+                              }}
+                              color="primary"
+                              size="small"
+                            >
+                              <BluetoothIcon />
+                            </IconButton>
                             {isUpdating && (
                               <CircularProgress size={12} sx={{ mr: 1 }} />
                             )}
@@ -2118,6 +2140,14 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Bluetooth Configuration Dialog */}
+      {selectedDeviceForBluetooth && (
+        <BluetoothControl
+          device={selectedDeviceForBluetooth}
+          onClose={() => setSelectedDeviceForBluetooth(null)}
+        />
+      )}
     </Box>
   );
 } 

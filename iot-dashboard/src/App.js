@@ -11,6 +11,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { LoadingProvider } from './context/LoadingContext';
 import PageTransition from './components/PageTransition';
 import { CssBaseline, Box } from '@mui/material';
+import BluetoothControl from './components/BluetoothControl';
 
 function App() {
   const [user, setUser] = useState(() => {
@@ -67,6 +68,10 @@ function App() {
     localStorage.removeItem('selectedDevice');
   };
 
+  const handleSelectDevice = (device) => {
+    setSelectedDevice(device);
+  };
+
   return (
     <LoadingProvider>
       <CustomThemeProvider>
@@ -90,6 +95,12 @@ function App() {
                     )}
                   />
                   <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/" />} />
+                  <Route 
+                    path="/bluetooth" 
+                    element={
+                      <BluetoothControl />
+                    } 
+                  />
                 </Routes>
               </PageTransition>
             </Box>
