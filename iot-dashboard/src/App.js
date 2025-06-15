@@ -10,7 +10,7 @@ import "./App.css";
 import ErrorBoundary from './components/ErrorBoundary';
 import { LoadingProvider } from './context/LoadingContext';
 import PageTransition from './components/PageTransition';
-import { CssBaseline } from '@mui/material';
+import { CssBaseline, Box } from '@mui/material';
 
 function App() {
   const [user, setUser] = useState(() => {
@@ -71,26 +71,30 @@ function App() {
     <LoadingProvider>
       <CustomThemeProvider>
         <CssBaseline />
-        <Router>
-          <PageTransition>
-            <Routes>
-              <Route path="/" element={user ? <Navigate to="/devices" /> : <LoginPage onLogin={setUser} />} />
-              <Route path="/register" element={user ? <Navigate to="/devices" /> : <RegisterPage onRegister={setUser} />} />
-              <Route path="/devices" element={user ? <DevicesPage user={user} onSelectDevice={setSelectedDevice} onLogout={handleLogout} /> : <Navigate to="/" />} />
-              <Route
-                path="/dashboard"
-                element={user && selectedDevice ? (
-                  <ErrorBoundary>
-                    <Dashboard user={user} device={selectedDevice} onLogout={handleLogout} onBack={() => setSelectedDevice(null)} />
-                  </ErrorBoundary>
-                ) : (
-                  <Navigate to="/devices" />
-                )}
-              />
-              <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/" />} />
-            </Routes>
-          </PageTransition>
-        </Router>
+        <Box className="App">
+          <Router>
+            <Box className="App-content">
+              <PageTransition>
+                <Routes>
+                  <Route path="/" element={user ? <Navigate to="/devices" /> : <LoginPage onLogin={setUser} />} />
+                  <Route path="/register" element={user ? <Navigate to="/devices" /> : <RegisterPage onRegister={setUser} />} />
+                  <Route path="/devices" element={user ? <DevicesPage user={user} onSelectDevice={setSelectedDevice} onLogout={handleLogout} /> : <Navigate to="/" />} />
+                  <Route
+                    path="/dashboard"
+                    element={user && selectedDevice ? (
+                      <ErrorBoundary>
+                        <Dashboard user={user} device={selectedDevice} onLogout={handleLogout} onBack={() => setSelectedDevice(null)} />
+                      </ErrorBoundary>
+                    ) : (
+                      <Navigate to="/devices" />
+                    )}
+                  />
+                  <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/" />} />
+                </Routes>
+              </PageTransition>
+            </Box>
+          </Router>
+        </Box>
       </CustomThemeProvider>
     </LoadingProvider>
   );

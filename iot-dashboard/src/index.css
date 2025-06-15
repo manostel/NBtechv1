@@ -11,6 +11,11 @@ body {
   width: 100%;
   overflow-x: hidden;
   background-color: inherit;
+  /* Add safe area insets */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 #root {
@@ -19,6 +24,11 @@ body {
   position: relative;
   overflow-x: hidden;
   background-color: inherit;
+  /* Add safe area insets */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* Set explicit dark mode colors to prevent flashes */
@@ -35,4 +45,9 @@ body {
 /* Add a specific style for transitions to ensure smooth theme changes */
 .page-transition {
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Add viewport meta tag styles */
+@viewport {
+  viewport-fit: cover;
 }

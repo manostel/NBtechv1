@@ -1,5 +1,32 @@
 {
   "appId": "com.nbtech.iotdashboard",
   "appName": "IoT Dashboard",
-  "webDir": "build"
+  "webDir": "build",
+  "plugins": {
+    "StatusBar": {
+      "backgroundColor": "#ffffff",
+      "style": "dark",
+      "overlaysWebView": false
+    },
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#ffffff",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    }
+  },
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true,
+    "hostname": "localhost"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  }
 }
