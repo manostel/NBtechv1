@@ -123,13 +123,9 @@ function TabPanel({ children, value, index, ...other }) {
       id={`dashboard-tabpanel-${index}`}
       aria-labelledby={`dashboard-tab-${index}`}
       {...other}
-      style={{
-        height: '100%',
-        overflow: 'auto'
-      }}
     >
       {value === index && (
-        <Box sx={{ p: 1.5 }}>
+        <Box sx={{ py: 3, px: { xs: 0, sm: 3 } }}>
           {children}
         </Box>
       )}
@@ -872,7 +868,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
     
     // Send the command with the speed value
-    handleCommandSend('SET_SPEED', { speed: speed });
+    onCommandSend('SET_SPEED', { speed: speed });
   };
 
   const handleChartConfigChange = (key) => (event) => {
@@ -918,7 +914,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     fetchAlarms();
   };
 
-  const handleCommandSend = async (command, params = {}) => {
+  const onCommandSend = async (command, params = {}) => {
     if (!device || !device.client_id) {
       console.error('No device or client_id available');
       return false;
@@ -1042,7 +1038,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   };
 
   const renderTabContent = (tabValue) => {
-    console.log('Rendering tab content with triggeredAlarms:', triggeredAlarms);
     switch (tabValue) {
       case 0:
         return (
@@ -1053,7 +1048,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             availableVariables={availableVariables}
             deviceState={deviceState}
             isLoading={isLoading}
-            onVariableChange={(event) => handleVariableChange(event, true)}
+            onVariableChange={e => handleVariableChange(e, true)}
             triggeredAlarms={triggeredAlarms}
             deviceStartTimeInfo={deviceStartTimeInfo}
           />
@@ -1063,12 +1058,11 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           <DashboardChartsTab
             metricsData={metricsData}
             metricsConfig={metricsConfig}
-            selectedVariables={selectedVariablesChartsStats}
-            availableVariables={availableVariables}
-            isLoading={isLoading}
-            onVariableChange={(event) => handleVariableChange(event, false)}
             timeRange={timeRange}
             chartConfig={chartConfig}
+            selectedVariables={selectedVariablesChartsStats}
+            availableVariables={availableVariables}
+            onVariableChange={e => handleVariableChange(e, false)}
             onTimeRangeChange={handleTimeRangeChange}
             onApply={handleApply}
           />
@@ -1078,27 +1072,42 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           <DashboardStatisticsTab
             metricsData={metricsData}
             metricsConfig={metricsConfig}
-            deviceState={deviceState}
+            timeRange={timeRange}
             selectedVariables={selectedVariablesChartsStats}
             availableVariables={availableVariables}
-            onVariableChange={handleVariableChange}
-            timeRange={timeRange}
+            onVariableChange={e => handleVariableChange(e, false)}
             onTimeRangeChange={handleTimeRangeChange}
             onApply={handleApply}
           />
         );
       case 3:
         return (
-          <DashboardCommands
+          <DashboardCommandsTab
             device={device}
             deviceState={deviceState}
-            onCommandSend={handleCommandSend}
-            fetchDeviceState={fetchDeviceState}
-            handleCommandSend={handleCommandSend}
+            onCommandSend={onCommandSend}
+            commandHistory={commandHistory}
+            setCommandHistory={setCommandHistory}
+            metricsConfig={metricsConfig}
+            metricsData={metricsData}
             setSnackbar={setSnackbar}
+            fetchDeviceState={fetchDeviceState}
           />
         );
       case 4:
+        return (
+          <DashboardHistoryTab
+            metricsData={metricsData}
+            metricsConfig={metricsConfig}
+            timeRange={timeRange}
+            selectedVariables={selectedVariablesChartsStats}
+            availableVariables={availableVariables}
+            onVariableChange={e => handleVariableChange(e, false)}
+            onTimeRangeChange={handleTimeRangeChange}
+            onApply={handleApply}
+          />
+        );
+      case 5:
         return (
           <DashboardAlarmsTab
             device={device}
@@ -1268,154 +1277,118 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         maxWidth={false} 
         disableGutters 
         sx={{ 
-          p: { xs: 1, sm: 2 },
+          p: { xs: 1, sm: 1.5 },
           flexGrow: 1,
           width: '100%',
-          height: '100%',
-          overflow: 'hidden',
-          '& > *': {
-            maxWidth: '1200px',
-            mx: 'auto'
-          }
         }}
       >
-        <DeviceInfoCard
-          clientID={device?.client_id || "Unknown"}
-          deviceName={device?.device_name || "Unknown"}
-          deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
-          status={deviceStatus}
-          lastOnline={lastSeen ? lastSeen.toLocaleString() : 
-            device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString() : "N/A"}
-          batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
-          signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
-          showClientId={showClientId}
-          onToggleClientId={() => setShowClientId(!showClientId)}
-          batteryState={batteryState}
-          lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
-          deviceStartTimeInfo={deviceStartTimeInfo}
-        />
+        {/* Add Snackbar component */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert 
+            onClose={handleSnackbarClose} 
+            severity={snackbar.severity} 
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+
+        <Grid container spacing={1}>
+          <Grid item xs={12}>
+            <DeviceInfoCard
+              clientID={device?.client_id || "Unknown"}
+              deviceName={device?.device_name || "Unknown"}
+              deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
+              status={deviceStatus}
+              lastOnline={lastSeen ? lastSeen.toLocaleString() : 
+                device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString() : "N/A"}
+              batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
+              signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
+              showClientId={showClientId}
+              onToggleClientId={() => setShowClientId(!showClientId)}
+              batteryState={batteryState}
+              lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
+              deviceStartTimeInfo={deviceStartTimeInfo}
+            />
+          </Grid>
+        </Grid>
 
         {/* Tabs */}
         <Box sx={{ 
           borderBottom: 1, 
           borderColor: 'divider',
-          position: 'relative',
-          bgcolor: 'background.paper',
-          zIndex: 1
+          mb: 2,
+          overflowX: 'auto',
+          pl: { xs: 0, sm: 0 },
+          pr: { xs: 0, sm: 0 },
+          '&::-webkit-scrollbar': {
+            height: '6px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+            borderRadius: '3px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+            borderRadius: '3px',
+            '&:hover': {
+              background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+            },
+          },
         }}>
-          <Tabs
-            value={selectedTab}
+          <Tabs 
+            value={selectedTab} 
             onChange={handleTabChange}
             variant="scrollable"
             scrollButtons="auto"
             allowScrollButtonsMobile
             sx={{
+              minHeight: '40px',
+              ml: 0,
+              pl: 0,
               '& .MuiTab-root': {
-                minWidth: 'auto',
-                px: 1.5,
-                py: 1,
+                minHeight: '40px',
                 fontSize: '0.875rem',
-                transition: 'all 0.3s ease',
-                '& .MuiSvgIcon-root': {
-                  fontSize: '1.25rem',
-                  mr: 0.5,
-                  transition: 'all 0.3s ease'
-                },
-                '&.Mui-selected': {
-                  transform: 'scale(1.05)',
-                  '& .MuiSvgIcon-root': {
-                    transform: 'scale(1.1)'
-                  }
-                }
+                textTransform: 'none',
+                fontWeight: 500,
+                px: 2,
               },
-              '& .MuiTabs-scrollButtons': {
-                width: 32,
-                height: 32,
-                '&.Mui-disabled': {
-                  opacity: 0.3
-                }
-              },
-              '& .MuiTabs-indicator': {
-                transition: 'all 0.3s ease'
-              }
             }}
           >
-            <Tab 
-              label="Overview" 
-              icon={<DashboardIcon />} 
-              iconPosition="start" 
-              {...a11yProps(0)}
-            />
-            <Tab 
-              label="Charts" 
-              icon={<ShowChartIcon />} 
-              iconPosition="start" 
-              {...a11yProps(1)}
-            />
-            <Tab 
-              label="Statistics" 
-              icon={<TimelineIcon />} 
-              iconPosition="start" 
-              {...a11yProps(2)}
-            />
-            <Tab 
-              label="Commands" 
-              icon={<BuildIcon />} 
-              iconPosition="start" 
-              {...a11yProps(3)}
-            />
-            <Tab 
-              label="Alarms" 
-              icon={<WarningIcon />} 
-              iconPosition="start" 
-              {...a11yProps(4)}
-            />
+            <Tab label="Overview" {...a11yProps(0)} />
+            <Tab label="Charts" {...a11yProps(1)} />
+            <Tab label="Statistics" {...a11yProps(2)} />
+            <Tab label="Commands" {...a11yProps(3)} />
+            <Tab label="History" {...a11yProps(4)} />
+            <Tab label="Alarms" {...a11yProps(5)} />
           </Tabs>
         </Box>
 
         {/* Tab Content */}
-        <Box sx={{ 
-          mt: 2,
-          height: 'calc(100% - 120px)',
-          overflow: 'hidden',
-          position: 'relative'
-        }}>
-          <Box sx={{
-            display: 'flex',
-            width: '500%',
-            height: '100%',
-            transform: `translateX(-${selectedTab * 20}%)`,
-            transition: 'transform 0.3s ease-in-out'
-          }}>
-            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
-              {renderTabContent(0)}
-            </Box>
-            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
-              {renderTabContent(1)}
-            </Box>
-            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
-              {renderTabContent(2)}
-            </Box>
-            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
-              {renderTabContent(3)}
-            </Box>
-            <Box sx={{ width: '20%', height: '100%', overflow: 'auto' }}>
-              {renderTabContent(4)}
-            </Box>
-          </Box>
-        </Box>
+        <TabPanel value={selectedTab} index={0}>
+          {renderTabContent(0)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={1}>
+          {renderTabContent(1)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={2}>
+          {renderTabContent(2)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={3}>
+          {renderTabContent(3)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={4}>
+          {renderTabContent(4)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={5}>
+          {renderTabContent(5)}
+        </TabPanel>
       </Container>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 } 

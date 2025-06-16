@@ -89,18 +89,16 @@ const DashboardStatisticsTab = ({
   );
 
   return (
-    <Box sx={{ p: 1.5 }}>
-      <Box sx={{ mb: 1.5 }}>
-        <SharedControls
-          selectedVariables={selectedVariables}
-          availableVariables={availableVariables}
-          onVariableChange={onVariableChange}
-          timeRange={timeRange}
-          onTimeRangeChange={onTimeRangeChange}
-          onApply={onApply}
-        />
-      </Box>
-      <Grid container spacing={1.5}>
+    <Box sx={{ py: 3, px: { xs: 0, sm: 3 } }}>
+      <SharedControls
+        selectedVariables={selectedVariables}
+        availableVariables={availableVariables}
+        onVariableChange={onVariableChange}
+        timeRange={timeRange}
+        onTimeRangeChange={onTimeRangeChange}
+        onApply={onApply}
+      />
+      <Grid container spacing={2}>
         {selectedVariables.map((key) => {
           const config = metricsConfig[key];
           if (!config) return null;
@@ -110,12 +108,12 @@ const DashboardStatisticsTab = ({
 
           return (
             <Grid item xs={12} key={key}>
-              <Box sx={{ mb: 1.5 }}>
-                <Typography variant="subtitle2" gutterBottom>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom>
                   {config.label}
                 </Typography>
-                <Grid container spacing={1}>
-                  <Grid item xs={12} sm={6} md={3}>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} sm={6} md={3}>
                     <StatCard
                       title="Average"
                       value={stats.average}
@@ -124,7 +122,7 @@ const DashboardStatisticsTab = ({
                       color={theme.palette.primary.main}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={6} sm={6} md={3}>
                     <StatCard
                       title="Minimum"
                       value={stats.min}
@@ -133,7 +131,7 @@ const DashboardStatisticsTab = ({
                       color={theme.palette.error.main}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={6} sm={6} md={3}>
                     <StatCard
                       title="Maximum"
                       value={stats.max}
@@ -142,7 +140,7 @@ const DashboardStatisticsTab = ({
                       color={theme.palette.success.main}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={6} sm={6} md={3}>
                     <StatCard
                       title="Standard Deviation"
                       value={stats.standardDeviation}
@@ -152,7 +150,7 @@ const DashboardStatisticsTab = ({
                     />
                   </Grid>
                 </Grid>
-                <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5, display: 'block' }}>
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
                   Based on {stats.count} data points
                 </Typography>
               </Box>

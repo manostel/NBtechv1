@@ -6,7 +6,7 @@ const DashboardHistoryTab = ({ metricsData, metricsConfig }) => {
   const theme = useTheme();
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ py: 3, px: { xs: 0, sm: 3 } }}>
       <Typography variant="h6" gutterBottom>
         Device History
       </Typography>

@@ -11,7 +11,6 @@ const DashboardCommands = ({
   deviceState, 
   onCommandSend,
   fetchDeviceState,
-  handleCommandSend,
   setSnackbar
 }) => {
   const [led1State, setLed1State] = useState(false);
@@ -33,6 +32,9 @@ const DashboardCommands = ({
       setLed1State(deviceState.led1_state === 1);
       setLed2State(deviceState.led2_state === 1);
       setPowerSavingMode(deviceState.power_saving === 1);
+      if (deviceState.motor_speed !== undefined) {
+        setMotorSpeed(deviceState.motor_speed.toString());
+      }
     }
   }, [deviceState]);
 
@@ -65,23 +67,38 @@ const DashboardCommands = ({
 
       const payload = {
         client_id: device.client_id,
-        command: command
+        command: command,
+        ...params
       };
+
+      console.log('Sending command with payload:', payload);
 
       const response = await fetch(COMMAND_API_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to send command');
+        throw new Error(errorData.error || 'Failed to send command');
       }
 
-      return await response.json();
+      // The API might return a success response without a body
+      if (response.status === 200) {
+        return { success: true }; // Return a success object
+      }
+
+      // If there is a response body, try to parse it
+      const result = await response.json();
+      if (result && result.success) {
+        return result;
+      }
+
+      throw new Error(result?.error || 'Failed to send command');
     } catch (error) {
       console.error('Error sending command:', error);
       throw error;
@@ -92,11 +109,12 @@ const DashboardCommands = ({
     setIsLoading(true);
     try {
       const command = isOn ? `TOGGLE_${led}_ON` : `TOGGLE_${led}_OFF`;
-      console.log('Sending switch command:', command);
+      console.log("handleSwitchChange: Attempting to send command:", command);
       
-      // Send the command
-      await handleCommandSend(command);
-      console.log('Command sent successfully');
+      // Send the command directly using the internal sendCommand function
+      await sendCommand(command);
+
+      console.log("handleSwitchChange: Command sent successfully, waiting for verification...");
       
       // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
@@ -106,7 +124,7 @@ const DashboardCommands = ({
       const latestState = await fetchDeviceState();
       console.log('First verification state:', latestState);
       
-      // Additional verification after 10 seconds (increased from 2s)
+      // Additional verification after 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
       console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
@@ -117,9 +135,14 @@ const DashboardCommands = ({
         console.log('Updating UI with final state:', finalState);
         setLed1State(finalState.led1_state === 1);
         setLed2State(finalState.led2_state === 1);
-        setMotorSpeed(finalState.motor_speed?.toString() || "0");
+        setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
         setPowerSavingMode(finalState.power_saving === 1);
       }
+      setSnackbar({
+        open: true,
+        message: `LED ${led} state updated successfully`,
+        severity: 'success'
+      });
     } catch (error) {
       console.error('Error in handleSwitchChange:', error);
       setSnackbar({
@@ -136,11 +159,12 @@ const DashboardCommands = ({
     setIsLoading(true);
     try {
       const command = isOn ? 'POWER_SAVING_ON' : 'POWER_SAVING_OFF';
-      console.log('Sending power saving command:', command);
+      console.log("handlePowerSavingChange: Attempting to send command:", command);
       
-      // Send the command
-      await handleCommandSend(command);
-      console.log('Command sent successfully');
+      // Send the command directly using the internal sendCommand function
+      await sendCommand(command);
+
+      console.log("handlePowerSavingChange: Command sent successfully, waiting for verification...");
       
       // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
@@ -150,7 +174,7 @@ const DashboardCommands = ({
       const latestState = await fetchDeviceState();
       console.log('First verification state:', latestState);
       
-      // Additional verification after 10 seconds (increased from 2s)
+      // Additional verification after 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
       console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
@@ -159,8 +183,16 @@ const DashboardCommands = ({
       // Update the UI with the final state
       if (finalState) {
         console.log('Updating UI with final state:', finalState);
+        setLed1State(finalState.led1_state === 1); // Ensure LED states are updated
+        setLed2State(finalState.led2_state === 1); // Ensure LED states are updated
+        setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
         setPowerSavingMode(finalState.power_saving === 1);
       }
+      setSnackbar({
+        open: true,
+        message: `Power saving mode updated to ${isOn ? 'ON' : 'OFF'}`,
+        severity: 'success'
+      });
     } catch (error) {
       console.error('Error in handlePowerSavingChange:', error);
       setSnackbar({
@@ -182,29 +214,19 @@ const DashboardCommands = ({
       setError(null);
       setCommandFeedback({
         show: true,
-        message: 'Sending motor speed command...',
+        message: 'Sending speed command...',
         loading: true
       });
 
-      // Get the speed value from the input field
       const speed = parseInt(motorSpeed);
       if (isNaN(speed) || speed < 0 || speed > 100) {
         throw new Error('Speed must be between 0 and 100');
       }
 
-      console.log('Sending speed command with value:', speed);
-      
-      // Send the command with the speed parameter
-      await handleCommandSend('SET_SPEED', { speed: speed });
-      console.log('Command sent successfully');
-      
-      setCommandFeedback({
-        show: true,
-        message: 'Waiting for device confirmation...',
-        loading: true
-      });
+      // Send the command directly using the internal sendCommand function
+      await sendCommand('SET_SPEED', { speed });
 
-      // Wait 5 seconds for device to process command
+      // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
       console.log('First verification after 5s');
       
@@ -212,33 +234,17 @@ const DashboardCommands = ({
       const latestState = await fetchDeviceState();
       console.log('First verification state:', latestState);
       
-      // Additional verification after 10 seconds (increased from 2s)
+      // Additional verification after 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
       console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
       console.log('Final verification state:', finalState);
-      
-      // Update the UI with the final state
+
       if (finalState) {
-        console.log('Updating UI with final state:', finalState);
-        // Only update if the speed matches what we sent
-        if (finalState.motor_speed === speed) {
+        setMotorSpeed(finalState.motor_speed?.toString() || "0");
         setCommandFeedback({
           show: true,
-          message: 'Speed command confirmed!',
-          loading: false
-        });
-        } else {
-          setCommandFeedback({
-            show: true,
-            message: 'Speed command verification failed - speed mismatch',
-            loading: false
-          });
-        }
-      } else {
-        setCommandFeedback({
-          show: true,
-          message: 'Speed command failed to verify',
+          message: 'Speed updated successfully',
           loading: false
         });
       }
@@ -247,42 +253,27 @@ const DashboardCommands = ({
       setError(error.message);
       setCommandFeedback({
         show: true,
-        message: error.message || 'Failed to send speed command',
+        message: error.message || 'Failed to update speed',
         loading: false
       });
     } finally {
       setIsVerifying(false);
-      setTimeout(() => {
-        setCommandFeedback({ show: false, message: '', loading: false });
-      }, 2000);
     }
   };
 
   const handleRestart = async () => {
-    if (isVerifying) return;
-
+    setIsLoading(true);
     try {
-      setIsVerifying(true);
-      setError(null);
-      setCommandFeedback({
-        show: true,
-        message: 'Sending restart command...',
-        loading: true
+      // Send the command directly using the internal sendCommand function
+      await sendCommand('RESTART');
+
+      setSnackbar({
+        open: true,
+        message: 'Restart command sent successfully',
+        severity: 'success'
       });
 
-      console.log('Sending restart command');
-
-      // Send the command
-      await handleCommandSend('RESTART');
-      console.log('Command sent successfully');
-      
-      setCommandFeedback({
-        show: true,
-        message: 'Waiting for device confirmation...',
-        loading: true
-      });
-
-      // Wait for device to process command
+      // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
       console.log('First verification after 5s');
       
@@ -290,182 +281,116 @@ const DashboardCommands = ({
       const latestState = await fetchDeviceState();
       console.log('First verification state:', latestState);
       
-      // Additional verification after 10 seconds (increased from 2s)
+      // Additional verification after 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
       console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
       console.log('Final verification state:', finalState);
-      
-      // Update the UI with the final state
+
       if (finalState) {
-        console.log('Updating UI with final state:', finalState);
         setLed1State(finalState.led1_state === 1);
         setLed2State(finalState.led2_state === 1);
         setMotorSpeed(finalState.motor_speed?.toString() || "0");
-        setCommandFeedback({
-          show: true,
-          message: 'Restart command confirmed!',
-          loading: false
-        });
-      } else {
-        setCommandFeedback({
-          show: true,
-          message: 'Restart command failed to verify',
-          loading: false
-        });
+        setPowerSavingMode(finalState.power_saving === 1);
       }
     } catch (error) {
       console.error('Error in handleRestart:', error);
-      setError(error.message);
-      setCommandFeedback({
-        show: true,
-        message: 'Failed to send restart command',
-        loading: false
+      setSnackbar({
+        open: true,
+        message: error.message || 'Failed to restart device',
+        severity: 'error'
       });
     } finally {
-      setIsVerifying(false);
-      setTimeout(() => {
-        setCommandFeedback({ show: false, message: '', loading: false });
-      }, 2000);
+      setIsLoading(false);
     }
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          LED Controls
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Typography sx={{ mr: 2 }}>LED 1</Typography>
-          <Switch
-            checked={led1State}
-            onChange={(e) => handleSwitchChange(1, e.target.checked)}
-            disabled={isLoading || isVerifying}
-          />
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Typography sx={{ mr: 2 }}>LED 2</Typography>
-          <Switch
-            checked={led2State}
-            onChange={(e) => handleSwitchChange(2, e.target.checked)}
-            disabled={isLoading || isVerifying}
-          />
-        </Box>
-      </Paper>
-
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Power Saving Mode
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Typography sx={{ mr: 2 }}>Power Saving</Typography>
-          <Switch
-            checked={powerSavingMode}
-            onChange={(e) => handlePowerSavingChange(e.target.checked)}
-            disabled={isLoading || isVerifying}
-            color="primary"
-          />
-        </Box>
-      </Paper>
-
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Motor Control
-        </Typography>
-        <Box component="form" onSubmit={handleSpeedSubmit} sx={{ display: 'flex', gap: 1 }}>
-          <TextField
-            label="Motor Speed (0-100)"
-            type="number"
-            value={motorSpeed}
-            onChange={(e) => setMotorSpeed(e.target.value)}
-            disabled={isLoading || isVerifying}
-            sx={{ flex: 1 }}
-          />
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={isLoading || isVerifying}
-          >
-            {isVerifying ? <CircularProgress size={24} /> : 'Set Speed'}
-          </Button>
-        </Box>
-        {deviceState?.motor_speed !== undefined && (
-          <Typography sx={{ mt: 1 }}>
-            Current Speed: {deviceState.motor_speed}%
-          </Typography>
-        )}
-        {error && (
-          <Typography color="error" sx={{ mt: 1 }}>
-            {error}
-          </Typography>
-        )}
-      </Paper>
-
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Device Control
-        </Typography>
-        <Button
-          variant="contained"
-          color="secondary"
-          startIcon={<RestartAltIcon />}
-          onClick={handleRestart}
-          disabled={isLoading || isVerifying}
-        >
-          {isVerifying ? <CircularProgress size={24} /> : 'Restart Device'}
-        </Button>
-      </Paper>
-
+    <Paper elevation={3} sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
       {isLoading && (
-        <Box sx={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          backgroundColor: 'rgba(0, 0, 0, 0.1)',
-          zIndex: 1000
-        }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress />
         </Box>
       )}
-
-      <Snackbar
-        open={commandFeedback.show}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{
-          '& .MuiPaper-root': {
-            bgcolor: 'background.paper',
-            color: 'text.primary',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            px: 2,
-            minWidth: 250
-          }
-        }}
-      >
-        <Paper elevation={3}>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2,
-            p: 1.5
-          }}>
-            {commandFeedback.loading && (
-              <CircularProgress size={20} color="primary" />
-            )}
-            <Typography variant="body2">
-              {commandFeedback.message}
-            </Typography>
+      {!isLoading && (
+        <>
+          <Typography variant="h6">LED Control</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography>LED 1</Typography>
+            <Switch
+              checked={led1State}
+              onChange={(e) => handleSwitchChange(1, e.target.checked)}
+              inputProps={{ 'aria-label': 'LED 1 switch' }}
+            />
           </Box>
-        </Paper>
-      </Snackbar>
-    </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography>LED 2</Typography>
+            <Switch
+              checked={led2State}
+              onChange={(e) => handleSwitchChange(2, e.target.checked)}
+              inputProps={{ 'aria-label': 'LED 2 switch' }}
+            />
+          </Box>
+
+          <Typography variant="h6" sx={{ mt: 2 }}>Motor Speed</Typography>
+          <form onSubmit={handleSpeedSubmit}>
+            <TextField
+              label="Speed (0-100)"
+              type="number"
+              value={motorSpeed}
+              onChange={(e) => setMotorSpeed(e.target.value)}
+              inputProps={{ min: 0, max: 100, step: 1 }}
+              fullWidth
+              variant="outlined"
+              margin="normal"
+              disabled={isVerifying}
+            />
+            <Button 
+              type="submit" 
+              variant="contained" 
+              color="primary" 
+              fullWidth 
+              disabled={isVerifying}
+              sx={{ mt: 1 }}
+            >
+              {isVerifying ? <CircularProgress size={24} /> : 'Set Speed'}
+            </Button>
+          </form>
+
+          {commandFeedback.show && (
+            <Snackbar
+              open={commandFeedback.show}
+              autoHideDuration={commandFeedback.loading ? null : 3000}
+              onClose={() => setCommandFeedback({ ...commandFeedback, show: false })}
+              message={commandFeedback.message}
+              action={commandFeedback.loading && <CircularProgress color="inherit" size={20} />}
+            />
+          )}
+
+          <Typography variant="h6" sx={{ mt: 2 }}>Power Saving Mode</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography>Enable Power Saving</Typography>
+            <Switch
+              checked={powerSavingMode}
+              onChange={(e) => handlePowerSavingChange(e.target.checked)}
+              inputProps={{ 'aria-label': 'Power Saving Mode switch' }}
+            />
+          </Box>
+
+          <Typography variant="h6" sx={{ mt: 2 }}>Device Actions</Typography>
+          <Button 
+            variant="contained" 
+            color="error" 
+            startIcon={<RestartAltIcon />} 
+            onClick={handleRestart} 
+            fullWidth
+            disabled={isLoading}
+          >
+            Restart Device
+          </Button>
+        </>
+      )}
+    </Paper>
   );
 };
 

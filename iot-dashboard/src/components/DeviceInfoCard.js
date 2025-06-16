@@ -111,70 +111,67 @@ export default function DeviceInfoCard({
   }
 
   return (
-    <Card sx={{ minWidth: 275, mb: 2 }}>
-      <CardContent>
+    <Card sx={{ minWidth: 275, mb: 1, p: 0.5 }}>
+      <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
         {/* Main content area below Device Name/Type */}
         <Box display="flex" justifyContent="space-between" width="100%" alignItems="flex-end">
 
           {/* Left side: ID and Timing Information */}
-          <Box display="flex" flexDirection="column" gap={1}>
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography variant="body2" color="text.secondary">
+          <Box display="flex" flexDirection="column" gap={0.5}>
+            <Box display="flex" alignItems="center" gap={0.5}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
                 ID: {showClientId ? clientID : '••••••••••••'}
               </Typography>
-              <IconButton onClick={onToggleClientId} size="small">
-                {showClientId ? <VisibilityOff /> : <Visibility />}
+              <IconButton onClick={onToggleClientId} size="small" sx={{ p: 0.5 }}>
+                {showClientId ? <VisibilityOff sx={{ fontSize: '0.875rem' }} /> : <Visibility sx={{ fontSize: '0.875rem' }} />}
               </IconButton>
             </Box>
             <Box display="flex" flexDirection="column" gap={0}>
-              <Typography variant="body2" color="text.secondary">
-                Startup time: {deviceStartTimeInfo?.timestamp ? new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A (Future Timestamp)' : new Date(deviceStartTimeInfo.timestamp).toLocaleString() : 'N/A'}
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                Startup: {deviceStartTimeInfo?.timestamp ? new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A' : new Date(deviceStartTimeInfo.timestamp).toLocaleString() : 'N/A'}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Last updated data: {lastOnline || 'N/A'}
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                Last update: {lastOnline || 'N/A'}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
                 Uptime: {currentUptimeDisplay}
               </Typography>
             </Box>
           </Box>
 
           {/* Right side: Status and Indicators */}
-          <Box display="flex" flexDirection="column" alignItems="flex-end" justifyContent="flex-end" gap={1}>
-
-            {/* Status row - Positioned between indicators below */}
-            <Box display="flex" justifyContent="center" width="100%" pb={1}>
-              {/* Status dot and text */}
-              <Box display="flex" alignItems="center" gap={1}>
-                  <Box
-                    sx={{
-                    width: 8,
-                    height: 8,
+          <Box display="flex" flexDirection="column" alignItems="flex-end" justifyContent="flex-end" gap={0.5}>
+            {/* Status row */}
+            <Box display="flex" justifyContent="center" width="100%" pb={0.5}>
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <Box
+                  sx={{
+                    width: 6,
+                    height: 6,
                     borderRadius: '50%',
                     backgroundColor: getStatusColor(displayStatus),
-                    }}
-                  />
+                  }}
+                />
                 <Typography
                   variant="body2"
                   sx={{
                     color: getStatusColor(displayStatus),
                     fontWeight: 'bold',
                     lineHeight: 'normal',
+                    fontSize: '0.75rem',
                   }}
                 >
-                    {displayStatus}
-                  </Typography>
-                </Box>
+                  {displayStatus}
+                </Typography>
+              </Box>
             </Box>
 
-            {/* Indicators row - Battery and Signal */}
-            <Box display="flex" alignItems="flex-end" gap={2}>
-              <BatteryIndicator value={batteryLevel} batteryState={batteryState} />
-              <SignalIndicator value={signalStrength} />
-                </Box>
-
+            {/* Indicators row */}
+            <Box display="flex" alignItems="flex-end" gap={1}>
+              <BatteryIndicator value={batteryLevel} batteryState={batteryState} size="small" />
+              <SignalIndicator value={signalStrength} size="small" />
+            </Box>
           </Box>
-
         </Box>
       </CardContent>
     </Card>

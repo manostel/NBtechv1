@@ -1,65 +1,70 @@
 import React from 'react';
-import { Card, CardContent, Typography, Box } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { Typography, Box, Paper, useTheme } from '@mui/material';
+import PropTypes from 'prop-types';
 
-const MetricCard = ({ title, value, unit, isText = false }) => {
+const MetricCard = ({ title, value, unit, isText = false, icon, color }) => {
   const theme = useTheme();
 
-  const displayValue = isText 
-    ? value 
-    : typeof value === 'number' 
-      ? value.toFixed(1) 
+  const displayValue = isText
+    ? value
+    : typeof value === 'number'
+      ? value.toFixed(1)
       : value;
 
   return (
-    <Card 
-      sx={{ 
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: 'background.paper',
-        border: `1px solid ${theme.palette.divider}`,
+        border: '1px solid',
+        borderColor: theme.palette.divider,
+        borderRadius: 2,
+        bgcolor: theme.palette.background.paper,
+        transition: 'all 0.2s ease-in-out',
         '&:hover': {
-          boxShadow: theme.shadows[4],
+          transform: 'translateY(-2px)',
+          boxShadow: theme.shadows[2]
         }
       }}
     >
-      <CardContent sx={{ flexGrow: 1, p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <Typography 
-            variant="subtitle2" 
-            color="text.secondary"
-            sx={{ textTransform: 'uppercase' }}
-          >
-            {title}
-          </Typography>
-        </Box>
-        <Typography 
-          variant="h5" 
-          component="div"
-          sx={{ 
-            fontWeight: 'bold',
-            color: theme.palette.primary.main
-          }}
-        >
-          {displayValue}
-          {!isText && unit && (
-            <Typography 
-              component="span" 
-              variant="body2"
-              sx={{ 
-                ml: 0.5,
-                color: 'text.secondary',
-                fontWeight: 'normal'
-              }}
-            >
-              {unit}
-            </Typography>
-          )}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        {icon && React.cloneElement(icon, {
+          sx: {
+            color: color || theme.palette.primary.main,
+            fontSize: 24
+          }
+        })}
+        <Typography variant="subtitle2" color="textSecondary" sx={{ ml: 1 }}>
+          {title}
         </Typography>
-      </CardContent>
-    </Card>
+      </Box>
+      <Typography variant="h4" component="div" sx={{ mt: 1 }}>
+        {displayValue}
+        {unit && (
+          <Typography
+            component="span"
+            variant="body2"
+            color="textSecondary"
+            sx={{ ml: 0.5 }}
+          >
+            {unit}
+          </Typography>
+        )}
+      </Typography>
+    </Paper>
   );
+};
+
+MetricCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.bool]),
+  unit: PropTypes.string,
+  isText: PropTypes.bool,
+  icon: PropTypes.element,
+  color: PropTypes.string,
 };
 
 export default MetricCard; 

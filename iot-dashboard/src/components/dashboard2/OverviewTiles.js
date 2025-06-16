@@ -132,7 +132,7 @@ const OverviewTiles = ({
 
   return (
     <Box>
-      <Grid container spacing={2}>
+      <Grid container spacing={1}>
         {selectedVariables.map((variable) => {
           const config = metricsConfig[variable];
           if (!config) return null;
@@ -155,7 +155,7 @@ const OverviewTiles = ({
           console.log(`Tile ${variable} triggered alarms:`, triggeredAlarmsList.length);
 
           return (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={variable}>
+            <Grid item xs={6} sm={6} md={4} lg={3} key={variable}>
               <OverviewTile
                 title={config.label}
                 value={typeof value === 'number' ? value.toFixed(1) : '0.0'}

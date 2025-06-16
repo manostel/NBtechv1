@@ -1553,26 +1553,23 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         </Toolbar>
       </AppBar>
 
-      <Tabs 
-        value={activeTab} 
-        onChange={handleTabChange} 
-        variant="standard"
-        sx={{
-          borderBottom: 1,
-          borderColor: 'divider',
-          '& .MuiTab-root': {
-            minWidth: 'auto',
-            px: 2,
-            py: 1.5
-          }
-        }}
-      >
-        <Tab label="List View" />
-        <Tab label="Map View" />
-      </Tabs>
+      <Box sx={{ width: '100%', mb: 2 }}>
+        <Tabs
+          value={activeTab}
+          onChange={handleTabChange}
+          indicatorColor="primary"
+          textColor="primary"
+          centered
+          variant="fullWidth"
+          sx={{ mb: 2 }}
+        >
+          <Tab label="All Devices" />
+          <Tab label="Map View" />
+        </Tabs>
+      </Box>
 
-      {activeTab === 0 ? (
-        <Box sx={{ p: 2, flexGrow: 1, overflow: 'auto' }}>
+      {activeTab === 0 && (
+        <Box sx={{ p: 0 }}>
           <Box 
             sx={{ 
               display: 'flex', 
@@ -1658,7 +1655,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                     <Grid item xs={12} sm={6} md={4} key={device.client_id}>
                       <Paper
                         sx={{
-                          p: 2,
+                          p: 1.5,
                           bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
                           cursor: 'pointer',
                           transition: 'all 0.3s ease',
@@ -1671,16 +1668,17 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                           },
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: 1,
+                          gap: 0.5,
                           position: 'relative',
                           overflow: 'hidden',
+                          height: '100%',
                           '&::before': {
                             content: '""',
                             position: 'absolute',
                             top: 0,
                             left: 0,
                             right: 0,
-                            height: '4px',
+                            height: '3px',
                             backgroundColor: getStatusColor(deviceStatus.status),
                             transition: 'background-color 0.3s ease',
                           }
@@ -1716,11 +1714,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                             />
                             <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus.status) }}>
                               {deviceStatus.status}
-                              {deviceStatus.status === 'Offline' && deviceStatus.lastSeen && (
-                                <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
-                                  (Last seen: {deviceStatus.lastSeen.toLocaleString()})
-                                </Typography>
-                              )}
                             </Typography>
                           </Box>
                         </Box>
@@ -1761,7 +1754,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                         </Box>
 
                         {/* Metrics */}
-                        <Box sx={{ mt: 1 }}>
+                        <Box sx={{ mt: 0.5 }}>
                           {Object.entries(latestData).map(([key, value]) => {
                             // Skip if value is null, undefined, or an object
                             if (value === null || value === undefined || typeof value === 'object') return null;
@@ -1794,7 +1787,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                             const unit = key === 'temperature' ? '°C' : key === 'humidity' ? '%' : '';
 
                             return (
-                              <Typography key={key} variant="body2" color="textSecondary">
+                              <Typography key={key} variant="body2" color="textSecondary" sx={{ fontSize: '0.8rem', lineHeight: 1.2 }}>
                                 {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
                               </Typography>
                             );
@@ -1898,13 +1891,16 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             )}
           </Grid>
         </Box>
-      ) : (
-        <MapView 
-          devices={devices} 
-          deviceData={deviceData} 
-          onDeviceClick={handleDeviceClick}
-          getDeviceStatus={getDeviceStatus}
-        />
+      )}
+      {activeTab === 1 && (
+        <Box sx={{ p: 0 }}>
+          <MapView
+            devices={devices}
+            deviceData={deviceData}
+            onDeviceClick={handleDeviceClick}
+            getDeviceStatus={getDeviceStatus}
+          />
+        </Box>
       )}
 
       {/* Add Device Dialog */}

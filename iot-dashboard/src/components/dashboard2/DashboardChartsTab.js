@@ -41,6 +41,11 @@ const DashboardChartsTab = ({
   const chartRef = React.useRef(null);
   const [combinedView, setCombinedView] = useState(false);
 
+  // Debug logging for chart issues
+  console.log('DashboardChartsTab selectedVariables:', selectedVariables);
+  console.log('DashboardChartsTab metricsConfig:', metricsConfig);
+  console.log('DashboardChartsTab first data object:', metricsData?.data?.[0]);
+
   const renderCombinedChart = (data) => {
     if (!data || !Array.isArray(data) || data.length === 0) {
       return null;
@@ -209,17 +214,14 @@ const DashboardChartsTab = ({
   };
 
   const renderChart = (data, metricKey) => {
+    if (!data || data.length === 0) return null;
     const config = metricsConfig[metricKey];
-    if (!config || !data || !Array.isArray(data) || data.length === 0) {
-      return null;
-    }
-
     const chartData = {
       labels: data.map(d => new Date(d.timestamp.replace('Z', ''))),
       datasets: [
         {
           label: `${config.label} (${config.unit})`,
-          data: data.map(d => parseFloat(d[metricKey])),
+          data: data.map(d => parseFloat(d.value)),
           borderColor: config.color,
           backgroundColor: `${config.color}40`,
           fill: true,
@@ -372,104 +374,57 @@ const DashboardChartsTab = ({
   };
 
   const renderCharts = () => {
-    if (metricsData?.data && metricsData.data.length > 0) {
-      const dataVariables = Object.keys(metricsData.data[0]).filter(key => key !== 'timestamp');
-      
-      if (combinedView) {
-        return (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 1.5, height: '300px', bgcolor: theme.palette.background.paper }}>
-              <Box sx={{ height: '100%' }}>
-                {renderCombinedChart(metricsData.data)}
-              </Box>
-            </Paper>
-          </Grid>
-        );
-      }
-
-      const charts = selectedVariables
-        .filter(key => dataVariables.includes(key))
-        .map((key) => {
-          const config = metricsConfig[key];
-          const data = metricsData.data;
-          if (!data || !Array.isArray(data) || data.length === 0) return null;
-
-          const chart = renderChart(data, key);
-          if (!chart) return null;
-
-          return (
-            <Grid item xs={12} sm={6} key={key}>
-              <Paper sx={{ p: 1.5, height: '300px', bgcolor: theme.palette.background.paper }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  {config.label} ({config.unit})
-                </Typography>
-                <Box sx={{ height: 'calc(100% - 24px)' }}>
-                  {chart}
-                </Box>
-              </Paper>
-            </Grid>
-          );
-        }).filter(Boolean);
-
-      if (charts.length > 0) {
-        return charts;
-      }
+    if (!metricsData || !metricsData.data || metricsData.data.length === 0 || !metricsConfig || selectedVariables.length === 0) {
+      return (
+        <Typography variant="body2" color="textSecondary" sx={{ p: { xs: 0, sm: 2 } }}>No data available to display charts for the selected period or variables.</Typography>
+      );
     }
 
-    return (
-      <Grid item xs={12}>
-        <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: theme.palette.background.paper }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            No data available. Please select variables and click Apply to fetch data.
-          </Typography>
-        </Paper>
-      </Grid>
-    );
+    if (combinedView) {
+      return (
+        <Grid item xs={12}>
+          <Paper sx={{ p: { xs: 0, sm: 2 }, height: 400 }}>
+            {renderCombinedChart(metricsData.data)}
+          </Paper>
+        </Grid>
+      );
+    }
+
+    return selectedVariables.map(key => {
+      const metricData = metricsData.data.map(d => ({ timestamp: d.timestamp, value: d[key] })).filter(d => d.value !== undefined && d.value !== null);
+      if (!metricsConfig[key] || metricData.length === 0) return null;
+
+      return (
+        <Grid item xs={12} sm={6} md={4} lg={3} key={key}>
+          <Paper sx={{ p: { xs: 0, sm: 2 }, height: 300 }}>
+            {renderChart(metricData, key)}
+          </Paper>
+        </Grid>
+      );
+    }).filter(Boolean);
   };
 
   return (
-    <Box sx={{ p: 1.5 }}>
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 1.5,
-        mb: 2,
-        flexWrap: 'wrap'
-      }}>
-        <Box sx={{ flex: 1, minWidth: '200px' }}>
-          <SharedControls
-            selectedVariables={selectedVariables}
-            availableVariables={availableVariables}
-            onVariableChange={onVariableChange}
-            timeRange={timeRange}
-            onTimeRangeChange={onTimeRangeChange}
-            onApply={onApply}
-          />
-        </Box>
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+      <SharedControls
+        timeRange={timeRange}
+        onTimeRangeChange={onTimeRangeChange}
+        onApply={onApply}
+        selectedVariables={selectedVariables}
+        availableVariables={availableVariables}
+        onVariableChange={onVariableChange}
+      />
+
+      <Box sx={{ mt: 2, flexGrow: 1 }}>
         <FormControlLabel
-          control={
-            <Switch
-              checked={combinedView}
-              onChange={(e) => setCombinedView(e.target.checked)}
-              color="primary"
-              size="small"
-            />
-          }
+          control={<Switch checked={combinedView} onChange={(e) => setCombinedView(e.target.checked)} />}
           label="Combined View"
-          sx={{
-            m: 0,
-            height: '32px',
-            alignItems: 'center',
-            '& .MuiFormControlLabel-label': {
-              color: theme.palette.text.secondary,
-              fontSize: '0.875rem'
-            }
-          }}
+          sx={{ mb: 1 }}
         />
+        <Grid container spacing={2}>
+          {renderCharts()}
+        </Grid>
       </Box>
-      <Grid container spacing={2}>
-        {renderCharts()}
-      </Grid>
     </Box>
   );
 };

@@ -9,24 +9,28 @@ const DashboardSummaryTab = ({ metricsData, metricsConfig, timeRange }) => {
     if (!metricsData || !metricsConfig) return null;
 
     return Object.entries(metricsConfig).map(([key, config]) => {
+      if (key === 'client_id' || key === 'ClientID') return null;
+      
       const data = metricsData[key];
       if (!data || !Array.isArray(data) || data.length === 0) return null;
 
-      const latestValue = data[data.length - 1]?.value;
-      if (latestValue === undefined) return null;
+      const value = data[data.length - 1];
+      if (value === undefined || value === null) return null;
 
+      const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
+      
       return (
-        <Grid item xs={12} sm={6} md={3} key={key}>
+        <Grid item xs={12} sm={6} key={key}>
           <MetricCard
             title={config.label}
-            value={latestValue}
+            value={displayValue}
             unit={config.unit}
             color={config.color}
             alertThresholds={config.alertThresholds}
           />
         </Grid>
       );
-    });
+    }).filter(Boolean); // Remove null entries
   };
 
   return (

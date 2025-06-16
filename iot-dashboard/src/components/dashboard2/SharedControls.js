@@ -33,9 +33,10 @@ const SharedControls = ({
   return (
     <Box sx={{ 
       display: 'flex', 
-      alignItems: 'center', 
+      flexDirection: { xs: 'column', sm: 'row' },
+      alignItems: { xs: 'stretch', sm: 'center' },
       gap: 2,
-      '& > *': { height: '40px' } // Ensure consistent height for all elements
+      '& > *': { height: '40px', width: { xs: '100%', sm: 'auto' } }
     }}>
       <Box sx={{ minWidth: 200, flex: 1 }}>
         <VariableSelector
@@ -68,7 +69,8 @@ const SharedControls = ({
         size="small"
         sx={{ 
           minWidth: 100,
-          height: '40px' // Match height with other elements
+          height: '40px',
+          width: { xs: '100%', sm: 'auto' }
         }}
       >
         Apply

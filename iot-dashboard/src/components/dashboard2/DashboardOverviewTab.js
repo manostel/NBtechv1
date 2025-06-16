@@ -5,6 +5,7 @@ import OverviewTiles from './OverviewTiles';
 import VariableSelector from './VariableSelector';
 import DeviceStateDisplay from './DeviceStateDisplay';
 import PropTypes from 'prop-types';
+import MetricCard from './MetricCard';
 
 const TriggeredAlarms = ({ triggeredAlarms, metricsConfig }) => {
   if (!triggeredAlarms || triggeredAlarms.length === 0) {
@@ -96,20 +97,41 @@ const DashboardOverviewTab = ({
     );
   }
 
+  const renderOverviewCards = () => {
+    if (!metricsData || !metricsConfig) return null;
+
+    // Get the latest data point
+    const latestData = metricsData.data_latest?.[0] || metricsData.data?.[0] || {};
+    
+    return Object.entries(metricsConfig).map(([key, config]) => {
+      if (key === 'client_id' || key === 'ClientID') return null;
+      
+      const value = latestData[key];
+      if (value === undefined || value === null) return null;
+
+      const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
+      
+      return (
+        <Grid item xs={6} sm={6} md={4} lg={3} key={key}>
+          <MetricCard
+            title={config.label}
+            value={displayValue}
+            unit={config.unit}
+            color={config.color}
+            alertThresholds={config.alertThresholds}
+          />
+        </Grid>
+      );
+    }).filter(Boolean); // Remove null entries
+  };
+
   return (
-    <Box sx={{ p: 1.5 }}>
+    <Box sx={{ py: 0.5, px: { xs: 0, sm: 0.5 }, width: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Metrics Title and Variable Selector */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        mb: 2,
-        flexWrap: 'wrap',
-        gap: 1
-      }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, minWidth: 0 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <ShowChartIcon sx={{ color: 'success.main', fontSize: '1.25rem' }} />
-          <Typography variant="subtitle1">Metrics</Typography>
+          <Typography variant="h6" sx={{ fontSize: '1rem' }}>Metrics</Typography>
         </Box>
         <VariableSelector
           variables={availableVariables}
@@ -120,7 +142,7 @@ const DashboardOverviewTab = ({
       </Box>
 
       {/* Overview Tiles */}
-      <Box sx={{ mt: 2 }}>
+      <Box sx={{ mt: 1.5, flexGrow: 1, minWidth: 0 }}>
         <OverviewTiles
           metricsData={metricsData}
           metricsConfig={metricsConfig}
@@ -131,12 +153,10 @@ const DashboardOverviewTab = ({
       </Box>
 
       {/* Device State Display */}
-      <Box sx={{ mt: 2 }}>
-        <DeviceStateDisplay
-          deviceState={deviceState}
-          isLoading={isLoading}
-        />
-      </Box>
+      <DeviceStateDisplay
+        deviceState={deviceState}
+        isLoading={isLoading}
+      />
     </Box>
   );
 };
