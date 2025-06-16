@@ -74,6 +74,10 @@ class NotificationService {
       console.log('Notifications are disabled');
       return;
     }
+    if (localStorage.getItem('pushEnabled') === 'false') {
+      console.log('Push notifications are disabled by user setting');
+      return;
+    }
 
     try {
       console.log('Showing alarm notification:', alarm);
@@ -105,6 +109,10 @@ class NotificationService {
   static async showDeviceStatusNotification(device, oldStatus, newStatus) {
     if (!this.enabled) {
       console.log('Notifications are disabled');
+      return;
+    }
+    if (localStorage.getItem('pushEnabled') === 'false') {
+      console.log('Push notifications are disabled by user setting');
       return;
     }
 
@@ -142,6 +150,10 @@ class NotificationService {
       console.log('Notifications are disabled');
       return;
     }
+    if (localStorage.getItem('pushEnabled') === 'false') {
+      console.log('Push notifications are disabled by user setting');
+      return;
+    }
 
     try {
       console.log('Showing battery low notification:', { device, batteryLevel });
@@ -174,6 +186,10 @@ class NotificationService {
   static async showSignalWeakNotification(device, signalStrength) {
     if (!this.enabled) {
       console.log('Notifications are disabled');
+      return;
+    }
+    if (localStorage.getItem('pushEnabled') === 'false') {
+      console.log('Push notifications are disabled by user setting');
       return;
     }
 

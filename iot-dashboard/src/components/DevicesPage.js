@@ -1523,46 +1523,45 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       </Helmet>
       
       <AppBar position="static" color="default" elevation={1}>
-        <Toolbar sx={{ px: 0 }}>
-          <Box sx={{ 
-            flexGrow: 1, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'flex-start'
-          }}>
+        <Toolbar sx={{ px: { xs: 1.5, sm: 3 }, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography 
               variant="h6" 
               component="div"
               sx={{ 
                 fontWeight: 700,
                 fontStyle: 'italic',
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
+                ml: 0.5,
+                mr: 2
               }}
             >
               NB-Tech v1
             </Typography>
-            <Typography variant="subtitle2" color="text.secondary">
+            <Typography variant="subtitle2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               {user.email}
             </Typography>
           </Box>
-          <IconButton
-            edge="end"
-            color="inherit"
-            aria-label="settings"
-            onClick={() => setSettingsOpen(true)}
-            sx={{ ml: 1 }}
-          >
-            <SettingsIcon />
-          </IconButton>
-          <IconButton
-            edge="end"
-            color="inherit"
-            aria-label="logout"
-            onClick={handleLogout}
-            sx={{ ml: 1 }}
-          >
-            <LogoutIcon />
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              edge="end"
+              color="inherit"
+              aria-label="settings"
+              onClick={() => setSettingsOpen(true)}
+              sx={{ mr: 1 }}
+            >
+              <SettingsIcon />
+            </IconButton>
+            <IconButton
+              edge="end"
+              color="inherit"
+              aria-label="logout"
+              onClick={handleLogout}
+              sx={{ mr: 0.5 }}
+            >
+              <LogoutIcon />
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
 

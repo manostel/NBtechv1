@@ -5,7 +5,11 @@ import { Brightness7, Brightness4, Close } from "@mui/icons-material";
 
 export default function SettingsDrawer({ open, onClose }) {
   const { currentTheme, setTheme } = useContext(CustomThemeContext);
-  const [pushEnabled, setPushEnabled] = useState(false);
+  // Persist pushEnabled in localStorage
+  const [pushEnabled, setPushEnabled] = useState(() => {
+    const stored = localStorage.getItem('pushEnabled');
+    return stored === null ? true : stored === 'true';
+  });
 
   const toggleTheme = () => {
     setTheme(currentTheme === "dark" ? "light" : "dark");
@@ -13,7 +17,8 @@ export default function SettingsDrawer({ open, onClose }) {
 
   const handlePushToggle = (event) => {
     setPushEnabled(event.target.checked);
-    // Here you would add logic to enable/disable push notifications
+    localStorage.setItem('pushEnabled', event.target.checked);
+    // TODO: Wire this into NotificationService to respect the setting globally
   };
 
   return (

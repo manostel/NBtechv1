@@ -1,11 +1,13 @@
 import React from "react";
-import { Paper, Box, Tabs, Tab } from "@mui/material";
+import { Paper, Box } from "@mui/material";
 import { 
   ShowChart as ShowChartIcon,
   Settings as SettingsIcon,
   History as HistoryIcon
 } from '@mui/icons-material';
 import TimeRangeMenu from "./TimeRangeMenu";
+import { ScrollMenu, VisibilityContext } from 'react-horizontal-scrolling-menu';
+import 'react-horizontal-scrolling-menu/dist/styles.css';
 
 const TIME_RANGES = [
   { value: 'live', label: 'Live' },
@@ -30,6 +32,12 @@ export default function DashboardControls({
   const handleTimeRangeChange = (newTimeRange) => {
     setTimeRange(newTimeRange);
   };
+
+  const tabs = [
+    { label: 'Overview', icon: <ShowChartIcon />, value: 0 },
+    { label: 'Commands', icon: <SettingsIcon />, value: 1 },
+    { label: 'History', icon: <HistoryIcon />, value: 2 },
+  ];
 
   return (
     <>
@@ -60,50 +68,39 @@ export default function DashboardControls({
         </Box>
       </Paper>
 
-      <Tabs
-        value={tabValue}
-        onChange={(e, newValue) => setTabValue(newValue)}
-        variant="scrollable"
-        scrollButtons={false}
-        sx={{ 
-          mb: 3,
-          borderBottom: 1,
-          borderColor: 'divider',
-          minWidth: 0,
-          pl: 0,
-          ml: 0,
-          justifyContent: 'flex-start',
-          alignItems: 'flex-start',
-          '& .MuiTabs-flexContainer': {
-            justifyContent: 'flex-start',
-          },
-          '& .MuiTab-root': {
-            textTransform: 'none',
-            fontWeight: 'bold',
-            fontSize: '1rem',
-            minWidth: 120,
-            '&.Mui-selected': {
-              color: 'primary.main',
-            }
-          }
-        }}
-      >
-        <Tab 
-          label="Overview" 
-          icon={<ShowChartIcon />} 
-          iconPosition="start" 
-        />
-        <Tab 
-          label="Commands" 
-          icon={<SettingsIcon />} 
-          iconPosition="start" 
-        />
-        <Tab 
-          label="History" 
-          icon={<HistoryIcon />} 
-          iconPosition="start" 
-        />
-      </Tabs>
+      <Box sx={{ mb: 3, borderBottom: 1, borderColor: 'divider', minWidth: 0, pl: 0, ml: 0 }}>
+        <ScrollMenu>
+          {tabs.map((tab) => (
+            <Box
+              key={tab.value}
+              onClick={() => setTabValue(tab.value)}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                px: 2,
+                py: 1,
+                cursor: 'pointer',
+                fontWeight: tabValue === tab.value ? 'bold' : 400,
+                fontSize: '1rem',
+                color: tabValue === tab.value ? 'primary.main' : 'text.primary',
+                borderBottom: tabValue === tab.value ? '3px solid' : '3px solid transparent',
+                borderColor: tabValue === tab.value ? 'primary.main' : 'transparent',
+                backgroundColor: 'transparent',
+                transition: 'all 0.2s',
+                minWidth: 120,
+                mr: 1,
+                borderRadius: 2,
+                '&:hover': {
+                  backgroundColor: 'action.hover',
+                },
+              }}
+            >
+              {tab.icon}
+              <span style={{ marginLeft: 8 }}>{tab.label}</span>
+            </Box>
+          ))}
+        </ScrollMenu>
+      </Box>
     </>
   );
 } 
