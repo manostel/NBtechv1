@@ -51,7 +51,7 @@ const DashboardStatisticsTab = ({
     <Paper 
       elevation={0}
       sx={{ 
-        p: 2,
+        p: 1.2,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -66,30 +66,94 @@ const DashboardStatisticsTab = ({
         }
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        {icon}
-        <Typography variant="subtitle2" color="textSecondary" sx={{ ml: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, minHeight: 24 }}>
+        {icon && React.cloneElement(icon, { sx: { fontSize: 20, color: color || theme.palette.primary.main, mr: 1 } })}
+        <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 400, fontSize: '0.95rem', textAlign: 'left' }}>
           {title}
         </Typography>
       </Box>
-      <Typography variant="h4" component="div" sx={{ mt: 1 }}>
-        {value !== undefined ? value.toFixed(2) : 'N/A'}
+      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-start', gap: 0.5, ml: 0 }}>
+        <Typography
+          variant="h4"
+          component="div"
+          sx={{ fontSize: '1.2rem', fontWeight: 400, lineHeight: 1 }}
+        >
+          {value !== undefined ? value.toFixed(2) : 'N/A'}
+        </Typography>
         {unit && (
           <Typography 
             component="span" 
             variant="body2" 
             color="textSecondary"
-            sx={{ ml: 0.5 }}
+            sx={{ fontSize: '0.9rem', ml: 0 }}
           >
             {unit}
           </Typography>
         )}
-      </Typography>
+      </Box>
     </Paper>
   );
 
+  let dataPointsCount = null;
+  const statsList = selectedVariables.map((key) => {
+    const config = metricsConfig[key];
+    if (!config) return null;
+
+    const stats = calculateStatistics(metricsData.data, key);
+    if (!stats) return null;
+    if (dataPointsCount === null) dataPointsCount = stats.count;
+
+    return (
+      <Grid item xs={12} key={key}>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+            {config.label}
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={6} sm={6} md={3}>
+              <StatCard
+                title="Average"
+                value={stats.average}
+                unit={config.unit}
+                icon={<TimelineIcon color="primary" />}
+                color={theme.palette.primary.main}
+              />
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <StatCard
+                title="Minimum"
+                value={stats.min}
+                unit={config.unit}
+                icon={<TrendingDownIcon color="error" />}
+                color={theme.palette.error.main}
+              />
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <StatCard
+                title="Maximum"
+                value={stats.max}
+                unit={config.unit}
+                icon={<TrendingUpIcon color="success" />}
+                color={theme.palette.success.main}
+              />
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <StatCard
+                title="Standard Deviation"
+                value={stats.standardDeviation}
+                unit={config.unit}
+                icon={<SpeedIcon color="warning" />}
+                color={theme.palette.warning.main}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+      </Grid>
+    );
+  }).filter(Boolean);
+
   return (
-    <Box sx={{ py: 3, px: { xs: 0, sm: 3 } }}>
+    <Box sx={{ py: 0, px: 0.5 }}>
       <SharedControls
         selectedVariables={selectedVariables}
         availableVariables={availableVariables}
@@ -97,67 +161,16 @@ const DashboardStatisticsTab = ({
         timeRange={timeRange}
         onTimeRangeChange={onTimeRangeChange}
         onApply={onApply}
+        title={<span style={{ fontWeight: 400, fontSize: '1rem' }}>Statistics</span>}
       />
       <Grid container spacing={2}>
-        {selectedVariables.map((key) => {
-          const config = metricsConfig[key];
-          if (!config) return null;
-
-          const stats = calculateStatistics(metricsData.data, key);
-          if (!stats) return null;
-
-          return (
-            <Grid item xs={12} key={key}>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  {config.label}
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={6} md={3}>
-                    <StatCard
-                      title="Average"
-                      value={stats.average}
-                      unit={config.unit}
-                      icon={<TimelineIcon color="primary" />}
-                      color={theme.palette.primary.main}
-                    />
-                  </Grid>
-                  <Grid item xs={6} sm={6} md={3}>
-                    <StatCard
-                      title="Minimum"
-                      value={stats.min}
-                      unit={config.unit}
-                      icon={<TrendingDownIcon color="error" />}
-                      color={theme.palette.error.main}
-                    />
-                  </Grid>
-                  <Grid item xs={6} sm={6} md={3}>
-                    <StatCard
-                      title="Maximum"
-                      value={stats.max}
-                      unit={config.unit}
-                      icon={<TrendingUpIcon color="success" />}
-                      color={theme.palette.success.main}
-                    />
-                  </Grid>
-                  <Grid item xs={6} sm={6} md={3}>
-                    <StatCard
-                      title="Standard Deviation"
-                      value={stats.standardDeviation}
-                      unit={config.unit}
-                      icon={<SpeedIcon color="warning" />}
-                      color={theme.palette.warning.main}
-                    />
-                  </Grid>
-                </Grid>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-                  Based on {stats.count} data points
-                </Typography>
-              </Box>
-            </Grid>
-          );
-        })}
+        {statsList}
       </Grid>
+      {dataPointsCount !== null && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 2, textAlign: 'center' }}>
+          Based on {dataPointsCount} data points
+        </Typography>
+      )}
     </Box>
   );
 };

@@ -126,30 +126,40 @@ const DashboardOverviewTab = ({
   };
 
   return (
-    <Box sx={{ py: 0.5, px: { xs: 0, sm: 0.5 }, width: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ p: 0, width: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Metrics Title and Variable Selector */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, minWidth: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mt: 0, // No top margin
+        pt: 0, // No top padding
+        mb: 1, // Keep reasonable bottom margin
+        minWidth: 0,
+        px: 0.5, // Minimal horizontal padding
+        height: '32px' // Match height with other tabs
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '32px' }}>
           <ShowChartIcon sx={{ color: 'success.main', fontSize: '1.25rem' }} />
           <Typography variant="h6" sx={{ fontSize: '1rem' }}>Metrics</Typography>
         </Box>
-      <VariableSelector
-        variables={availableVariables}
-        selectedVariables={selectedVariables}
-        onVariableChange={onVariableChange}
+        <VariableSelector
+          variables={availableVariables}
+          selectedVariables={selectedVariables}
+          onVariableChange={onVariableChange}
           showTitle={false}
-      />
+        />
       </Box>
 
       {/* Overview Tiles */}
-      <Box sx={{ mt: 1.5, flexGrow: 1, minWidth: 0 }}>
+      <Box sx={{ mt: 0, flexGrow: 1, minWidth: 0 }}>
         <OverviewTiles
           metricsData={metricsData}
           metricsConfig={metricsConfig}
           selectedVariables={selectedVariables}
           isLoading={isLoading}
           triggeredAlarms={triggeredAlarms}
-              />
+        />
       </Box>
 
       {/* Device State Display */}

@@ -8,7 +8,8 @@ import {
   Checkbox, 
   ListItemText, 
   OutlinedInput,
-  Typography
+  Typography,
+  useTheme
 } from '@mui/material';
 import { ShowChart as ShowChartIcon } from '@mui/icons-material';
 
@@ -20,6 +21,7 @@ const VariableSelector = ({
   singleSelect = false,
   showTitle = false
 }) => {
+  const theme = useTheme();
   const [tempSelected, setTempSelected] = useState(selectedVariables);
 
   // Update tempSelected when selectedVariables prop changes
@@ -35,7 +37,7 @@ const VariableSelector = ({
   };
 
   return (
-    <Box sx={{ mb: 2 }}>
+    <Box sx={{ mb: 0 }}>
       {showTitle && (
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <ShowChartIcon sx={{ mr: 1, color: 'primary.main' }} />
@@ -44,13 +46,24 @@ const VariableSelector = ({
           </Typography>
         </Box>
       )}
-      <FormControl sx={{ width: 150 }} size="small">
-        <InputLabel>{label}</InputLabel>
+      <FormControl sx={{ width: 120 }} size="small">
+        <InputLabel sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>{label}</InputLabel>
         <Select
           multiple={!singleSelect}
           value={tempSelected}
           onChange={handleChange}
-          input={<OutlinedInput label={label} />}
+          input={<OutlinedInput 
+            label={label}
+            sx={{
+              color: 'text.primary',
+              fontSize: '0.8rem',
+              height: '32px',
+              borderRadius: '20px',
+              paddingLeft: '12px',
+              paddingRight: '32px',
+              backgroundColor: 'inherit',
+            }}
+          />}
           renderValue={(selected) => {
             if (singleSelect) {
               return selected[0] || '';
@@ -61,8 +74,27 @@ const VariableSelector = ({
             PaperProps: {
               style: {
                 maxHeight: 200,
-                width: 200,
+                width: 180,
+                backgroundColor: '#1a1f3c',
+                color: '#E0E0E0',
+                borderRadius: '12px',
+                marginTop: '4px'
               },
+            },
+          }}
+          sx={{
+            fontSize: '0.8rem',
+            height: '32px',
+            borderRadius: '20px',
+            color: 'text.primary',
+            backgroundColor: 'inherit',
+            '& .MuiSelect-icon': {
+              color: 'text.secondary',
+              fontSize: '1.2rem',
+              right: '8px'
+            },
+            '&:hover .MuiSelect-icon': {
+              color: 'text.primary',
             },
           }}
         >
@@ -72,18 +104,41 @@ const VariableSelector = ({
               value={variable}
               sx={{ 
                 py: 0.5,
+                fontSize: '0.8rem',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                },
+                '&.Mui-selected': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                  },
+                },
                 '& .MuiListItemText-root': {
                   margin: 0
                 }
               }}
             >
-              {!singleSelect && <Checkbox checked={tempSelected.indexOf(variable) > -1} size="small" />}
+              {!singleSelect && (
+                <Checkbox 
+                  checked={tempSelected.indexOf(variable) > -1} 
+                  size="small"
+                  sx={{
+                    color: 'text.secondary',
+                    padding: '4px',
+                    '&.Mui-checked': {
+                      color: theme.palette.primary.main,
+                    },
+                  }}
+                />
+              )}
               <ListItemText 
                 primary={variable} 
                 sx={{ 
                   ml: singleSelect ? 0 : 1,
                   '& .MuiTypography-root': {
-                    fontSize: '0.875rem'
+                    fontSize: '0.8rem',
+                    color: 'text.primary',
                   }
                 }}
               />

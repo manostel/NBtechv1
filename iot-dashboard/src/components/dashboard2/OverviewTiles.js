@@ -70,9 +70,10 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
         }
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        {icon}
-        <Typography variant="subtitle2" color="textSecondary" sx={{ ml: 1 }}>
+      {/* Icon, title, and alarm indicator in one row */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, minHeight: 24 }}>
+        {icon && <Box sx={{ mr: 1 }}>{icon}</Box>}
+        <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 400, fontSize: '0.95rem', textAlign: 'left' }}>
           {title}
         </Typography>
         {alarmActive && (
@@ -81,28 +82,30 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
             arrow
             placement="top"
           >
-            <Box sx={{ ml: 1, cursor: 'help' }}>
+            <Box sx={{ ml: 1, cursor: 'help', display: 'flex', alignItems: 'center' }}>
               {getSeverityIcon(overallAlarmSeverity)}
             </Box>
           </Tooltip>
         )}
       </Box>
+      {/* Value and unit */}
       {isLoading ? (
         <CircularProgress size={24} />
       ) : (
-        <Typography variant="h4" component="div" sx={{ mt: 1 }}>
-          {value}
+        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-start', gap: 0.5, ml: 0 }}>
+          <Typography
+            variant="h4"
+            component="div"
+            sx={{ fontSize: '1.2rem', fontWeight: 400, lineHeight: 1 }}
+          >
+            {value}
+          </Typography>
           {unit && (
-            <Typography 
-              component="span" 
-              variant="body2" 
-              color="textSecondary"
-              sx={{ ml: 0.5 }}
-            >
+            <Typography component="span" variant="body2" color="textSecondary" sx={{ fontSize: '0.9rem', ml: 0 }}>
               {unit}
             </Typography>
           )}
-        </Typography>
+        </Box>
       )}
     </Paper>
   );

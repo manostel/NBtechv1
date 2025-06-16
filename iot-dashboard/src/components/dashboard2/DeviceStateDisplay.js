@@ -12,7 +12,7 @@ const StateCard = ({ title, value, icon, color, unit, isBoolean }) => {
   const theme = useTheme();
 
   const getBooleanColor = (value) => {
-    return value ? theme.palette.success.main : theme.palette.error.main;
+    return value ? theme.palette.success.main : theme.palette.grey[400];
   };
 
   const displayValue = isBoolean ? (value ? 1 : 0) : value;
@@ -36,30 +36,37 @@ const StateCard = ({ title, value, icon, color, unit, isBoolean }) => {
         }
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, minHeight: 24 }}>
         {React.cloneElement(icon, {
           sx: {
             color: isBoolean ? getBooleanColor(value) : (color || theme.palette.primary.main),
             fontSize: 24,
+            mr: 1
           }
         })}
-        <Typography variant="subtitle2" color="textSecondary" sx={{ ml: 1 }}>
+        <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 400, fontSize: '0.95rem', textAlign: 'left' }}>
           {title}
         </Typography>
       </Box>
-      <Typography variant="h4" component="div" sx={{ mt: 1 }}>
-        {displayValue !== undefined ? (typeof displayValue === 'number' ? displayValue.toFixed(2) : displayValue) : 'N/A'}
-                {unit && (
-                  <Typography 
-                    component="span" 
-                    variant="body2" 
-                    color="textSecondary"
-                    sx={{ ml: 0.5 }}
-                  >
-                    {unit}
-                  </Typography>
-                )}
-              </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-start', gap: 0.5, ml: 0 }}>
+        <Typography
+          variant="h4"
+          component="div"
+          sx={{ fontSize: '1.2rem', fontWeight: 400, lineHeight: 1 }}
+        >
+          {displayValue !== undefined ? (typeof displayValue === 'number' ? displayValue.toFixed(2) : displayValue) : 'N/A'}
+        </Typography>
+        {unit && (
+          <Typography 
+            component="span" 
+            variant="body2" 
+            color="textSecondary"
+            sx={{ fontSize: '0.9rem', ml: 0 }}
+          >
+            {unit}
+          </Typography>
+        )}
+      </Box>
     </Paper>
   );
 };

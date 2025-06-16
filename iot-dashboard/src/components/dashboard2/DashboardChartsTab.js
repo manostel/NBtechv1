@@ -16,7 +16,7 @@ import {
 import 'chartjs-adapter-date-fns';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import SharedControls from './SharedControls';
-import { Fullscreen as FullscreenIcon, FullscreenExit as FullscreenExitIcon } from '@mui/icons-material';
+import { Fullscreen as FullscreenIcon, FullscreenExit as FullscreenExitIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { format, subMinutes, subHours, subDays } from 'date-fns';
 
 ChartJS.register(
@@ -44,13 +44,13 @@ const DashboardChartsTab = ({
   onApply
 }) => {
   const theme = useTheme();
-  const chartRef = useRef(null);
+  const chartRefs = useRef({});
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenChart, setFullscreenChart] = useState(null);
 
   const handleFullscreenToggle = () => {
     if (!document.fullscreenElement) {
-      chartRef.current.requestFullscreen();
+      chartRefs.current.chartRef.current.requestFullscreen();
       setIsFullscreen(true);
     } else {
       document.exitFullscreen();
@@ -111,11 +111,11 @@ const DashboardChartsTab = ({
       default:
         return 'HH:mm';
     }
-  };
+    };
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
     animation: {
       duration: 750,
       easing: 'easeInOutQuart'
@@ -125,10 +125,10 @@ const DashboardChartsTab = ({
       axis: 'x',
       intersect: false
     },
-    plugins: {
-      legend: {
+      plugins: {
+        legend: { 
         position: 'top',
-        labels: {
+          labels: { 
           usePointStyle: true,
           padding: 20,
           font: {
@@ -136,9 +136,9 @@ const DashboardChartsTab = ({
             weight: 'bold'
           },
           color: '#E0E0E0'
-        }
-      },
-      tooltip: {
+          }
+        },
+        tooltip: {
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         titleFont: {
           size: 14,
@@ -150,10 +150,10 @@ const DashboardChartsTab = ({
         padding: 12,
         cornerRadius: 8,
         displayColors: true,
-        callbacks: {
-          label: function(context) {
-            const label = context.dataset.label || '';
-            const value = context.parsed.y;
+          callbacks: {
+            label: function(context) {
+              const label = context.dataset.label || '';
+              const value = context.parsed.y;
             return `${label}: ${value.toFixed(2)}`;
           },
           title: function(context) {
@@ -186,30 +186,30 @@ const DashboardChartsTab = ({
         },
         limits: {
           x: {min: 'original', max: 'original'}
+          }
         }
-      }
-    },
-    scales: {
-      x: {
+      },
+      scales: {
+        x: {
         type: 'time',
-        time: {
+          time: { 
           unit: getTimeUnit(),
           tooltipFormat: getTimeFormat(),
-          displayFormats: {
-            minute: 'HH:mm',
-            hour: 'MMM dd, HH:mm',
-            day: 'MMM dd'
-          }
-        },
+            displayFormats: {
+              minute: 'HH:mm',
+              hour: 'MMM dd, HH:mm',
+              day: 'MMM dd'
+            }
+          },
         grid: {
-          display: true,
+            display: true, 
           color: 'rgba(255, 255, 255, 0.1)',
           drawBorder: false
-        },
-        ticks: {
+          },
+          ticks: {
           maxRotation: 45,
           minRotation: 45,
-          font: {
+            font: {
             size: 11
           },
           color: '#E0E0E0'
@@ -222,21 +222,21 @@ const DashboardChartsTab = ({
             weight: 'bold'
           },
           color: '#E0E0E0'
-        }
-      },
-      y: {
-        beginAtZero: true,
+          }
+        },
+        y: {
+          beginAtZero: true,
         grid: {
           display: true,
           color: 'rgba(255, 255, 255, 0.1)',
           drawBorder: false
         },
-        ticks: {
-          font: {
+          ticks: { 
+            font: {
             size: 11
-          },
+            },
           color: '#E0E0E0',
-          callback: function(value) {
+            callback: function(value) {
             return value.toFixed(1);
           }
         },
@@ -254,9 +254,13 @@ const DashboardChartsTab = ({
   };
 
   const renderChart = (data, metricKey) => {
+    if (!chartRefs.current[metricKey]) {
+      chartRefs.current[metricKey] = React.createRef();
+    }
+    const localChartRef = chartRefs.current[metricKey];
     if (!data || !Array.isArray(data) || data.length === 0) {
       return (
-        <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Box sx={{ p: 1, textAlign: 'center' }}>
           <Typography color="textSecondary">No data available</Typography>
         </Box>
       );
@@ -266,16 +270,16 @@ const DashboardChartsTab = ({
     const chartData = {
       labels: data.map(d => new Date(d.timestamp.replace('Z', ''))),
       datasets: [{
-        label: `${config.label} (${config.unit})`,
+          label: `${config.label} (${config.unit})`,
         data: data.map(d => parseFloat(d[metricKey])),
-        borderColor: config.color,
+          borderColor: config.color,
         backgroundColor: `${config.color}20`,
-        fill: true,
-        tension: 0.4,
-        borderWidth: 2,
-        pointRadius: chartConfig.showPoints ? 3 : 0,
-        pointHoverRadius: 6,
-        pointBackgroundColor: config.color,
+          fill: true,
+          tension: 0.4,
+          borderWidth: 2,
+          pointRadius: chartConfig.showPoints ? 3 : 0,
+          pointHoverRadius: 6,
+          pointBackgroundColor: config.color,
         pointBorderColor: '#fff',
         pointBorderWidth: 2,
         pointStyle: 'circle'
@@ -284,7 +288,6 @@ const DashboardChartsTab = ({
 
     return (
       <Box
-        ref={chartRef}
         sx={{
           position: 'relative',
           width: '100%',
@@ -292,9 +295,35 @@ const DashboardChartsTab = ({
           transition: 'height 0.3s ease',
           backgroundColor: '#1a1f3c',
           borderRadius: 1,
-          p: 2
+          p: 0.5,
+          px: 0
         }}
       >
+        <IconButton
+          onClick={() => {
+            if (localChartRef.current && localChartRef.current.resetZoom) {
+              localChartRef.current.resetZoom();
+            }
+          }}
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 48,
+            zIndex: 1,
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            color: '#E0E0E0',
+            mr: 1,
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            },
+            transition: 'all 0.2s ease-in-out',
+            '& .MuiSvgIcon-root': {
+              fontSize: '1.2rem'
+            }
+          }}
+        >
+          <RefreshIcon />
+        </IconButton>
         <IconButton
           onClick={() => handleFullscreenToggleChart(chartData)}
           sx={{
@@ -316,6 +345,7 @@ const DashboardChartsTab = ({
           {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
         </IconButton>
         <Line
+          ref={localChartRef}
           data={chartData}
           options={chartOptions}
         />
@@ -325,7 +355,7 @@ const DashboardChartsTab = ({
 
   return (
     <Box>
-      <SharedControls
+          <SharedControls
         selectedVariables={selectedVariables}
         availableVariables={availableVariables}
         onVariableChange={onVariableChange}
@@ -335,16 +365,18 @@ const DashboardChartsTab = ({
         chartConfig={chartConfig}
       />
       
-      <Grid container spacing={2} sx={{ mt: 2 }}>
+      <Grid container spacing={1} sx={{ mt: 2 }}>
         {selectedVariables.map(metricKey => (
           <Grid item xs={12} md={6} key={metricKey}>
             <Paper 
               elevation={2}
               sx={{ 
-                p: 2,
-                borderRadius: 2,
+                p: 0.5,
+                px: 0,
+                borderRadius: 1,
                 transition: 'transform 0.2s ease-in-out',
                 backgroundColor: '#1a1f3c',
+                width: '100%',
                 '&:hover': {
                   transform: 'translateY(-2px)',
                   boxShadow: 3
@@ -398,7 +430,7 @@ const DashboardChartsTab = ({
               />
             )}
           </Box>
-        </Box>
+      </Box>
       </Dialog>
     </Box>
   );

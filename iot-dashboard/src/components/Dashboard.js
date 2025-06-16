@@ -128,7 +128,7 @@ function TabPanel({ children, value, index, ...other }) {
       {...other}
     >
       {value === index && (
-        <Box sx={{ py: 3, px: { xs: 0, sm: 3 } }}>
+        <Box sx={{ py: 0, px: { xs: 0, sm: 3 } }}>
           {children}
         </Box>
       )}

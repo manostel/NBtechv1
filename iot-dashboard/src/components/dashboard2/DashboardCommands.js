@@ -306,7 +306,7 @@ const DashboardCommands = ({
   };
 
   return (
-    <Paper elevation={3} sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Paper elevation={3} sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 2 }}>
       {isLoading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress />
@@ -314,47 +314,93 @@ const DashboardCommands = ({
       )}
       {!isLoading && (
         <>
-          <Typography variant="h6">LED Control</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography>LED 1</Typography>
-          <Switch
-            checked={led1State}
-            onChange={(e) => handleSwitchChange(1, e.target.checked)}
+          <Typography variant="subtitle1" sx={{ fontSize: '1rem', fontWeight: 400, mb: 0.5 }}>LED Control</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.95rem' }}>LED 1</Typography>
+            <Switch
+              checked={led1State}
+              onChange={(e) => handleSwitchChange(1, e.target.checked)}
               inputProps={{ 'aria-label': 'LED 1 switch' }}
-          />
-        </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography>LED 2</Typography>
-          <Switch
-            checked={led2State}
-            onChange={(e) => handleSwitchChange(2, e.target.checked)}
+              size="small"
+              sx={{
+                '& .MuiSwitch-switchBase': {
+                  borderRadius: '16px',
+                },
+                '& .MuiSwitch-thumb': {
+                  borderRadius: '16px',
+                },
+                '& .MuiSwitch-track': {
+                  borderRadius: '16px',
+                },
+              }}
+            />
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.95rem' }}>LED 2</Typography>
+            <Switch
+              checked={led2State}
+              onChange={(e) => handleSwitchChange(2, e.target.checked)}
               inputProps={{ 'aria-label': 'LED 2 switch' }}
-          />
-        </Box>
+              size="small"
+              sx={{
+                '& .MuiSwitch-switchBase': {
+                  borderRadius: '16px',
+                },
+                '& .MuiSwitch-thumb': {
+                  borderRadius: '16px',
+                },
+                '& .MuiSwitch-track': {
+                  borderRadius: '16px',
+                },
+              }}
+            />
+          </Box>
 
-          <Typography variant="h6" sx={{ mt: 2 }}>Motor Speed</Typography>
-          <form onSubmit={handleSpeedSubmit}>
-          <TextField
+          <Typography variant="subtitle1" sx={{ fontSize: '1rem', fontWeight: 400, mt: 1, mb: 0.5 }}>Motor Speed</Typography>
+          <form onSubmit={handleSpeedSubmit} style={{ width: '100%' }}>
+            <TextField
               label="Speed (0-100)"
-            type="number"
-            value={motorSpeed}
-            onChange={(e) => setMotorSpeed(e.target.value)}
-              inputProps={{ min: 0, max: 100, step: 1 }}
+              type="number"
+              value={motorSpeed}
+              onChange={(e) => setMotorSpeed(e.target.value)}
+              inputProps={{ min: 0, max: 100, step: 1, style: { height: '32px', fontSize: '0.8rem', borderRadius: 20, padding: '0 12px' } }}
               fullWidth
               variant="outlined"
               margin="normal"
               disabled={isVerifying}
-          />
-          <Button
-            type="submit"
-            variant="contained"
-              color="primary" 
-              fullWidth 
+              sx={{
+                height: '32px',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '20px',
+                  height: '32px',
+                  fontSize: '0.8rem',
+                  padding: '0 12px',
+                },
+                '& .MuiInputBase-input': {
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '0.8rem',
+                },
+              }}
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              fullWidth
               disabled={isVerifying}
-              sx={{ mt: 1 }}
-          >
-            {isVerifying ? <CircularProgress size={24} /> : 'Set Speed'}
-          </Button>
+              sx={{
+                mt: 0.5,
+                height: '32px',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                px: 2
+              }}
+            >
+              {isVerifying ? <CircularProgress size={24} /> : 'Set Speed'}
+            </Button>
           </form>
 
           {commandFeedback.show && (
@@ -367,30 +413,48 @@ const DashboardCommands = ({
             />
           )}
 
-          <Typography variant="h6" sx={{ mt: 2 }}>Power Saving Mode</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography>Enable Power Saving</Typography>
+          <Typography variant="subtitle1" sx={{ fontSize: '1rem', fontWeight: 400, mt: 1, mb: 0.5 }}>Power Saving Mode</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.95rem' }}>Enable Power Saving</Typography>
             <Switch
               checked={powerSavingMode}
               onChange={(e) => handlePowerSavingChange(e.target.checked)}
               inputProps={{ 'aria-label': 'Power Saving Mode switch' }}
+              size="small"
+              sx={{
+                '& .MuiSwitch-switchBase': {
+                  borderRadius: '16px',
+                },
+                '& .MuiSwitch-thumb': {
+                  borderRadius: '16px',
+                },
+                '& .MuiSwitch-track': {
+                  borderRadius: '16px',
+                },
+              }}
             />
-        </Box>
+          </Box>
 
-          <Typography variant="h6" sx={{ mt: 2 }}>Device Actions</Typography>
-        <Button
-          variant="contained"
-            color="error" 
-          startIcon={<RestartAltIcon />}
-          onClick={handleRestart}
+          <Typography variant="subtitle1" sx={{ fontSize: '1rem', fontWeight: 400, mt: 1, mb: 0.5 }}>Device Actions</Typography>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<RestartAltIcon />}
+            onClick={handleRestart}
             fullWidth
             disabled={isLoading}
-        >
+            sx={{
+              height: '32px',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              px: 2
+            }}
+          >
             Restart Device
-        </Button>
+          </Button>
         </>
       )}
-        </Paper>
+    </Paper>
   );
 };
 

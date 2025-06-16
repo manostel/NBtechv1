@@ -37,6 +37,8 @@ export default function DashboardControls({
         p: 1.5,
         mb: 2,
         bgcolor: 'background.paper',
+        pl: 0,
+        ml: 0,
         '& .MuiButton-root': {
           minHeight: 28,
           minWidth: 'auto'
@@ -46,7 +48,9 @@ export default function DashboardControls({
           display: 'flex', 
           flexWrap: 'wrap', 
           gap: 1,
-          alignItems: 'center' 
+          alignItems: 'center',
+          pl: 0,
+          ml: 0
         }}>
           <TimeRangeMenu
             timeRange={timeRange}
@@ -59,10 +63,20 @@ export default function DashboardControls({
       <Tabs
         value={tabValue}
         onChange={(e, newValue) => setTabValue(newValue)}
+        variant="scrollable"
+        scrollButtons={false}
         sx={{ 
           mb: 3,
           borderBottom: 1,
           borderColor: 'divider',
+          minWidth: 0,
+          pl: 0,
+          ml: 0,
+          justifyContent: 'flex-start',
+          alignItems: 'flex-start',
+          '& .MuiTabs-flexContainer': {
+            justifyContent: 'flex-start',
+          },
           '& .MuiTab-root': {
             textTransform: 'none',
             fontWeight: 'bold',

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, FormControl, InputLabel, Select, MenuItem, Button } from '@mui/material';
 import VariableSelector from './VariableSelector';
+import { ShowChart as ShowChartIcon } from '@mui/icons-material';
 
 const TIME_RANGES = [
   { value: 'live', label: 'Live' },
@@ -23,7 +24,8 @@ const SharedControls = ({
   timeRange,
   onTimeRangeChange,
   onApply,
-  isOverview = false
+  isOverview = false,
+  title = 'Charts'
 }) => {
   // Don't render anything for the overview tab as it uses the latest data API
   if (isOverview) {
@@ -35,46 +37,90 @@ const SharedControls = ({
       display: 'flex', 
       flexDirection: { xs: 'column', sm: 'row' },
       alignItems: { xs: 'stretch', sm: 'center' },
+      justifyContent: { xs: 'flex-start', sm: 'space-between' },
       gap: 2,
-      '& > *': { height: '40px', width: { xs: '100%', sm: 'auto' } }
+      '& > *': { height: '32px', width: { xs: '100%', sm: 'auto' } }
     }}>
-      <Box sx={{ minWidth: 200, flex: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: { xs: 1, sm: 0 }, minWidth: 0 }}>
+        <ShowChartIcon sx={{ color: 'success.main', fontSize: '1.25rem' }} />
+        <span style={{ fontWeight: 400, fontSize: '1rem' }}>{title}</span>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 2, justifyContent: { xs: 'flex-start', sm: 'flex-end' }, flex: 1 }}>
+        <FormControl size="small" sx={{ width: 120 }}>
+          <InputLabel sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>Time Range</InputLabel>
+          <Select
+            value={timeRange}
+            onChange={(e) => onTimeRangeChange(e.target.value)}
+            label="Time Range"
+            size="small"
+            inputProps={{
+              sx: {
+                fontSize: '0.8rem',
+                height: '32px',
+                borderRadius: '20px',
+                paddingLeft: '12px',
+                paddingRight: '32px',
+                backgroundColor: 'inherit',
+              }
+            }}
+            sx={{
+              fontSize: '0.8rem',
+              height: '32px',
+              borderRadius: '20px',
+              color: 'text.primary',
+              backgroundColor: 'inherit',
+              '& .MuiSelect-icon': {
+                color: 'text.secondary',
+                fontSize: '1.2rem',
+                right: '8px'
+              },
+              '&:hover .MuiSelect-icon': {
+                color: 'text.primary',
+              },
+            }}
+            MenuProps={{
+              PaperProps: {
+                style: {
+                  maxHeight: 200,
+                  width: 180,
+                  backgroundColor: '#1a1f3c',
+                  color: '#E0E0E0',
+                  borderRadius: '12px',
+                  marginTop: '4px'
+                },
+              },
+            }}
+          >
+            {TIME_RANGES.map((range) => (
+              <MenuItem key={range.value} value={range.value} sx={{ fontSize: '0.8rem' }}>
+                {range.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <VariableSelector
           variables={availableVariables}
           selectedVariables={selectedVariables}
           onVariableChange={onVariableChange}
           label="Chart Variables"
         />
-      </Box>
-      <FormControl size="small" sx={{ minWidth: 150 }}>
-        <InputLabel>Time Range</InputLabel>
-        <Select
-          value={timeRange}
-          onChange={(e) => onTimeRangeChange(e.target.value)}
-          label="Time Range"
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={onApply}
+          disabled={selectedVariables.length === 0}
           size="small"
+          sx={{ 
+            minWidth: 80,
+            height: '32px',
+            borderRadius: '20px',
+            fontSize: '0.8rem',
+            px: 2
+          }}
         >
-          {TIME_RANGES.map((range) => (
-            <MenuItem key={range.value} value={range.value}>
-              {range.label}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={onApply}
-        disabled={selectedVariables.length === 0}
-        size="small"
-        sx={{ 
-          minWidth: 100,
-          height: '40px',
-          width: { xs: '100%', sm: 'auto' }
-        }}
-      >
-        Apply
-      </Button>
+          Apply
+        </Button>
+      </Box>
     </Box>
   );
 };

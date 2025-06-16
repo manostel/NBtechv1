@@ -25,7 +25,9 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Tabs,
+  Tab
 } from '@mui/material';
 import { 
   Notifications as NotificationsIcon,
@@ -69,6 +71,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
     enabled: true,
     severity: 'warning'
   });
+  const [activeTab, setActiveTab] = useState(0);
 
   const fetchAlarms = useCallback(async () => {
     if (!device?.client_id) {
@@ -444,140 +447,145 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
   }
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={12} md={6} lg={6}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ fontSize: '1rem' }}>
-                <NotificationsIcon sx={{ verticalAlign: 'middle', mr: 0.5 }} /> Current Alarms
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => setNewAlarmDialog(true)}
-                size="small"
-              >
-                Add Alarm
-              </Button>
+    <Box sx={{ py: 0, px: 0.5 }}>
+      <Tabs
+        value={activeTab}
+        onChange={(_, newValue) => setActiveTab(newValue)}
+        sx={{ mb: 2, minHeight: 32, '& .MuiTab-root': { minHeight: 32, fontSize: '1rem', textTransform: 'none' } }}
+      >
+        <Tab label="Triggered Alarms" />
+        <Tab label="Manage Alarms" />
+      </Tabs>
+      {activeTab === 0 && (
+        <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 2 }}>
+            <WarningIcon sx={{ verticalAlign: 'middle', mr: 0.5 }} /> Triggered Alarms
+          </Typography>
+          {isLoading && !triggeredAlarms.length && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+              <CircularProgress />
             </Box>
-            {isLoading && !alarms.length && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                <CircularProgress />
-              </Box>
-            )}
-            {!isLoading && alarms.length === 0 ? (
-              <Typography variant="body2" color="textSecondary">No alarms configured.</Typography>
-            ) : (
-              <List sx={{ flexGrow: 1, overflow: 'auto' }}>
-                {alarms.map((alarm) => (
-                  <ListItem
-                    key={alarm.alarm_id}
-                    secondaryAction={
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={alarm.enabled}
-                              onChange={() => handleToggleAlarm(alarm.alarm_id, alarm.enabled)}
-                              name={`enable-alarm-${alarm.alarm_id}`}
-                              size="small"
-                            />
-                          }
-                          label={alarm.enabled ? 'Enabled' : 'Disabled'}
-                          labelPlacement="start"
-                          sx={{ mr: 1, '.MuiFormControlLabel-label': { fontSize: '0.75rem' } }}
-                        />
-                        <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteAlarm(alarm.alarm_id)} size="small">
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
+          )}
+          {!isLoading && triggeredAlarms.length === 0 ? (
+            <Typography variant="body2" color="textSecondary">No alarms currently triggered.</Typography>
+          ) : (
+            <List sx={{ flexGrow: 1, overflow: 'auto' }}>
+              {triggeredAlarms.map((alarm) => (
+                <ListItem key={alarm.alarm_id}>
+                  <ListItemIcon>
+                    {getSeverityIcon(alarm.severity)}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      <Typography variant="subtitle1" sx={{ fontSize: '0.9rem' }}>
+                        {formatAlarmValue(alarm)}
+                      </Typography>
                     }
-                  >
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle1" sx={{ fontSize: '0.9rem' }}>
-                          {formatAlarmValue(alarm)}
+                    secondary={
+                      <Typography component="div" variant="body2" color="text.primary" sx={{ fontSize: '0.75rem' }}>
+                        <Box component="span" sx={{ display: 'inline' }}>
+                          Current value: {formatCurrentValue(alarm)}
+                        </Box>
+                        <Typography 
+                          component="span" 
+                          variant="body2" 
+                          sx={{ 
+                            color: getSeverityColor(alarm.severity),
+                            ml: 1,
+                            fontWeight: 'medium',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          {getSeverityText(alarm.severity)}
                         </Typography>
-                      }
-                      secondary={
-                        <Typography component="div" variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                          <Box component="span" sx={{ display: 'inline' }}>
-                            {alarm.description}
-                          </Box>
-                          <Typography 
-                            component="span" 
-                            variant="body2" 
-                            sx={{ 
-                              color: getSeverityColor(alarm.severity),
-                              ml: 1,
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            {getSeverityText(alarm.severity)}
-                          </Typography>
-                        </Typography>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} sm={12} md={6} lg={6}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="h6" sx={{ fontSize: '1rem', mb: 2 }}>
-              <WarningIcon sx={{ verticalAlign: 'middle', mr: 0.5 }} /> Triggered Alarms
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Paper>
+      )}
+      {activeTab === 1 && (
+        <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontSize: '1rem' }}>
+              <NotificationsIcon sx={{ verticalAlign: 'middle', mr: 0.5 }} /> Manage Alarms
             </Typography>
-            {isLoading && !triggeredAlarms.length && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                <CircularProgress />
-              </Box>
-            )}
-            {!isLoading && triggeredAlarms.length === 0 ? (
-              <Typography variant="body2" color="textSecondary">No alarms currently triggered.</Typography>
-            ) : (
-              <List sx={{ flexGrow: 1, overflow: 'auto' }}>
-                {triggeredAlarms.map((alarm) => (
-                  <ListItem key={alarm.alarm_id}>
-                    <ListItemIcon>
-                      {getSeverityIcon(alarm.severity)}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle1" sx={{ fontSize: '0.9rem' }}>
-                          {formatAlarmValue(alarm)}
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setNewAlarmDialog(true)}
+              size="small"
+            >
+              Add Alarm
+            </Button>
+          </Box>
+          {isLoading && !alarms.length && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+              <CircularProgress />
+            </Box>
+          )}
+          {!isLoading && alarms.length === 0 ? (
+            <Typography variant="body2" color="textSecondary">No alarms configured.</Typography>
+          ) : (
+            <List sx={{ flexGrow: 1, overflow: 'auto' }}>
+              {alarms.map((alarm) => (
+                <ListItem
+                  key={alarm.alarm_id}
+                  secondaryAction={
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={alarm.enabled}
+                            onChange={() => handleToggleAlarm(alarm.alarm_id, alarm.enabled)}
+                            name={`enable-alarm-${alarm.alarm_id}`}
+                            size="small"
+                          />
+                        }
+                        label={alarm.enabled ? 'Enabled' : 'Disabled'}
+                        labelPlacement="start"
+                        sx={{ mr: 1, '.MuiFormControlLabel-label': { fontSize: '0.75rem' } }}
+                      />
+                      <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteAlarm(alarm.alarm_id)} size="small">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  }
+                >
+                  <ListItemText
+                    primary={
+                      <Typography variant="subtitle1" sx={{ fontSize: '0.9rem' }}>
+                        {formatAlarmValue(alarm)}
+                      </Typography>
+                    }
+                    secondary={
+                      <Typography component="div" variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                        <Box component="span" sx={{ display: 'inline' }}>
+                          {alarm.description}
+                        </Box>
+                        <Typography 
+                          component="span" 
+                          variant="body2" 
+                          sx={{ 
+                            color: getSeverityColor(alarm.severity),
+                            ml: 1,
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          {getSeverityText(alarm.severity)}
                         </Typography>
-                      }
-                      secondary={
-                        <Typography component="div" variant="body2" color="text.primary" sx={{ fontSize: '0.75rem' }}>
-                          <Box component="span" sx={{ display: 'inline' }}>
-                            Current value: {formatCurrentValue(alarm)}
-                          </Box>
-                          <Typography 
-                            component="span" 
-                            variant="body2" 
-                            sx={{ 
-                              color: getSeverityColor(alarm.severity),
-                              ml: 1,
-                              fontWeight: 'medium',
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            {getSeverityText(alarm.severity)}
-                          </Typography>
-                        </Typography>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Paper>
+      )}
 
       {/* Add New Alarm Dialog */}
       <Dialog open={newAlarmDialog} onClose={() => setNewAlarmDialog(false)} maxWidth="sm" fullWidth>
