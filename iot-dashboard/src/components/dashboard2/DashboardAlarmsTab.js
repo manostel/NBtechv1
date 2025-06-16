@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Box, 
   Grid, 
@@ -60,6 +60,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [isInitializing, setIsInitializing] = useState(true);
+  const lastAlarmNotificationRef = useRef({});
   const [newAlarm, setNewAlarm] = useState({
     variable_name: '',
     condition: 'above',
@@ -69,46 +70,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
     severity: 'warning'
   });
 
-  // Fetch alarms on component mount and when device changes
-  useEffect(() => {
-    let isMounted = true;
-
-    const initializeAlarms = async () => {
-      if (!device?.client_id) {
-        console.log('No device ID available');
-        return;
-      }
-
-      try {
-        setIsInitializing(true);
-        // Fetch alarms without waiting for notification initialization
-        if (isMounted) {
-          await fetchAlarms();
-        }
-      } catch (error) {
-        console.error('Error initializing alarms:', error);
-        if (isMounted) {
-          setSnackbar({
-            open: true,
-            message: 'Failed to load alarms. Please try again.',
-            severity: 'error'
-          });
-        }
-      } finally {
-        if (isMounted) {
-          setIsInitializing(false);
-        }
-      }
-    };
-
-    initializeAlarms();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [device?.client_id]);
-
-  const fetchAlarms = async () => {
+  const fetchAlarms = useCallback(async () => {
     if (!device?.client_id) {
       console.log('No device ID available for fetching alarms');
       return;
@@ -137,11 +99,30 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
         throw new Error('No data received from server');
       }
 
-      // Check for newly triggered alarms but don't show notifications
+      // Check for newly triggered alarms with debounce
       const previousTriggeredIds = new Set(triggeredAlarms.map(a => a.alarm_id));
-      const newTriggeredAlarms = (data.triggered_alarms || []).filter(
-        alarm => !previousTriggeredIds.has(alarm.alarm_id)
-      );
+      const now = Date.now();
+      const newTriggeredAlarms = (data.triggered_alarms || []).filter(alarm => {
+        const isNew = !previousTriggeredIds.has(alarm.alarm_id);
+        const lastNotification = lastAlarmNotificationRef.current[alarm.alarm_id] || 0;
+        const timeSinceLastNotification = now - lastNotification;
+        const shouldNotify = isNew && timeSinceLastNotification > 180000; // 3 minutes debounce
+        
+        if (shouldNotify) {
+          lastAlarmNotificationRef.current[alarm.alarm_id] = now;
+        }
+        
+        return shouldNotify;
+      });
+      
+      // Show notifications for newly triggered alarms
+      for (const alarm of newTriggeredAlarms) {
+        try {
+          await NotificationService.showAlarmNotification(alarm);
+        } catch (error) {
+          console.error('Error showing notification for alarm:', error);
+        }
+      }
       
       setAlarms(data.alarms || []);
       setTriggeredAlarms(data.triggered_alarms || []);
@@ -157,7 +138,68 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [device?.client_id]);
+
+  useEffect(() => {
+    const initializeNotifications = async () => {
+      const notificationsEnabled = await NotificationService.initialize();
+      if (!notificationsEnabled) {
+        console.log('Notifications are disabled');
+      }
+    };
+
+    initializeNotifications();
+  }, []);
+
+  const handleAlarmTriggered = useCallback((alarm) => {
+    setTriggeredAlarms(prev => {
+      const exists = prev.some(a => a.alarm_id === alarm.alarm_id);
+      if (!exists) {
+        NotificationService.showAlarmNotification(alarm);
+        return [...prev, alarm];
+      }
+      return prev;
+    });
+  }, []);
+
+  // Fetch alarms on component mount and when device changes
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeAlarms = async () => {
+      if (!device?.client_id) {
+        console.log('No device ID available');
+        return;
+      }
+
+      try {
+        setIsInitializing(true);
+        // Fetch alarms
+        if (isMounted) {
+          await fetchAlarms();
+        }
+      } catch (error) {
+        console.error('Error initializing alarms:', error);
+        if (isMounted) {
+          setSnackbar({
+            open: true,
+            message: 'Failed to initialize alarms.',
+            severity: 'error'
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
+      }
+    };
+
+    initializeAlarms();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [device?.client_id, fetchAlarms]);
 
   const handleAddAlarm = async () => {
     if (!newAlarm.variable_name || !newAlarm.threshold) {
@@ -459,10 +501,10 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                         </Typography>
                       }
                       secondary={
-                        <Box>
-                          <Typography component="span" variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                        <Typography component="div" variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                          <Box component="span" sx={{ display: 'inline' }}>
                             {alarm.description}
-                          </Typography>
+                          </Box>
                           <Typography 
                             component="span" 
                             variant="body2" 
@@ -474,7 +516,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                           >
                             {getSeverityText(alarm.severity)}
                           </Typography>
-                        </Box>
+                        </Typography>
                       }
                     />
                   </ListItem>
@@ -510,10 +552,10 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                         </Typography>
                       }
                       secondary={
-                        <Box>
-                          <Typography component="span" variant="body2" color="text.primary" sx={{ fontSize: '0.75rem' }}>
+                        <Typography component="div" variant="body2" color="text.primary" sx={{ fontSize: '0.75rem' }}>
+                          <Box component="span" sx={{ display: 'inline' }}>
                             Current value: {formatCurrentValue(alarm)}
-                          </Typography>
+                          </Box>
                           <Typography 
                             component="span" 
                             variant="body2" 
@@ -526,7 +568,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                           >
                             {getSeverityText(alarm.severity)}
                           </Typography>
-                        </Box>
+                        </Typography>
                       }
                     />
                   </ListItem>

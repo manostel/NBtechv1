@@ -1,83 +1,71 @@
-import { PushNotifications } from '@capacitor/push-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 
 class NotificationService {
   static initialized = false;
-  static channelCreated = false;
-  static enabled = false; // Disable notifications by default
+  static enabled = false;
 
   static async initialize() {
-    if (!this.enabled) {
-      console.log('Notifications are disabled');
-      return;
-    }
-
     if (this.initialized) {
-      console.log('Notifications already initialized');
-      return;
+      return this.enabled;
     }
-
-    console.log('Initializing notifications...');
-    console.log('Platform:', Capacitor.getPlatform());
-    console.log('Is native:', Capacitor.isNativePlatform());
 
     try {
-      // For web platform, use browser notifications
-      if (Capacitor.getPlatform() === 'web') {
-        console.log('Using web notifications');
-        if ('Notification' in window) {
+      console.log('Initializing notifications...');
+      console.log('Platform:', Capacitor.getPlatform());
+      
+      // Request permissions
+      const permissionStatus = await LocalNotifications.requestPermissions();
+      console.log('Permission status:', permissionStatus);
+      
+      if (permissionStatus.display === 'granted') {
+        this.enabled = true;
+        this.initialized = true;
+        
+        // Add notification listeners
+        LocalNotifications.addListener('localNotificationReceived', (notification) => {
+          console.log('Notification received:', notification);
+        });
+
+        LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
+          console.log('Notification action performed:', notification);
+        });
+
+        // Create notification channel for Android
+        if (Capacitor.getPlatform() === 'android') {
           try {
-            const permission = await Notification.requestPermission();
-            console.log('Web notification permission:', permission);
-            if (permission === 'granted') {
-              this.initialized = true;
-            }
+            await LocalNotifications.createChannel({
+              id: 'device_notifications',
+              name: 'Device Notifications',
+              description: 'Device status and event notifications',
+              importance: 5, // HIGH importance
+              vibration: true,
+              sound: 'beep.wav',
+              lights: true,
+              lightColor: '#FF0000',
+              visibility: 1, // Public visibility
+              bypassDnd: true, // Bypass Do Not Disturb
+              enableVibration: true,
+              enableLights: true,
+              showBadge: true
+            });
+            console.log('Android notification channel created successfully');
           } catch (error) {
-            console.error('Error requesting web notification permission:', error);
-            // Don't throw, just disable notifications
-            this.enabled = false;
+            console.error('Error creating Android notification channel:', error);
           }
         }
-        return;
-      }
 
-      // For native platforms
-      if (Capacitor.isNativePlatform()) {
-        console.log('Using native notifications');
-        try {
-          console.log('Requesting notification permissions...');
-          const permissionStatus = await PushNotifications.requestPermissions();
-          console.log('Native notification permission status:', permissionStatus);
-
-          if (permissionStatus.receive === 'granted') {
-            console.log('Registering push notifications...');
-            await PushNotifications.register();
-            console.log('Push notifications registered successfully');
-
-            // Add basic listeners for debugging
-            PushNotifications.addListener('registration', (token) => {
-              console.log('Push registration success:', token.value);
-            });
-
-            PushNotifications.addListener('registrationError', (error) => {
-              console.error('Push registration error:', error.error);
-              // Don't throw, just disable notifications
-              this.enabled = false;
-            });
-
-            this.initialized = true;
-          } else {
-            console.log('Notification permission not granted');
-            this.enabled = false;
-          }
-        } catch (error) {
-          console.error('Error initializing native notifications:', error);
-          this.enabled = false;
-        }
+        console.log('Notifications initialized successfully');
+        return true;
+      } else {
+        console.log('Notification permissions denied');
+        this.enabled = false;
+        return false;
       }
     } catch (error) {
-      console.error('Error in notification initialization:', error);
+      console.error('Error initializing notifications:', error);
       this.enabled = false;
+      return false;
     }
   }
 
@@ -87,109 +75,170 @@ class NotificationService {
       return;
     }
 
-    if (!this.initialized) {
-      console.log('Notifications not initialized, initializing now...');
-      await this.initialize();
+    try {
+      console.log('Showing alarm notification:', alarm);
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title: 'Alarm Triggered',
+            body: `${alarm.variable_name} is ${alarm.condition} ${alarm.threshold}${alarm.unit || ''}`,
+            id: Math.floor(Math.random() * 2147483647), // Random number within Java int range
+            channelId: 'device_notifications',
+            sound: 'beep.wav',
+            extra: {
+              alarm: alarm
+            },
+            schedule: { at: new Date(Date.now() + 1000) }, // Schedule 1 second in the future
+            wake: true, // Wake up device if sleeping
+            priority: 2, // High priority
+            visibility: 1, // Public visibility
+            ongoing: true // Make it an ongoing notification
+          }
+        ]
+      });
+      console.log('Alarm notification scheduled successfully');
+    } catch (error) {
+      console.error('Error showing alarm notification:', error);
     }
+  }
 
+  static async showDeviceStatusNotification(device, oldStatus, newStatus) {
     if (!this.enabled) {
-      console.log('Notifications are still disabled after initialization attempt');
-      return;
-    }
-
-    console.log('Showing alarm notification...');
-    console.log('Alarm data:', alarm);
-
-    if (!alarm) {
-      console.log('No alarm data provided');
+      console.log('Notifications are disabled');
       return;
     }
 
     try {
-      const { title, body } = this.formatAlarmNotification(alarm);
-      console.log('Formatted notification:', { title, body });
-
-      // For web platform, use browser notifications
-      if (Capacitor.getPlatform() === 'web') {
-        console.log('Showing web notification');
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(title, {
-            body: body,
-            icon: '/telectronio.png'
-          });
-        }
-        return;
-      }
-
-      // For native platforms
-      if (Capacitor.isNativePlatform()) {
-        console.log('Showing native notification');
-        
-        // Create notification channel for Android only once
-        if (Capacitor.getPlatform() === 'android' && !this.channelCreated) {
-          console.log('Creating Android notification channel');
-          try {
-            await PushNotifications.createChannel({
-              id: 'alarms',
-              name: 'Alarms',
-              description: 'Device alarm notifications',
-              importance: 5,
-              vibration: true,
-              sound: 'default'
-            });
-            console.log('Android notification channel created');
-            this.channelCreated = true;
-          } catch (error) {
-            console.error('Error creating Android notification channel:', error);
-            // Don't throw here, try to show notification anyway
+      console.log('Showing device status notification:', { device, oldStatus, newStatus });
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title: 'Device Status Changed',
+            body: `${device.name || device.client_id} status changed from ${oldStatus} to ${newStatus}`,
+            id: Math.floor(Math.random() * 2147483647), // Random number within Java int range
+            channelId: 'device_notifications',
+            sound: 'default', // Use default system sound
+            extra: {
+              device: device,
+              oldStatus: oldStatus,
+              newStatus: newStatus
+            },
+            schedule: { at: new Date(Date.now() + 1000) }, // Schedule 1 second in the future
+            wake: true, // Wake up device if sleeping
+            priority: 2, // High priority
+            visibility: 1, // Public visibility
+            ongoing: true // Make it an ongoing notification
           }
-        }
-
-        // Show the notification
-        console.log('Scheduling notification');
-        await PushNotifications.schedule({
-          notifications: [
-            {
-              title,
-              body,
-              id: Date.now().toString(),
-              schedule: { at: new Date(Date.now()) },
-              channelId: 'alarms',
-              sound: 'default',
-              attachments: null,
-              actionTypeId: '',
-              extra: {
-                alarmId: alarm.alarm_id,
-                severity: alarm.severity
-              }
-            }
-          ]
-        });
-        console.log('Notification scheduled successfully');
-      }
+        ]
+      });
+      console.log('Status notification scheduled successfully');
     } catch (error) {
-      console.error('Error showing notification:', error);
-      // Don't throw the error, just log it
+      console.error('Error showing device status notification:', error);
     }
   }
 
-  static formatAlarmNotification(alarm) {
-    console.log('Formatting alarm notification:', alarm);
-    
-    if (!alarm) {
-      console.log('No alarm data to format');
-      return {
-        title: 'Alarm',
-        body: 'Unknown alarm triggered'
-      };
+  static async showBatteryLowNotification(device, batteryLevel) {
+    if (!this.enabled) {
+      console.log('Notifications are disabled');
+      return;
     }
 
-    const severity = alarm.severity || 'info';
-    const title = `Alarm: ${severity.toUpperCase()}`;
-    const body = `${alarm.description || 'Device alarm triggered'}\nCurrent value: ${alarm.current_value}`;
-    
-    console.log('Formatted notification:', { title, body });
-    return { title, body };
+    try {
+      console.log('Showing battery low notification:', { device, batteryLevel });
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title: 'Low Battery Alert',
+            body: `${device.name || device.client_id} battery is low (${batteryLevel}%)`,
+            id: Math.floor(Math.random() * 2147483647), // Random number within Java int range
+            channelId: 'device_notifications',
+            sound: 'beep.wav',
+            extra: {
+              device: device,
+              batteryLevel: batteryLevel
+            },
+            schedule: { at: new Date(Date.now() + 1000) }, // Schedule 1 second in the future
+            wake: true, // Wake up device if sleeping
+            priority: 2, // High priority
+            visibility: 1, // Public visibility
+            ongoing: true // Make it an ongoing notification
+          }
+        ]
+      });
+      console.log('Battery notification scheduled successfully');
+    } catch (error) {
+      console.error('Error showing battery low notification:', error);
+    }
+  }
+
+  static async showSignalWeakNotification(device, signalStrength) {
+    if (!this.enabled) {
+      console.log('Notifications are disabled');
+      return;
+    }
+
+    try {
+      console.log('Showing signal weak notification:', { device, signalStrength });
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title: 'Weak Signal Alert',
+            body: `${device.name || device.client_id} has weak signal (${signalStrength}%)`,
+            id: Math.floor(Math.random() * 2147483647), // Random number within Java int range
+            channelId: 'device_notifications',
+            sound: 'beep.wav',
+            extra: {
+              device: device,
+              signalStrength: signalStrength
+            },
+            schedule: { at: new Date(Date.now() + 1000) }, // Schedule 1 second in the future
+            wake: true, // Wake up device if sleeping
+            priority: 2, // High priority
+            visibility: 1, // Public visibility
+            ongoing: true // Make it an ongoing notification
+          }
+        ]
+      });
+      console.log('Signal notification scheduled successfully');
+    } catch (error) {
+      console.error('Error showing signal weak notification:', error);
+    }
+  }
+
+  static async showThresholdExceededNotification(device, metric, value, threshold) {
+    if (!this.enabled) {
+      console.log('Notifications are disabled');
+      return;
+    }
+
+    try {
+      console.log('Showing threshold exceeded notification:', { device, metric, value, threshold });
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title: 'Threshold Exceeded',
+            body: `${device.name || device.client_id} ${metric} is ${value} (threshold: ${threshold})`,
+            id: Math.floor(Math.random() * 2147483647), // Random number within Java int range
+            channelId: 'device_notifications',
+            sound: 'beep.wav',
+            extra: {
+              device: device,
+              metric: metric,
+              value: value,
+              threshold: threshold
+            },
+            schedule: { at: new Date(Date.now() + 1000) }, // Schedule 1 second in the future
+            wake: true, // Wake up device if sleeping
+            priority: 2, // High priority
+            visibility: 1, // Public visibility
+            ongoing: true // Make it an ongoing notification
+          }
+        ]
+      });
+      console.log('Threshold notification scheduled successfully');
+    } catch (error) {
+      console.error('Error showing threshold exceeded notification:', error);
+    }
   }
 }
 

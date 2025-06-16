@@ -25,15 +25,12 @@ export default function DeviceInfoCard({
   const [error, setError] = useState(null);
   const [currentUptimeDisplay, setCurrentUptimeDisplay] = useState('N/A');
 
-  // Convert Active/Inactive to Online/Offline for display
-  const displayStatus = status === "Active" ? "Online" : "Offline";
-
   // Effect to update uptime display based on deviceStartTimeInfo and status
   useEffect(() => {
     let intervalId;
 
     // Check if device is online and we have a valid startup timestamp
-    if (displayStatus !== "Offline" && deviceStartTimeInfo?.timestamp) {
+    if (status !== "Offline" && deviceStartTimeInfo?.timestamp) {
       const startupTime = new Date(deviceStartTimeInfo.timestamp);
 
       // Ensure the startup time is not in the future
@@ -77,7 +74,7 @@ export default function DeviceInfoCard({
         clearInterval(intervalId);
       }
     };
-  }, [displayStatus, deviceStartTimeInfo?.timestamp]); // Re-run effect if displayStatus or timestamp changes
+  }, [status, deviceStartTimeInfo?.timestamp]); // Re-run effect if status or timestamp changes
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -149,19 +146,19 @@ export default function DeviceInfoCard({
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    backgroundColor: getStatusColor(displayStatus),
+                    backgroundColor: getStatusColor(status),
                     }}
                   />
                 <Typography
                   variant="body2"
                   sx={{
-                    color: getStatusColor(displayStatus),
+                    color: getStatusColor(status),
                     fontWeight: 'bold',
                     lineHeight: 'normal',
                     fontSize: '0.75rem',
                   }}
                 >
-                    {displayStatus}
+                    {status}
                   </Typography>
                 </Box>
             </Box>

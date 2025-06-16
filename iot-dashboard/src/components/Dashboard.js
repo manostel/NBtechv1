@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Helmet } from "react-helmet";
 import { useNavigate } from "react-router-dom";
 import { Line } from 'react-chartjs-2';
@@ -94,6 +94,9 @@ import DashboardHistoryTab from './dashboard2/DashboardHistoryTab';
 import DashboardOverviewTab from './dashboard2/DashboardOverviewTab';
 import DashboardStatisticsTab from './dashboard2/DashboardStatisticsTab';
 import DashboardAlarmsTab from './dashboard2/DashboardAlarmsTab';
+import DeviceNotificationService from '../utils/DeviceNotificationService';
+import NotificationService from '../utils/NotificationService';
+import './Dashboard.css';
 
 // Register Chart.js components
 ChartJS.register(
@@ -193,7 +196,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [alerts, setAlerts] = useState([]);
   const [showAlerts, setShowAlerts] = useState(false);
   const [chartConfig, setChartConfig] = useState({
-    showPoints: true,
+    showPoints: false,
     showGrid: true
   });
 
@@ -278,6 +281,10 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   // State for device start time and uptime
   const [deviceStartTimeInfo, setDeviceStartTimeInfo] = useState(null);
+
+  // Add new state variable for last status change
+  const [lastStatusChange, setLastStatusChange] = useState(null);
+  const STATUS_CHANGE_COOLDOWN = 30000; // 30 seconds cooldown between status changes
 
   useEffect(() => {
     if (metricsConfig) {
@@ -472,9 +479,23 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         const lastTimestamp = new Date(latestData.timestamp);
         const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
         
-        // Device is active if last seen within 7 minutes
-        setDeviceStatus(timeDiffSeconds <= 420 ? "Active" : "Inactive");
-
+        // For 1-minute data intervals with SIM7080 retry policy, consider device offline if no data for 3 minutes
+        const newStatus = timeDiffSeconds <= 180 ? "Online" : "Offline";
+        
+        // Only notify if status has actually changed and enough time has passed since last change
+        const now = Date.now();
+        if (newStatus !== deviceStatus && (!lastStatusChange || now - lastStatusChange > 180000)) {  // 3 minutes debounce
+          console.log('Device status changed:', { 
+            oldStatus: deviceStatus, 
+            newStatus,
+            timeDiffSeconds,
+            lastTimestamp: lastTimestamp.toISOString()
+          });
+          DeviceNotificationService.notifyDeviceStatusChange(device, deviceStatus, newStatus);
+          setDeviceStatus(newStatus);
+          setLastStatusChange(now);
+        }
+        
         // Update metrics data with latest values
         setMetricsData(prevData => ({
           ...prevData,
@@ -501,7 +522,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
         console.log('Updated device info:', {
           name: latestData.device_name || device.name,
-          type: latestData.device || device.device
+          type: latestData.device || device.device,
+          status: newStatus,
+          timeDiffSeconds
         });
       }
     } catch (error) {
@@ -695,26 +718,31 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
-  // Update the initial data fetch useEffect
+  // Initialize notifications and fetch initial data
   useEffect(() => {
     if (device && device.client_id) {
-      const fetchData = async () => {
+      const initialize = async () => {
         if (isFetching.current) return;
         isFetching.current = true;
         
         try {
+          // Initialize notifications first
+          await DeviceNotificationService.initialize();
+          
+          // Then fetch all other data
           await fetchInitialData();
-          // Make initial call to fetch battery state
           await fetchBatteryState();
           await fetchAlarms();
-          // Fetch device start time and uptime
           await fetchDeviceStartTimeInfo();
+        } catch (error) {
+          console.error('Error during initialization:', error);
+          setError(error.message || 'Failed to initialize dashboard');
         } finally {
           isFetching.current = false;
         }
       };
 
-      fetchData();
+      initialize();
       
       // Set up intervals for different data types
       const latestDataInterval = setInterval(async () => {
@@ -914,6 +942,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     fetchAlarms();
   };
 
+  // Single, complete version of onCommandSend
   const onCommandSend = async (command, params = {}) => {
     if (!device || !device.client_id) {
       console.error('No device or client_id available');
@@ -921,62 +950,52 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
 
     try {
-      const payload = {
-        client_id: device.client_id,
-        command: command
-      };
-
-      // Add speed to payload for SET_SPEED command
-      if (command === 'SET_SPEED') {
-        payload.speed = params.speed;
-      }
-
-      console.log('Sending command with payload:', payload);
-
-      const response = await fetch('https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command', {
+      setIsLoading(true);
+      const response = await fetch(COMMAND_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          client_id: device.client_id,
+          command: command,
+          params: params
+        })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send command');
+        throw new Error('Failed to send command');
       }
 
-      // The API might return a success response without a body
-      if (response.status === 200) {
-        setSnackbar({
-          open: true,
-          message: 'Command sent successfully',
-          severity: 'success'
-        });
-        return true;
-      }
+      const data = await response.json();
+      console.log('Command response:', data);
 
-      // If there is a response body, try to parse it
-      const result = await response.json();
-      if (result && result.success) {
-        setSnackbar({
-          open: true,
-          message: 'Command sent successfully',
-          severity: 'success'
-        });
-        return true;
-      }
+      // Notify successful command execution
+      DeviceNotificationService.notifyCommandExecuted(device, command, true);
 
-      throw new Error(result?.error || 'Failed to send command');
-    } catch (error) {
-      console.error('Error sending command:', error);
       setSnackbar({
         open: true,
-        message: error.message || 'Failed to send command',
+        message: 'Command sent successfully',
+        severity: 'success'
+      });
+
+      // Refresh device state after command
+      await fetchDeviceState();
+      return true;
+    } catch (error) {
+      console.error('Error sending command:', error);
+      
+      // Notify failed command execution
+      DeviceNotificationService.notifyCommandExecuted(device, command, false);
+      
+      setSnackbar({
+        open: true,
+        message: 'Failed to send command',
         severity: 'error'
       });
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1177,6 +1196,43 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       setDeviceStartTimeInfo(null);
     }
   };
+
+  useEffect(() => {
+    const initializeNotifications = async () => {
+      const notificationsEnabled = await NotificationService.initialize();
+      if (!notificationsEnabled) {
+        console.log('Notifications are disabled');
+      }
+    };
+
+    initializeNotifications();
+  }, []);
+
+  const handleDeviceStatusChange = useCallback((device, oldStatus, newStatus) => {
+    setDeviceStatus(prev => ({
+      ...prev,
+      [device.client_id]: newStatus
+    }));
+
+    // Show notification for status change
+    NotificationService.showDeviceStatusNotification(device, oldStatus, newStatus);
+  }, []);
+
+  const handleBatteryLevel = useCallback((device, batteryLevel) => {
+    if (batteryLevel <= 20) {
+      DeviceNotificationService.notifyBatteryLevel(device, batteryLevel);
+    }
+  }, []);
+
+  const handleSignalStrength = useCallback((device, signalStrength) => {
+    if (signalStrength <= 30) {
+      DeviceNotificationService.notifySignalStrength(device, signalStrength);
+    }
+  }, []);
+
+  const handleThresholdExceeded = useCallback((device, metric, value, threshold) => {
+    DeviceNotificationService.notifyThresholdExceeded(device, metric, value, threshold);
+  }, []);
 
   if (isInitialLoad && isLoading) {
     return <DashboardSkeleton />;

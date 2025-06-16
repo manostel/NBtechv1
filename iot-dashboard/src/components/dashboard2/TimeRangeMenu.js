@@ -1,8 +1,8 @@
 import React from 'react';
-import { Menu, MenuItem, IconButton, Tooltip } from '@mui/material';
-import { AccessTime as AccessTimeIcon } from '@mui/icons-material';
+import { Menu, MenuItem, IconButton } from '@mui/material';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
-export default function TimeRangeMenu({ timeRange, onTimeRangeChange, timeRanges }) {
+const TimeRangeMenu = ({ timeRange, onTimeRangeChange }) => {
   const [anchorEl, setAnchorEl] = React.useState(null);
 
   const handleClick = (event) => {
@@ -18,50 +18,24 @@ export default function TimeRangeMenu({ timeRange, onTimeRangeChange, timeRanges
     handleClose();
   };
 
-  const getTimeRangeLabel = (range) => {
-    if (typeof range === 'object' && range.label) {
-      return range.label;
-    }
-    if (range === 'live') return 'Live';
-    if (typeof range === 'string') {
-      if (range.endsWith('m')) return `${range.replace('m', '')} min`;
-      if (range.endsWith('h')) return `${range.replace('h', '')} hour${range.replace('h', '') > 1 ? 's' : ''}`;
-      if (range.endsWith('d')) return `${range.replace('d', '')} day${range.replace('d', '') > 1 ? 's' : ''}`;
-    }
-    return range;
-  };
-
   return (
     <>
-      <Tooltip title="Select time range">
-        <IconButton
-          onClick={handleClick}
-          sx={{ 
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
-            '&:hover': {
-              bgcolor: 'primary.dark'
-            }
-          }}
-        >
-          <AccessTimeIcon />
-        </IconButton>
-      </Tooltip>
+      <IconButton onClick={handleClick} color="primary">
+        <AccessTimeIcon />
+      </IconButton>
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleClose}
       >
-        {timeRanges.map((range) => (
-          <MenuItem
-            key={range.value}
-            onClick={() => handleTimeRangeSelect(range.value)}
-            selected={timeRange === range.value}
-          >
-            {range.label}
-          </MenuItem>
-        ))}
+        <MenuItem onClick={() => handleTimeRangeSelect('1h')}>Last Hour</MenuItem>
+        <MenuItem onClick={() => handleTimeRangeSelect('6h')}>Last 6 Hours</MenuItem>
+        <MenuItem onClick={() => handleTimeRangeSelect('24h')}>Last 24 Hours</MenuItem>
+        <MenuItem onClick={() => handleTimeRangeSelect('7d')}>Last 7 Days</MenuItem>
+        <MenuItem onClick={() => handleTimeRangeSelect('30d')}>Last 30 Days</MenuItem>
       </Menu>
     </>
   );
-} 
+};
+
+export default TimeRangeMenu; 

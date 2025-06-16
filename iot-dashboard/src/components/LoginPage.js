@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
-import { Box, Button, TextField, Typography, Paper, Checkbox, FormControlLabel, CircularProgress } from "@mui/material";
+import { Box, Button, TextField, Typography, Paper, Checkbox, FormControlLabel, CircularProgress, InputAdornment, IconButton } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 
 // Update the API URL to include /auth
 const API_URL = "https://dv7723iff5.execute-api.eu-central-1.amazonaws.com/default/auth/login";
@@ -15,6 +16,7 @@ const LoginPage = ({ onLogin }) => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   // Check for saved credentials on page load
@@ -107,10 +109,23 @@ const LoginPage = ({ onLogin }) => {
           />
           <TextField
             label="Password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           <FormControlLabel
             control={

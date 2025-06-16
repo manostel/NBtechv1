@@ -1,6 +1,6 @@
 {
-  "appId": "com.nbtechv1.app",
-  "appName": "NBtechv1",
+  "appId": "com.telectronio.iotdashboard",
+  "appName": "IoT Dashboard",
   "webDir": "build",
   "bundledWebRuntime": false,
   "plugins": {
@@ -27,14 +27,24 @@
         "noDeviceFound": "No device found"
       }
     },
-    "PushNotifications": {
-      "presentationOptions": ["badge", "sound", "alert"]
+    "LocalNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"],
+      "permissions": {
+        "sound": true,
+        "alert": true,
+        "badge": true,
+        "vibration": true
+      },
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#488AFF",
+      "sound": "beep.wav"
     }
   },
   "server": {
     "allowNavigation": ["*"],
     "cleartext": true,
-    "hostname": "localhost"
+    "hostname": "localhost",
+    "androidScheme": "https"
   },
   "android": {
     "permissions": [
@@ -50,7 +60,11 @@
       "android.permission.CHANGE_WIFI_STATE",
       "android.permission.INTERNET",
       "android.permission.POST_NOTIFICATIONS",
-      "android.permission.RECEIVE_BOOT_COMPLETED"
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.VIBRATE",
+      "android.permission.WAKE_LOCK",
+      "android.permission.SCHEDULE_EXACT_ALARM",
+      "android.permission.USE_EXACT_ALARM"
     ],
     "allowMixedContent": true,
     "captureInput": true,

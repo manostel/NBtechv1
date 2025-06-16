@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Grid, Typography, Paper, useTheme, FormControlLabel, Switch } from '@mui/material';
+import React, { useState, useEffect, useRef } from 'react';
+import { Box, Grid, Paper, useTheme, IconButton, Dialog, Typography } from '@mui/material';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -10,10 +10,14 @@ import {
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
+  Filler,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import SharedControls from './SharedControls';
+import { Fullscreen as FullscreenIcon, FullscreenExit as FullscreenExitIcon } from '@mui/icons-material';
+import { format, subMinutes, subHours, subDays } from 'date-fns';
 
 ChartJS.register(
   CategoryScale,
@@ -23,7 +27,9 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
+  Filler,
+  zoomPlugin
 );
 
 const DashboardChartsTab = ({ 
@@ -38,393 +44,362 @@ const DashboardChartsTab = ({
   onApply
 }) => {
   const theme = useTheme();
-  const chartRef = React.useRef(null);
-  const [combinedView, setCombinedView] = useState(false);
+  const chartRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenChart, setFullscreenChart] = useState(null);
 
-  // Debug logging for chart issues
-  console.log('DashboardChartsTab selectedVariables:', selectedVariables);
-  console.log('DashboardChartsTab metricsConfig:', metricsConfig);
-  console.log('DashboardChartsTab first data object:', metricsData?.data?.[0]);
-
-  const renderCombinedChart = (data) => {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      return null;
+  const handleFullscreenToggle = () => {
+    if (!document.fullscreenElement) {
+      chartRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
     }
+  };
 
-    const datasets = selectedVariables
-      .filter(key => metricsConfig[key] && data[0][key] !== undefined)
-      .map(key => {
-        const config = metricsConfig[key];
-        return {
-          label: `${config.label} (${config.unit})`,
-          data: data.map(d => parseFloat(d[key])),
-          borderColor: config.color,
-          backgroundColor: `${config.color}40`,
-          fill: true,
-          tension: 0.4,
-          borderWidth: 2,
-          pointRadius: chartConfig.showPoints ? 3 : 0,
-          pointHoverRadius: 6,
-          pointBackgroundColor: config.color,
-          pointBorderColor: config.color,
-          pointBorderWidth: 2
-        };
-      });
-
-    const chartData = {
-      labels: data.map(d => new Date(d.timestamp.replace('Z', ''))),
-      datasets
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
     };
 
-    const chartOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { 
-          position: "top", 
-          labels: { 
-            color: theme.palette.text.primary,
-            boxWidth: window.innerWidth < 600 ? 10 : 40,
-            padding: window.innerWidth < 600 ? 8 : 10,
-            font: {
-              size: window.innerWidth < 600 ? 10 : 12
-            }
-          },
-          display: true
-        },
-        title: { 
-          display: true, 
-          text: "Combined Metrics", 
-          color: theme.palette.text.primary,
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const handleFullscreenToggleChart = (chartData) => {
+    setFullscreenChart(chartData);
+    setIsFullscreen(true);
+  };
+
+  const handleFullscreenClose = () => {
+    setIsFullscreen(false);
+    setFullscreenChart(null);
+  };
+
+  const getTimeUnit = () => {
+    switch (timeRange) {
+      case '1h':
+        return 'minute';
+      case '6h':
+        return 'hour';
+      case '24h':
+        return 'hour';
+      case '7d':
+        return 'day';
+      case '30d':
+        return 'day';
+      default:
+        return 'minute';
+    }
+  };
+
+  const getTimeFormat = () => {
+    switch (timeRange) {
+      case '1h':
+        return 'HH:mm';
+      case '6h':
+        return 'HH:mm';
+      case '24h':
+        return 'MMM dd, HH:mm';
+      case '7d':
+        return 'MMM dd';
+      case '30d':
+        return 'MMM dd';
+      default:
+        return 'HH:mm';
+    }
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 750,
+      easing: 'easeInOutQuart'
+    },
+    interaction: {
+      mode: 'nearest',
+      axis: 'x',
+      intersect: false
+    },
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          padding: 20,
           font: {
-            size: window.innerWidth < 600 ? 14 : 16,
+            size: 12,
             weight: 'bold'
-          }
+          },
+          color: '#E0E0E0'
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleFont: {
+          size: 14,
+          weight: 'bold'
         },
-        tooltip: {
-          enabled: true,
-          mode: 'index',
-          intersect: true,
-          callbacks: {
-            label: function(context) {
-              const label = context.dataset.label || '';
-              const value = context.parsed.y;
-              return `${label}: ${value}`;
-            }
+        bodyFont: {
+          size: 13
+        },
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: true,
+        callbacks: {
+          label: function(context) {
+            const label = context.dataset.label || '';
+            const value = context.parsed.y;
+            return `${label}: ${value.toFixed(2)}`;
+          },
+          title: function(context) {
+            const date = new Date(context[0].parsed.x);
+            return format(date, getTimeFormat());
           }
         }
       },
-      scales: {
-        x: {
-          type: "time",
-          time: { 
-            unit: timeRange === 'live' ? 'second' :
-                  timeRange === '15m' ? 'minute' :
-                  timeRange === '1h' ? 'minute' :
-                  timeRange === '24h' || timeRange === '3d' || timeRange === '7d' || timeRange === '30d' ? 'hour' : 'minute',
-            tooltipFormat: timeRange === 'live' ? "HH:mm:ss" : 
-                          (timeRange === '24h' || timeRange === '3d' || timeRange === '7d' || timeRange === '30d') ? "MMM dd, HH:mm" : "HH:mm",
-            displayFormats: {
-              second: 'HH:mm:ss',
-              minute: 'HH:mm',
-              hour: 'MMM dd, HH:mm',
-              day: 'MMM dd'
-            }
+      zoom: {
+        pan: {
+          enabled: true,
+          mode: 'x',
+          modifierKey: 'ctrl',
+        },
+        zoom: {
+          wheel: {
+            enabled: true,
+            modifierKey: 'ctrl',
           },
-          title: { 
-            display: true, 
-            text: "Time", 
-            color: theme.palette.text.primary,
-            font: { 
-              weight: 'bold',
-              size: window.innerWidth < 600 ? 8 : 10
-            }
+          pinch: {
+            enabled: true,
           },
-          ticks: {
-            maxRotation: window.innerWidth < 600 ? 60 : 45,
-            minRotation: window.innerWidth < 600 ? 60 : 45,
-            source: 'data',
-            autoSkip: true,
-            maxTicksLimit: timeRange === '15m' ? 15 : 
-                          timeRange === 'live' ? 4 : 
-                          timeRange === '3d' ? 8 :
-                          timeRange === '7d' || timeRange === '30d' ? 7 : 10,
-            color: theme.palette.text.primary,
-            font: {
-              size: window.innerWidth < 600 ? 8 : 10,
-              weight: 'normal'
-            },
-            padding: 5
-          },
-          grid: {
-            display: chartConfig.showGrid,
-            color: theme.palette.divider,
-            drawBorder: true,
-            borderColor: theme.palette.divider
-          },
-          border: {
-            display: true,
-            color: theme.palette.divider
+          mode: 'x',
+          drag: {
+            enabled: true,
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            borderColor: 'rgba(0,0,0,0.3)',
+            borderWidth: 1
           }
         },
-        y: {
-          beginAtZero: true,
-          ticks: { 
-            color: theme.palette.text.primary,
-            font: {
-              size: window.innerWidth < 600 ? 8 : 10
-            },
-            maxTicksLimit: window.innerWidth < 600 ? 5 : 10,
-            callback: function(value) {
-              // Get all unique units from the selected variables
-              const units = [...new Set(selectedVariables
-                .filter(key => metricsConfig[key])
-                .map(key => metricsConfig[key].unit))];
-              
-              // If all metrics have the same unit, show it once
-              if (units.length === 1) {
-                return `${value} ${units[0]}`;
-              }
-              
-              // Otherwise, just show the value
-              return value;
-            }
-          },
-          grid: { 
-            color: chartConfig.showGrid ? "rgba(255,255,255,0.1)" : "transparent",
-            drawBorder: false
-          },
-        },
+        limits: {
+          x: {min: 'original', max: 'original'}
+        }
       }
-    };
-
-    return (
-      <Box sx={{ height: '100%', position: 'relative' }}>
-        <Line 
-          data={chartData} 
-          options={chartOptions} 
-          ref={chartEl => {
-            if (chartEl) {
-              chartRef.current = chartEl;
-            }
-          }} 
-        />
-      </Box>
-    );
+    },
+    scales: {
+      x: {
+        type: 'time',
+        time: {
+          unit: getTimeUnit(),
+          tooltipFormat: getTimeFormat(),
+          displayFormats: {
+            minute: 'HH:mm',
+            hour: 'MMM dd, HH:mm',
+            day: 'MMM dd'
+          }
+        },
+        grid: {
+          display: true,
+          color: 'rgba(255, 255, 255, 0.1)',
+          drawBorder: false
+        },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45,
+          font: {
+            size: 11
+          },
+          color: '#E0E0E0'
+        },
+        title: {
+          display: true,
+          text: 'Time',
+          font: {
+            size: 12,
+            weight: 'bold'
+          },
+          color: '#E0E0E0'
+        }
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          display: true,
+          color: 'rgba(255, 255, 255, 0.1)',
+          drawBorder: false
+        },
+        ticks: {
+          font: {
+            size: 11
+          },
+          color: '#E0E0E0',
+          callback: function(value) {
+            return value.toFixed(1);
+          }
+        },
+        title: {
+          display: true,
+          text: 'Value',
+          font: {
+            size: 12,
+            weight: 'bold'
+          },
+          color: '#E0E0E0'
+        }
+      }
+    }
   };
 
   const renderChart = (data, metricKey) => {
-    if (!data || data.length === 0) return null;
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography color="textSecondary">No data available</Typography>
+        </Box>
+      );
+    }
+
     const config = metricsConfig[metricKey];
     const chartData = {
       labels: data.map(d => new Date(d.timestamp.replace('Z', ''))),
-      datasets: [
-        {
-          label: `${config.label} (${config.unit})`,
-          data: data.map(d => parseFloat(d.value)),
-          borderColor: config.color,
-          backgroundColor: `${config.color}40`,
-          fill: true,
-          tension: 0.4,
-          borderWidth: 2,
-          pointRadius: chartConfig.showPoints ? 3 : 0,
-          pointHoverRadius: 6,
-          pointBackgroundColor: config.color,
-          pointBorderColor: config.color,
-          pointBorderWidth: 2
-        }
-      ]
-    };
-
-    const chartSpecificOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { 
-          position: "top", 
-          labels: { 
-            color: theme.palette.text.primary,
-            boxWidth: window.innerWidth < 600 ? 10 : 40,
-            padding: window.innerWidth < 600 ? 8 : 10,
-            font: {
-              size: window.innerWidth < 600 ? 10 : 12
-            }
-          },
-          display: true
-        },
-        title: { 
-          display: true, 
-          text: config.label, 
-          color: theme.palette.text.primary,
-          font: {
-            size: window.innerWidth < 600 ? 14 : 16,
-            weight: 'bold'
-          }
-        },
-        tooltip: {
-          enabled: true,
-          mode: 'index',
-          intersect: true,
-          callbacks: {
-            label: function(context) {
-              const label = context.dataset.label || '';
-              const value = context.parsed.y;
-              return `${label}: ${value}${config.unit}`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          type: "time",
-          time: { 
-            unit: timeRange === 'live' ? 'second' :
-                  timeRange === '15m' ? 'minute' :
-                  timeRange === '1h' ? 'minute' :
-                  timeRange === '24h' || timeRange === '3d' || timeRange === '7d' || timeRange === '30d' ? 'hour' : 'minute',
-            tooltipFormat: timeRange === 'live' ? "HH:mm:ss" : 
-                          (timeRange === '24h' || timeRange === '3d' || timeRange === '7d' || timeRange === '30d') ? "MMM dd, HH:mm" : "HH:mm",
-            displayFormats: {
-              second: 'HH:mm:ss',
-              minute: 'HH:mm',
-              hour: 'MMM dd, HH:mm',
-              day: 'MMM dd'
-            }
-          },
-          title: { 
-            display: true, 
-            text: "Time", 
-            color: theme.palette.text.primary,
-            font: { 
-              weight: 'bold',
-              size: window.innerWidth < 600 ? 8 : 10
-            }
-          },
-          ticks: {
-            maxRotation: window.innerWidth < 600 ? 60 : 45,
-            minRotation: window.innerWidth < 600 ? 60 : 45,
-            source: 'data',
-            autoSkip: true,
-            maxTicksLimit: timeRange === '15m' ? 15 : 
-                          timeRange === 'live' ? 4 : 
-                          timeRange === '3d' ? 8 :
-                          timeRange === '7d' || timeRange === '30d' ? 7 : 10,
-            color: theme.palette.text.primary,
-            font: {
-              size: window.innerWidth < 600 ? 8 : 10,
-              weight: 'normal'
-            },
-            padding: 5
-          },
-          grid: {
-            display: chartConfig.showGrid,
-            color: theme.palette.divider,
-            drawBorder: true,
-            borderColor: theme.palette.divider
-          },
-          border: {
-            display: true,
-            color: theme.palette.divider
-          }
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { 
-            color: theme.palette.text.primary,
-            font: {
-              size: window.innerWidth < 600 ? 8 : 10
-            },
-            maxTicksLimit: window.innerWidth < 600 ? 5 : 10,
-            callback: function(value) {
-              // Get all unique units from the selected variables
-              const units = [...new Set(selectedVariables
-                .filter(key => metricsConfig[key])
-                .map(key => metricsConfig[key].unit))];
-              
-              // If all metrics have the same unit, show it once
-              if (units.length === 1) {
-                return `${value} ${units[0]}`;
-              }
-              
-              // Otherwise, just show the value
-              return value;
-            }
-          },
-          grid: { 
-            color: chartConfig.showGrid ? "rgba(255,255,255,0.1)" : "transparent",
-            drawBorder: false
-          },
-        },
-      }
+      datasets: [{
+        label: `${config.label} (${config.unit})`,
+        data: data.map(d => parseFloat(d[metricKey])),
+        borderColor: config.color,
+        backgroundColor: `${config.color}20`,
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2,
+        pointRadius: chartConfig.showPoints ? 3 : 0,
+        pointHoverRadius: 6,
+        pointBackgroundColor: config.color,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointStyle: 'circle'
+      }]
     };
 
     return (
-      <Box sx={{ height: '100%', position: 'relative' }}>
-        <Line 
-          data={chartData} 
-          options={chartSpecificOptions} 
-          ref={chartEl => {
-            if (chartEl) {
-              chartRef.current = chartEl;
+      <Box
+        ref={chartRef}
+        sx={{
+          position: 'relative',
+          width: '100%',
+          height: isFullscreen ? '100vh' : '400px',
+          transition: 'height 0.3s ease',
+          backgroundColor: '#1a1f3c',
+          borderRadius: 1,
+          p: 2
+        }}
+      >
+        <IconButton
+          onClick={() => handleFullscreenToggleChart(chartData)}
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            zIndex: 1,
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            color: '#E0E0E0',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            },
+            transition: 'all 0.2s ease-in-out',
+            '& .MuiSvgIcon-root': {
+              fontSize: '1.2rem'
             }
-          }} 
+          }}
+        >
+          {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+        </IconButton>
+        <Line
+          data={chartData}
+          options={chartOptions}
         />
       </Box>
     );
   };
 
-  const renderCharts = () => {
-    if (!metricsData || !metricsData.data || metricsData.data.length === 0 || !metricsConfig || selectedVariables.length === 0) {
-      return (
-        <Typography variant="body2" color="textSecondary" sx={{ p: { xs: 0, sm: 2 } }}>No data available to display charts for the selected period or variables.</Typography>
-      );
-    }
-
-      if (combinedView) {
-        return (
-          <Grid item xs={12}>
-          <Paper sx={{ p: { xs: 0, sm: 2 }, height: 400 }}>
-                {renderCombinedChart(metricsData.data)}
-            </Paper>
-          </Grid>
-        );
-      }
-
-    return selectedVariables.map(key => {
-      const metricData = metricsData.data.map(d => ({ timestamp: d.timestamp, value: d[key] })).filter(d => d.value !== undefined && d.value !== null);
-      if (!metricsConfig[key] || metricData.length === 0) return null;
-
-          return (
-        <Grid item xs={12} sm={6} md={4} lg={3} key={key}>
-          <Paper sx={{ p: { xs: 0, sm: 2 }, height: 300 }}>
-            {renderChart(metricData, key)}
-              </Paper>
-            </Grid>
-          );
-        }).filter(Boolean);
-  };
-
   return (
-    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
-          <SharedControls
+    <Box>
+      <SharedControls
+        selectedVariables={selectedVariables}
+        availableVariables={availableVariables}
+        onVariableChange={onVariableChange}
         timeRange={timeRange}
         onTimeRangeChange={onTimeRangeChange}
         onApply={onApply}
-            selectedVariables={selectedVariables}
-            availableVariables={availableVariables}
-            onVariableChange={onVariableChange}
-          />
+        chartConfig={chartConfig}
+      />
+      
+      <Grid container spacing={2} sx={{ mt: 2 }}>
+        {selectedVariables.map(metricKey => (
+          <Grid item xs={12} md={6} key={metricKey}>
+            <Paper 
+              elevation={2}
+              sx={{ 
+                p: 2,
+                borderRadius: 2,
+                transition: 'transform 0.2s ease-in-out',
+                backgroundColor: '#1a1f3c',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: 3
+                }
+              }}
+            >
+              {renderChart(metricsData?.data || [], metricKey)}
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
 
-      <Box sx={{ mt: 2, flexGrow: 1 }}>
-        <FormControlLabel
-          control={<Switch checked={combinedView} onChange={(e) => setCombinedView(e.target.checked)} />}
-          label="Combined View"
-          sx={{ mb: 1 }}
-        />
-        <Grid container spacing={2}>
-          {renderCharts()}
-        </Grid>
-      </Box>
+      <Dialog
+        fullScreen
+        open={isFullscreen}
+        onClose={handleFullscreenClose}
+        sx={{
+          '& .MuiDialog-paper': {
+            backgroundColor: '#1a1f3c',
+          },
+        }}
+      >
+        <Box sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <IconButton 
+              onClick={handleFullscreenClose} 
+              sx={{
+                color: '#E0E0E0',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                transition: 'all 0.2s ease-in-out',
+                '& .MuiSvgIcon-root': {
+                  fontSize: '1.2rem'
+                }
+              }}
+            >
+              <FullscreenExitIcon />
+            </IconButton>
+          </Box>
+          <Box sx={{ flex: 1, position: 'relative' }}>
+            {fullscreenChart && (
+              <Line
+                data={fullscreenChart}
+                options={{
+                  ...chartOptions,
+                  maintainAspectRatio: false,
+                  responsive: true,
+                }}
+              />
+            )}
+          </Box>
+        </Box>
+      </Dialog>
     </Box>
   );
 };

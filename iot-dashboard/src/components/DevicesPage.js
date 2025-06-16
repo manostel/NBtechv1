@@ -1554,18 +1554,27 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       </AppBar>
 
       <Box sx={{ width: '100%', mb: 2 }}>
-      <Tabs 
-        value={activeTab} 
-        onChange={handleTabChange} 
+        <Tabs 
+          value={activeTab} 
+          onChange={handleTabChange} 
           indicatorColor="primary"
           textColor="primary"
           centered
           variant="fullWidth"
-          sx={{ mb: 2 }}
-      >
+          sx={{ 
+            mb: 1,
+            '& .MuiTab-root': {
+              minHeight: '36px',
+              fontSize: '0.875rem',
+              textTransform: 'none',
+              fontWeight: 500,
+              py: 0.5
+            }
+          }}
+        >
           <Tab label="All Devices" />
-        <Tab label="Map View" />
-      </Tabs>
+          <Tab label="Map View" />
+        </Tabs>
       </Box>
 
       {activeTab === 0 && (
@@ -1576,8 +1585,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
               flexDirection: { xs: 'column', sm: 'row' },
               alignItems: { xs: 'flex-start', sm: 'center' },
               justifyContent: 'space-between',
-              mb: 4,
-              pb: 2,
+              mb: 2,
+              pb: 1,
               borderBottom: 1,
               borderColor: 'divider'
             }}
@@ -1586,14 +1595,18 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
               sx={{ 
                 display: 'flex', 
                 gap: 1,
-                mt: { xs: 2, sm: 0 }
+                mt: { xs: 1, sm: 0 }
               }}
             >
               <Button 
                 variant={sortOrder === "asc" ? "contained" : "outlined"}
                 size="small"
                 onClick={() => handleSortChange("asc")}
-                sx={{ minWidth: 120 }}
+                sx={{ 
+                  minWidth: 100,
+                  py: 0.5,
+                  fontSize: '0.75rem'
+                }}
               >
                 Sort A-Z
               </Button>
@@ -1601,7 +1614,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                 variant={sortOrder === "desc" ? "contained" : "outlined"}
                 size="small"
                 onClick={() => handleSortChange("desc")}
-                sx={{ minWidth: 120 }}
+                sx={{ 
+                  minWidth: 100,
+                  py: 0.5,
+                  fontSize: '0.75rem'
+                }}
               >
                 Sort Z-A
               </Button>

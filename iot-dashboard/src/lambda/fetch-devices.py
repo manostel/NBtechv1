@@ -101,7 +101,7 @@ def lambda_handler(event, context):
                     device = {
                         'client_id': item['client_id'],
                         'device_name': item.get('device_name'),
-                        'status': item.get('status', 'Inactive'),
+                        'status': item.get('status', 'Offline'),
                         'last_seen': item.get('last_seen'),
                         'created_at': item.get('created_at'),
                         'device_type': decimal_to_float(item.get('device_info', {})).get('type', 'Unknown'),
@@ -334,7 +334,7 @@ def create_device_item(body):
         # Timestamps and Status
         'created_at': current_time,
         'last_seen': current_time,
-        'status': 'Active',
+        'status': 'Online',
         'last_updated': current_time,
         
         # Device Information

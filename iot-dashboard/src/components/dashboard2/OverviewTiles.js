@@ -1,6 +1,5 @@
 import React from 'react';
 import { Grid, Paper, Typography, Box, CircularProgress, Tooltip } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 import PropTypes from 'prop-types';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
@@ -20,8 +19,6 @@ const getSeverityIcon = (severity) => {
 };
 
 const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAlarmsList }) => {
-  const theme = useTheme();
-  
   const alarmActive = Array.isArray(triggeredAlarmsList) && triggeredAlarmsList.length > 0;
 
   const getHighestSeverity = (alarms) => {
@@ -63,13 +60,13 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
         display: 'flex',
         flexDirection: 'column',
         border: '1px solid',
-        borderColor: theme.palette.divider,
+        borderColor: 'divider',
         borderRadius: 2,
-        bgcolor: theme.palette.background.paper,
+        bgcolor: 'background.paper',
         transition: 'all 0.2s ease-in-out',
         '&:hover': {
           transform: 'translateY(-2px)',
-          boxShadow: theme.shadows[2]
+          boxShadow: 2
         }
       }}
     >
@@ -118,8 +115,6 @@ const OverviewTiles = ({
   isLoading,
   triggeredAlarms
 }) => {
-  const theme = useTheme();
-
   console.log('OverviewTiles received triggeredAlarms:', triggeredAlarms);
 
   if (!metricsData || !metricsConfig || !selectedVariables) {

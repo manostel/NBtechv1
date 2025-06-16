@@ -21,8 +21,8 @@ export const CustomThemeProvider = ({ children }) => {
   useEffect(() => {
     // Apply theme-specific attributes to document elements
     document.documentElement.setAttribute('data-theme', themeMode);
-    document.body.style.backgroundColor = themeMode === "dark" ? "#1e1e2f" : "#f9f9f9";
-    document.body.style.color = themeMode === "dark" ? "#f4f4f4" : "#333";
+    document.body.style.backgroundColor = themeMode === "dark" ? "#141829" : "#f9f9f9";
+    document.body.style.color = themeMode === "dark" ? "#E0E0E0" : "#333";
     
     // Apply transition only after initial load
     setTimeout(() => {
@@ -36,35 +36,59 @@ export const CustomThemeProvider = ({ children }) => {
         palette: {
           mode: themeMode,
           background: {
-            default: themeMode === "dark" ? "#1e1e2f" : "#f9f9f9",
-            paper: themeMode === "dark" ? "#2b2b3d" : "#fff",
+            default: themeMode === "dark" ? "#141829" : "#f9f9f9",
+            paper: themeMode === "dark" ? "#1a1f3c" : "#fff",
           },
           text: {
-            primary: themeMode === "dark" ? "#f4f4f4" : "#333",
+            primary: themeMode === "dark" ? "#E0E0E0" : "#333",
+            secondary: themeMode === "dark" ? "#A0A0A0" : "#666",
           },
           primary: {
             main: "#4caf50",
+            light: "#6bc06f",
+            dark: "#357a38",
           },
           secondary: {
             main: "#f44336",
+            light: "#f6685e",
+            dark: "#aa2e25",
           },
+          divider: themeMode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
         },
         typography: {
           fontFamily: "Roboto, Helvetica, Arial, sans-serif",
+          h1: {
+            color: themeMode === "dark" ? "#E0E0E0" : "#333",
+          },
+          h2: {
+            color: themeMode === "dark" ? "#E0E0E0" : "#333",
+          },
+          h3: {
+            color: themeMode === "dark" ? "#E0E0E0" : "#333",
+          },
+          h4: {
+            color: themeMode === "dark" ? "#E0E0E0" : "#333",
+          },
+          h5: {
+            color: themeMode === "dark" ? "#E0E0E0" : "#333",
+          },
+          h6: {
+            color: themeMode === "dark" ? "#E0E0E0" : "#333",
+          },
         },
         components: {
           MuiCssBaseline: {
             styleOverrides: `
               body {
                 transition: background-color 0.3s ease;
-                background-color: ${themeMode === "dark" ? "#1e1e2f" : "#f9f9f9"};
-                color: ${themeMode === "dark" ? "#f4f4f4" : "#333"};
+                background-color: ${themeMode === "dark" ? "#141829" : "#f9f9f9"};
+                color: ${themeMode === "dark" ? "#E0E0E0" : "#333"};
                 min-height: 100vh;
               }
               
               #root {
                 min-height: 100vh;
-                background-color: ${themeMode === "dark" ? "#1e1e2f" : "#f9f9f9"};
+                background-color: ${themeMode === "dark" ? "#141829" : "#f9f9f9"};
                 transition: background-color 0.3s ease;
               }
             `,
@@ -72,7 +96,71 @@ export const CustomThemeProvider = ({ children }) => {
           MuiPaper: {
             styleOverrides: {
               root: {
-                transition: 'background-color 0.3s ease',
+                transition: 'all 0.3s ease',
+                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fff",
+                '&:hover': {
+                  backgroundColor: themeMode === "dark" ? "#1f2547" : "#f5f5f5",
+                  boxShadow: themeMode === "dark" ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.1)',
+                },
+              },
+            },
+          },
+          MuiButton: {
+            styleOverrides: {
+              root: {
+                textTransform: 'none',
+                borderRadius: 8,
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                },
+              },
+            },
+          },
+          MuiIconButton: {
+            styleOverrides: {
+              root: {
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                  backgroundColor: themeMode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.04)",
+                },
+              },
+            },
+          },
+          MuiCard: {
+            styleOverrides: {
+              root: {
+                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fff",
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: themeMode === "dark" ? "#1f2547" : "#f5f5f5",
+                  boxShadow: themeMode === "dark" ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.1)',
+                },
+              },
+            },
+          },
+          MuiAppBar: {
+            styleOverrides: {
+              root: {
+                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fff",
+                boxShadow: themeMode === "dark" ? '0 2px 10px rgba(0, 0, 0, 0.3)' : '0 2px 10px rgba(0, 0, 0, 0.1)',
+              },
+            },
+          },
+          MuiDrawer: {
+            styleOverrides: {
+              paper: {
+                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fff",
+              },
+            },
+          },
+          MuiListItem: {
+            styleOverrides: {
+              root: {
+                '&:hover': {
+                  backgroundColor: themeMode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.04)",
+                },
               },
             },
           },
