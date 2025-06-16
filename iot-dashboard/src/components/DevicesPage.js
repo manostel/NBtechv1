@@ -1523,10 +1523,23 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       </Helmet>
       
       <AppBar position="static" color="default" elevation={1}>
-        <Toolbar>
-          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Typography variant="h6" component="div">
-              Devices
+        <Toolbar sx={{ px: 0 }}>
+          <Box sx={{ 
+            flexGrow: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'flex-start'
+          }}>
+            <Typography 
+              variant="h6" 
+              component="div"
+              sx={{ 
+                fontWeight: 700,
+                fontStyle: 'italic',
+                letterSpacing: '0.5px'
+              }}
+            >
+              NB-Tech v1
             </Typography>
             <Typography variant="subtitle2" color="text.secondary">
               {user.email}
@@ -1583,12 +1596,13 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             sx={{ 
               display: 'flex', 
               flexDirection: { xs: 'column', sm: 'row' },
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              justifyContent: 'space-between',
+              alignItems: { xs: 'flex-start', sm: 'flex-start' },
+              justifyContent: 'flex-start',
               mb: 2,
               pb: 1,
               borderBottom: 1,
-              borderColor: 'divider'
+              borderColor: 'divider',
+              px: { xs: 2, sm: 3, md: 4 }
             }}
           >
             <Box 
@@ -1625,7 +1639,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             </Box>
           </Box>
 
-          <Grid container spacing={3}>
+          <Grid container spacing={3} sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
             {isLoading ? (
               // Show 6 skeleton cards while loading
               Array.from(new Array(6)).map((_, index) => (

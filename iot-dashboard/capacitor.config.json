@@ -5,14 +5,14 @@
   "bundledWebRuntime": false,
   "plugins": {
     "StatusBar": {
-      "backgroundColor": "#ffffff",
-      "style": "dark",
+      "backgroundColor": "#141829",
+      "style": "light",
       "overlaysWebView": false
     },
     "SplashScreen": {
       "launchShowDuration": 0,
       "launchAutoHide": true,
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#141829",
       "androidSplashResourceName": "splash",
       "androidScaleType": "CENTER_CROP",
       "showSpinner": false,
