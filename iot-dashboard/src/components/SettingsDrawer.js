@@ -1,13 +1,19 @@
-import React, { useContext } from "react";
-import { Drawer, Box, Typography, IconButton, List, ListItem, ListItemText, Divider } from "@mui/material";
+import React, { useContext, useState } from "react";
+import { Drawer, Box, Typography, IconButton, List, ListItem, ListItemText, Divider, Switch, FormControlLabel } from "@mui/material";
 import { CustomThemeContext } from "./ThemeContext";
 import { Brightness7, Brightness4, Close } from "@mui/icons-material";
 
 export default function SettingsDrawer({ open, onClose }) {
   const { currentTheme, setTheme } = useContext(CustomThemeContext);
+  const [pushEnabled, setPushEnabled] = useState(false);
 
   const toggleTheme = () => {
     setTheme(currentTheme === "dark" ? "light" : "dark");
+  };
+
+  const handlePushToggle = (event) => {
+    setPushEnabled(event.target.checked);
+    // Here you would add logic to enable/disable push notifications
   };
 
   return (
@@ -20,6 +26,12 @@ export default function SettingsDrawer({ open, onClose }) {
           </IconButton>
         </Box>
         <Divider sx={{ my: 1 }} />
+        {/* Notification Settings Section */}
+        <FormControlLabel
+          control={<Switch checked={pushEnabled} onChange={handlePushToggle} color="primary" />}
+          label="Enable Push Notifications"
+          sx={{ mb: 2 }}
+        />
         <List>
           <ListItem button onClick={toggleTheme}>
             <ListItemText primary="Toggle Theme" />

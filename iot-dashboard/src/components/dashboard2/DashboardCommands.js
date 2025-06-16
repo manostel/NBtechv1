@@ -239,7 +239,7 @@ const DashboardCommands = ({
       console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
       console.log('Final verification state:', finalState);
-
+      
       if (finalState) {
         setMotorSpeed(finalState.motor_speed?.toString() || "0");
         setCommandFeedback({
@@ -286,7 +286,7 @@ const DashboardCommands = ({
       console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
       console.log('Final verification state:', finalState);
-
+      
       if (finalState) {
         setLed1State(finalState.led1_state === 1);
         setLed2State(finalState.led2_state === 1);
@@ -317,44 +317,44 @@ const DashboardCommands = ({
           <Typography variant="h6">LED Control</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography>LED 1</Typography>
-            <Switch
-              checked={led1State}
-              onChange={(e) => handleSwitchChange(1, e.target.checked)}
+          <Switch
+            checked={led1State}
+            onChange={(e) => handleSwitchChange(1, e.target.checked)}
               inputProps={{ 'aria-label': 'LED 1 switch' }}
-            />
-          </Box>
+          />
+        </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography>LED 2</Typography>
-            <Switch
-              checked={led2State}
-              onChange={(e) => handleSwitchChange(2, e.target.checked)}
+          <Switch
+            checked={led2State}
+            onChange={(e) => handleSwitchChange(2, e.target.checked)}
               inputProps={{ 'aria-label': 'LED 2 switch' }}
-            />
-          </Box>
+          />
+        </Box>
 
           <Typography variant="h6" sx={{ mt: 2 }}>Motor Speed</Typography>
           <form onSubmit={handleSpeedSubmit}>
-            <TextField
+          <TextField
               label="Speed (0-100)"
-              type="number"
-              value={motorSpeed}
-              onChange={(e) => setMotorSpeed(e.target.value)}
+            type="number"
+            value={motorSpeed}
+            onChange={(e) => setMotorSpeed(e.target.value)}
               inputProps={{ min: 0, max: 100, step: 1 }}
               fullWidth
               variant="outlined"
               margin="normal"
               disabled={isVerifying}
-            />
-            <Button 
-              type="submit" 
-              variant="contained" 
+          />
+          <Button
+            type="submit"
+            variant="contained"
               color="primary" 
               fullWidth 
               disabled={isVerifying}
               sx={{ mt: 1 }}
-            >
-              {isVerifying ? <CircularProgress size={24} /> : 'Set Speed'}
-            </Button>
+          >
+            {isVerifying ? <CircularProgress size={24} /> : 'Set Speed'}
+          </Button>
           </form>
 
           {commandFeedback.show && (
@@ -375,22 +375,22 @@ const DashboardCommands = ({
               onChange={(e) => handlePowerSavingChange(e.target.checked)}
               inputProps={{ 'aria-label': 'Power Saving Mode switch' }}
             />
-          </Box>
+        </Box>
 
           <Typography variant="h6" sx={{ mt: 2 }}>Device Actions</Typography>
-          <Button 
-            variant="contained" 
+        <Button
+          variant="contained"
             color="error" 
-            startIcon={<RestartAltIcon />} 
-            onClick={handleRestart} 
+          startIcon={<RestartAltIcon />}
+          onClick={handleRestart}
             fullWidth
             disabled={isLoading}
-          >
+        >
             Restart Device
-          </Button>
+        </Button>
         </>
       )}
-    </Paper>
+        </Paper>
   );
 };
 

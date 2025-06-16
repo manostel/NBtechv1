@@ -1300,21 +1300,21 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
         <Grid container spacing={1}>
           <Grid item xs={12}>
-            <DeviceInfoCard
-              clientID={device?.client_id || "Unknown"}
-              deviceName={device?.device_name || "Unknown"}
-              deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
-              status={deviceStatus}
-              lastOnline={lastSeen ? lastSeen.toLocaleString() : 
-                device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString() : "N/A"}
-              batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
-              signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
-              showClientId={showClientId}
-              onToggleClientId={() => setShowClientId(!showClientId)}
-              batteryState={batteryState}
-              lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
-              deviceStartTimeInfo={deviceStartTimeInfo}
-            />
+        <DeviceInfoCard
+          clientID={device?.client_id || "Unknown"}
+          deviceName={device?.device_name || "Unknown"}
+          deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
+          status={deviceStatus}
+          lastOnline={lastSeen ? lastSeen.toLocaleString() : 
+            device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString() : "N/A"}
+          batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
+          signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
+          showClientId={showClientId}
+          onToggleClientId={() => setShowClientId(!showClientId)}
+          batteryState={batteryState}
+          lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
+          deviceStartTimeInfo={deviceStartTimeInfo}
+        />
           </Grid>
         </Grid>
 
@@ -1341,32 +1341,32 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             },
           },
         }}>
-          <Tabs 
-            value={selectedTab} 
-            onChange={handleTabChange}
+        <Tabs
+          value={selectedTab}
+          onChange={handleTabChange}
             variant="scrollable"
             scrollButtons="auto"
             allowScrollButtonsMobile
-            sx={{
+          sx={{
               minHeight: '40px',
               ml: 0,
               pl: 0,
-              '& .MuiTab-root': {
+            '& .MuiTab-root': {
                 minHeight: '40px',
                 fontSize: '0.875rem',
                 textTransform: 'none',
                 fontWeight: 500,
-                px: 2,
+              px: 2,
               },
-            }}
-          >
+          }}
+        >
             <Tab label="Overview" {...a11yProps(0)} />
             <Tab label="Charts" {...a11yProps(1)} />
             <Tab label="Statistics" {...a11yProps(2)} />
             <Tab label="Commands" {...a11yProps(3)} />
             <Tab label="History" {...a11yProps(4)} />
             <Tab label="Alarms" {...a11yProps(5)} />
-          </Tabs>
+        </Tabs>
         </Box>
 
         {/* Tab Content */}

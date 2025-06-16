@@ -26,6 +26,9 @@
         "availableDevices": "Available devices",
         "noDeviceFound": "No device found"
       }
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
     }
   },
   "server": {
@@ -45,7 +48,9 @@
       "android.permission.ACCESS_NETWORK_STATE",
       "android.permission.ACCESS_WIFI_STATE",
       "android.permission.CHANGE_WIFI_STATE",
-      "android.permission.INTERNET"
+      "android.permission.INTERNET",
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.RECEIVE_BOOT_COMPLETED"
     ],
     "allowMixedContent": true,
     "captureInput": true,

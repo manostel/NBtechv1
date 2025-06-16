@@ -5,16 +5,16 @@ import PropTypes from 'prop-types';
 const MetricCard = ({ title, value, unit, isText = false, icon, color }) => {
   const theme = useTheme();
 
-  const displayValue = isText
-    ? value
-    : typeof value === 'number'
-      ? value.toFixed(1)
+  const displayValue = isText 
+    ? value 
+    : typeof value === 'number' 
+      ? value.toFixed(1) 
       : value;
 
   return (
     <Paper
       elevation={0}
-      sx={{
+      sx={{ 
         p: 2,
         height: '100%',
         display: 'flex',
@@ -30,7 +30,7 @@ const MetricCard = ({ title, value, unit, isText = false, icon, color }) => {
         }
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
         {icon && React.cloneElement(icon, {
           sx: {
             color: color || theme.palette.primary.main,
@@ -38,22 +38,22 @@ const MetricCard = ({ title, value, unit, isText = false, icon, color }) => {
           }
         })}
         <Typography variant="subtitle2" color="textSecondary" sx={{ ml: 1 }}>
-          {title}
-        </Typography>
-      </Box>
+            {title}
+          </Typography>
+        </Box>
       <Typography variant="h4" component="div" sx={{ mt: 1 }}>
-        {displayValue}
+          {displayValue}
         {unit && (
-          <Typography
-            component="span"
-            variant="body2"
+            <Typography 
+              component="span" 
+              variant="body2"
             color="textSecondary"
             sx={{ ml: 0.5 }}
-          >
-            {unit}
-          </Typography>
-        )}
-      </Typography>
+            >
+              {unit}
+            </Typography>
+          )}
+        </Typography>
     </Paper>
   );
 };

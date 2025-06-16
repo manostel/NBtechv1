@@ -380,40 +380,40 @@ const DashboardChartsTab = ({
       );
     }
 
-    if (combinedView) {
-      return (
-        <Grid item xs={12}>
+      if (combinedView) {
+        return (
+          <Grid item xs={12}>
           <Paper sx={{ p: { xs: 0, sm: 2 }, height: 400 }}>
-            {renderCombinedChart(metricsData.data)}
-          </Paper>
-        </Grid>
-      );
-    }
+                {renderCombinedChart(metricsData.data)}
+            </Paper>
+          </Grid>
+        );
+      }
 
     return selectedVariables.map(key => {
       const metricData = metricsData.data.map(d => ({ timestamp: d.timestamp, value: d[key] })).filter(d => d.value !== undefined && d.value !== null);
       if (!metricsConfig[key] || metricData.length === 0) return null;
 
-      return (
+          return (
         <Grid item xs={12} sm={6} md={4} lg={3} key={key}>
           <Paper sx={{ p: { xs: 0, sm: 2 }, height: 300 }}>
             {renderChart(metricData, key)}
-          </Paper>
-        </Grid>
-      );
-    }).filter(Boolean);
+              </Paper>
+            </Grid>
+          );
+        }).filter(Boolean);
   };
 
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
-      <SharedControls
+          <SharedControls
         timeRange={timeRange}
         onTimeRangeChange={onTimeRangeChange}
         onApply={onApply}
-        selectedVariables={selectedVariables}
-        availableVariables={availableVariables}
-        onVariableChange={onVariableChange}
-      />
+            selectedVariables={selectedVariables}
+            availableVariables={availableVariables}
+            onVariableChange={onVariableChange}
+          />
 
       <Box sx={{ mt: 2, flexGrow: 1 }}>
         <FormControlLabel

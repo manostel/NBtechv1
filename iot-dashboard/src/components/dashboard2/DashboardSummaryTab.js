@@ -18,7 +18,7 @@ const DashboardSummaryTab = ({ metricsData, metricsConfig, timeRange }) => {
       if (value === undefined || value === null) return null;
 
       const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
-      
+
       return (
         <Grid item xs={12} sm={6} key={key}>
           <MetricCard

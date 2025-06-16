@@ -10,6 +10,8 @@
     "@capacitor/core": "^7.3.0",
     "@capacitor/haptics": "^7.0.0",
     "@capacitor/keyboard": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.1",
+    "@capacitor/push-notifications": "^7.0.1",
     "@capacitor/status-bar": "^7.0.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",

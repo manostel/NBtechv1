@@ -1535,11 +1535,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           <IconButton
             edge="end"
             color="inherit"
-            aria-label="theme"
-            onClick={toggleTheme}
+            aria-label="settings"
+            onClick={() => setSettingsOpen(true)}
             sx={{ ml: 1 }}
           >
-            {theme.palette.mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+            <SettingsIcon />
           </IconButton>
           <IconButton
             edge="end"
@@ -1554,18 +1554,18 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       </AppBar>
 
       <Box sx={{ width: '100%', mb: 2 }}>
-        <Tabs
-          value={activeTab}
-          onChange={handleTabChange}
+      <Tabs 
+        value={activeTab} 
+        onChange={handleTabChange} 
           indicatorColor="primary"
           textColor="primary"
           centered
           variant="fullWidth"
           sx={{ mb: 2 }}
-        >
+      >
           <Tab label="All Devices" />
-          <Tab label="Map View" />
-        </Tabs>
+        <Tab label="Map View" />
+      </Tabs>
       </Box>
 
       {activeTab === 0 && (
@@ -1894,12 +1894,12 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       )}
       {activeTab === 1 && (
         <Box sx={{ p: 0 }}>
-          <MapView
-            devices={devices}
-            deviceData={deviceData}
-            onDeviceClick={handleDeviceClick}
-            getDeviceStatus={getDeviceStatus}
-          />
+        <MapView 
+          devices={devices} 
+          deviceData={deviceData} 
+          onDeviceClick={handleDeviceClick}
+          getDeviceStatus={getDeviceStatus}
+        />
         </Box>
       )}
 

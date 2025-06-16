@@ -35,12 +35,23 @@ import {
   Error as ErrorIcon,
   Info as InfoIcon
 } from '@mui/icons-material';
+import NotificationService from '../../utils/NotificationService';
 
 // API endpoints
 const MANAGE_ALARMS_API_URL = "https://ueqnh8082k.execute-api.eu-central-1.amazonaws.com/default/manage-alarms";
 const FETCH_ALARMS_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-alarms";
 
-const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
+// Default metrics configuration
+const defaultMetricsConfig = {
+  battery: { label: 'Battery', unit: '%' },
+  temperature: { label: 'Temperature', unit: '°C' },
+  humidity: { label: 'Humidity', unit: '%' },
+  pressure: { label: 'Pressure', unit: 'hPa' },
+  signal_quality: { label: 'Signal Quality', unit: '%' },
+  thermistor_temp: { label: 'Thermistor Temperature', unit: '°C' }
+};
+
+const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAlarmToggle }) => {
   const theme = useTheme();
   const [alarms, setAlarms] = useState([]);
   const [triggeredAlarms, setTriggeredAlarms] = useState([]);
@@ -48,6 +59,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [isInitializing, setIsInitializing] = useState(true);
   const [newAlarm, setNewAlarm] = useState({
     variable_name: '',
     condition: 'above',
@@ -59,12 +71,49 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
 
   // Fetch alarms on component mount and when device changes
   useEffect(() => {
-    if (device?.client_id) {
-      fetchAlarms();
-    }
+    let isMounted = true;
+
+    const initializeAlarms = async () => {
+      if (!device?.client_id) {
+        console.log('No device ID available');
+        return;
+      }
+
+      try {
+        setIsInitializing(true);
+        // Fetch alarms without waiting for notification initialization
+        if (isMounted) {
+          await fetchAlarms();
+        }
+      } catch (error) {
+        console.error('Error initializing alarms:', error);
+        if (isMounted) {
+          setSnackbar({
+            open: true,
+            message: 'Failed to load alarms. Please try again.',
+            severity: 'error'
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
+      }
+    };
+
+    initializeAlarms();
+
+    return () => {
+      isMounted = false;
+    };
   }, [device?.client_id]);
 
   const fetchAlarms = async () => {
+    if (!device?.client_id) {
+      console.log('No device ID available for fetching alarms');
+      return;
+    }
+
     try {
       setIsLoading(true);
       const response = await fetch(FETCH_ALARMS_API_URL, {
@@ -78,19 +127,31 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch alarms');
+        throw new Error(`Failed to fetch alarms: ${response.statusText}`);
       }
 
       const data = await response.json();
       console.log('Fetched alarms data:', data);
+      
+      if (!data) {
+        throw new Error('No data received from server');
+      }
+
+      // Check for newly triggered alarms but don't show notifications
+      const previousTriggeredIds = new Set(triggeredAlarms.map(a => a.alarm_id));
+      const newTriggeredAlarms = (data.triggered_alarms || []).filter(
+        alarm => !previousTriggeredIds.has(alarm.alarm_id)
+      );
+      
       setAlarms(data.alarms || []);
       setTriggeredAlarms(data.triggered_alarms || []);
+      setError(null);
     } catch (err) {
       console.error('Error fetching alarms:', err);
       setError(err.message);
       setSnackbar({
         open: true,
-        message: 'Failed to fetch alarms',
+        message: 'Failed to fetch alarms. Please try again.',
         severity: 'error'
       });
     } finally {
@@ -298,9 +359,43 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
     }
   };
 
-  if (isLoading) {
+  const formatAlarmValue = (alarm) => {
+    const config = metricsConfig[alarm.variable_name] || { label: alarm.variable_name, unit: '' };
+    return `${config.label} ${alarm.condition} ${alarm.threshold}${config.unit}`;
+  };
+
+  const formatCurrentValue = (alarm) => {
+    const config = metricsConfig[alarm.variable_name] || { unit: '' };
+    return `${alarm.current_value}${config.unit}`;
+  };
+
+  // Add error boundary render
+  if (error) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <ErrorIcon color="error" sx={{ fontSize: 48, mb: 2 }} />
+        <Typography variant="h6" color="error" gutterBottom>
+          Error Loading Alarms
+        </Typography>
+        <Typography color="textSecondary" paragraph>
+          {error}
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={fetchAlarms}
+          sx={{ mt: 2 }}
+        >
+          Retry
+        </Button>
+      </Box>
+    );
+  }
+
+  // Add loading state
+  if (isInitializing || isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
         <CircularProgress />
       </Box>
     );
@@ -360,7 +455,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
                     <ListItemText
                       primary={
                         <Typography variant="subtitle1" sx={{ fontSize: '0.9rem' }}>
-                          {metricsConfig[alarm.variable_name]?.label || alarm.variable_name} {alarm.condition} {alarm.threshold}{metricsConfig[alarm.variable_name]?.unit || ''}
+                          {formatAlarmValue(alarm)}
                         </Typography>
                       }
                       secondary={
@@ -411,13 +506,13 @@ const DashboardAlarmsTab = ({ device, metricsConfig, onAlarmToggle }) => {
                     <ListItemText
                       primary={
                         <Typography variant="subtitle1" sx={{ fontSize: '0.9rem' }}>
-                          {metricsConfig[alarm.variable_name]?.label || alarm.variable_name} {alarm.condition} {alarm.threshold}{metricsConfig[alarm.variable_name]?.unit || ''}
+                          {formatAlarmValue(alarm)}
                         </Typography>
                       }
                       secondary={
                         <Box>
                           <Typography component="span" variant="body2" color="text.primary" sx={{ fontSize: '0.75rem' }}>
-                            Current value: {alarm.current_value}{metricsConfig[alarm.variable_name]?.unit || ''}
+                            Current value: {formatCurrentValue(alarm)}
                           </Typography>
                           <Typography 
                             component="span" 
