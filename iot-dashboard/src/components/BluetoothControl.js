@@ -31,11 +31,14 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 
 // UUIDs from your ESP32 code
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const RESTART_SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0";
 const LED1_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 const LED2_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
 const SPEED_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26aa";
 const STATUS_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26ab";
 const MODEM_ISSUE_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26ac";
+const OFFLINE_MODE_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26ae";
+const RESTART_CHAR_UUID = "cafebabe-1234-5678-9abc-def012345678";
 
 const BluetoothControl = ({ device, onClose }) => {
   const [devices, setDevices] = useState([]);
@@ -54,6 +57,8 @@ const BluetoothControl = ({ device, onClose }) => {
   const [diagnosticData, setDiagnosticData] = useState('');
   const [isLoadingDiagnostics, setIsLoadingDiagnostics] = useState(false);
   const [isAttemptingReconnect, setIsAttemptingReconnect] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [isLoadingOfflineMode, setIsLoadingOfflineMode] = useState(false);
 
   const showNotification = (message, severity = 'info') => {
     setToastMessage(message);
@@ -220,32 +225,32 @@ const BluetoothControl = ({ device, onClose }) => {
 
   const readDeviceStates = async (deviceId) => {
     try {
+      console.log('Reading device states...');
+      
       // Read LED1 state
       const led1Data = await BleClient.read(deviceId, SERVICE_UUID, LED1_CHAR_UUID);
-      const led1Value = new TextDecoder().decode(led1Data);
-      setLed1State(led1Value === "1");
+      const led1Value = new TextDecoder().decode(led1Data.value);
+      setLed1State(led1Value === '1');
       
       // Read LED2 state
       const led2Data = await BleClient.read(deviceId, SERVICE_UUID, LED2_CHAR_UUID);
-      const led2Value = new TextDecoder().decode(led2Data);
-      setLed2State(led2Value === "1");
+      const led2Value = new TextDecoder().decode(led2Data.value);
+      setLed2State(led2Value === '1');
       
       // Read motor speed
       const speedData = await BleClient.read(deviceId, SERVICE_UUID, SPEED_CHAR_UUID);
-      const speedValue = new TextDecoder().decode(speedData);
-      const speed = parseInt(speedValue, 10);
-      if (!isNaN(speed)) {
-        setMotorSpeed(speed);
-        setSpeedInput(speed.toString());
-      }
+      const speedValue = new TextDecoder().decode(speedData.value);
+      setMotorSpeed(parseInt(speedValue) || 0);
       
-      // Read diagnostic data
-      await readDiagnosticData(deviceId);
+      // Read offline mode state
+      const offlineData = await BleClient.read(deviceId, SERVICE_UUID, OFFLINE_MODE_CHAR_UUID);
+      const offlineValue = new TextDecoder().decode(offlineData.value);
+      setOfflineMode(offlineValue === '1');
       
-      console.log('Device states read:', { led1: led1Value, led2: led2Value, speed: speedValue });
+      console.log('Device states read successfully');
     } catch (error) {
-      console.error('Failed to read device states:', error);
-      // Don't show error notification as this is not critical
+      console.error('Error reading device states:', error);
+      showNotification('Failed to read device states', 'error');
     }
   };
 
@@ -306,25 +311,75 @@ const BluetoothControl = ({ device, onClose }) => {
   };
 
   const handleSpeedSubmit = async () => {
+    if (!selectedDevice || !speedInput) return;
+    
+    try {
+      const speed = parseInt(speedInput);
+      if (isNaN(speed) || speed < 0 || speed > 100) {
+        showNotification('Speed must be between 0 and 100', 'error');
+        return;
+      }
+      
+      const encoder = new TextEncoder();
+      await BleClient.write(selectedDevice.deviceId, SERVICE_UUID, SPEED_CHAR_UUID, encoder.encode(speed.toString()));
+      
+      setMotorSpeed(speed);
+      showNotification(`Motor speed set to ${speed}%`, 'success');
+    } catch (error) {
+      console.error('Error setting motor speed:', error);
+      showNotification('Failed to set motor speed', 'error');
+    }
+  };
+
+  const toggleOfflineMode = async (enabled) => {
     if (!selectedDevice) return;
     
-    const speed = parseInt(speedInput, 10);
-    if (isNaN(speed) || speed < 0 || speed > 100) {
-      showNotification('Speed must be between 0 and 100', 'error');
-      return;
-    }
-
     try {
+      setIsLoadingOfflineMode(true);
+      const encoder = new TextEncoder();
+      const value = enabled ? '1' : '0';
+      
+      await BleClient.write(selectedDevice.deviceId, SERVICE_UUID, OFFLINE_MODE_CHAR_UUID, encoder.encode(value));
+      
+      setOfflineMode(enabled);
+      showNotification(`Offline mode ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    } catch (error) {
+      console.error('Error toggling offline mode:', error);
+      showNotification('Failed to toggle offline mode', 'error');
+    } finally {
+      setIsLoadingOfflineMode(false);
+    }
+  };
+
+  const restartDevice = async () => {
+    if (!selectedDevice) return;
+    try {
+      console.log('Attempting to restart device...');
+      showNotification('Restarting device...', 'info');
+      
+      console.log('Writing to restart characteristic:', RESTART_CHAR_UUID);
       await BleClient.write(
         selectedDevice.deviceId,
-        SERVICE_UUID,
-        SPEED_CHAR_UUID,
-        new TextEncoder().encode(speed.toString())
+        RESTART_SERVICE_UUID,
+        RESTART_CHAR_UUID,
+        new Uint8Array([49]) // '1' as ASCII
       );
-      setMotorSpeed(speed);
-      showNotification(`Speed set to ${speed}%`, 'success');
+      console.log('Restart command sent successfully');
+      
+      // Don't wait for confirmation - ESP32 restarts immediately
+      showNotification('Device restarting... Please reconnect in a few seconds', 'success');
+      
+      // Disconnect immediately since device is restarting
+      setTimeout(() => {
+        disconnectFromDevice();
+      }, 1000);
     } catch (error) {
-      showNotification('Failed to set speed', 'error');
+      console.error('Error sending restart command:', error);
+      // Even if there's an error, the device might still restart
+      showNotification('Restart command sent. Device may be restarting...', 'warning');
+      setTimeout(() => {
+        disconnectFromDevice();
+      }, 1000);
     }
   };
 
@@ -346,20 +401,34 @@ const BluetoothControl = ({ device, onClose }) => {
   }, [activeTab, selectedDevice, isConnected]);
 
   return (
-    <Dialog open={true} onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>
-        <Typography variant="h5" sx={{ fontSize: '1.2rem' }}>
-          Bluetooth Control
-        </Typography>
+    <Dialog
+      open={true}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          maxHeight: '80vh',
+          fontSize: '0.8rem'
+        }
+      }}
+    >
+      <DialogTitle sx={{ fontSize: '1rem', pb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <BluetoothIcon sx={{ fontSize: '1.2rem' }} />
+          <Typography variant="h6" sx={{ fontSize: '1rem' }}>
+            Bluetooth Control
+          </Typography>
+        </Box>
         <IconButton
           aria-label="close"
           onClick={onClose}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
+          sx={{ position: 'absolute', right: 8, top: 8, fontSize: '0.8rem' }}
         >
           <CloseIcon />
         </IconButton>
       </DialogTitle>
-      <DialogContent sx={{ fontSize: '0.875rem' }}>
+      <DialogContent sx={{ fontSize: '0.75rem', p: 2 }}>
         {isAttemptingReconnect ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
             <CircularProgress size={40} sx={{ mb: 2 }} />
@@ -427,14 +496,15 @@ const BluetoothControl = ({ device, onClose }) => {
               </Box>
 
               <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
-                <Tab label="Commands" sx={{ fontSize: '0.875rem' }} />
-                <Tab label="Diagnostics" sx={{ fontSize: '0.875rem' }} />
+                <Tab label="Commands" sx={{ fontSize: '0.7rem', minHeight: '32px' }} />
+                <Tab label="Diagnostics" sx={{ fontSize: '0.7rem', minHeight: '32px' }} />
+                <Tab label="Device" sx={{ fontSize: '0.7rem', minHeight: '32px' }} />
               </Tabs>
 
               {activeTab === 0 && (
                 <Box>
                   <Box sx={{ mb: 2 }}>
-                    <Typography gutterBottom sx={{ fontSize: '0.875rem' }}>LED 1</Typography>
+                    <Typography gutterBottom sx={{ fontSize: '0.75rem' }}>LED 1</Typography>
                     <Switch
                       checked={led1State}
                       onChange={(e) => toggleLED1(e.target.checked)}
@@ -443,7 +513,7 @@ const BluetoothControl = ({ device, onClose }) => {
                   </Box>
 
                   <Box sx={{ mb: 2 }}>
-                    <Typography gutterBottom sx={{ fontSize: '0.875rem' }}>LED 2</Typography>
+                    <Typography gutterBottom sx={{ fontSize: '0.75rem' }}>LED 2</Typography>
                     <Switch
                       checked={led2State}
                       onChange={(e) => toggleLED2(e.target.checked)}
@@ -452,27 +522,31 @@ const BluetoothControl = ({ device, onClose }) => {
                   </Box>
 
                   <Box sx={{ mb: 2 }}>
-                    <Typography gutterBottom sx={{ fontSize: '0.875rem' }}>Motor Speed: {motorSpeed}%</Typography>
+                    <Typography gutterBottom sx={{ fontSize: '0.75rem' }}>Motor Speed: {motorSpeed}%</Typography>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                       <TextField
                         type="number"
                         value={speedInput}
                         onChange={handleSpeedChange}
-                        inputProps={{ min: 0, max: 100 }}
-                        sx={{ width: '100px', flexShrink: 0 }}
+                        sx={{ width: '80px', flexShrink: 0 }}
                         size="small"
+                        inputProps={{ 
+                          min: 0, 
+                          max: 100,
+                          style: { fontSize: '0.7rem' }
+                        }}
                       />
                       <Button
                         variant="contained"
                         onClick={handleSpeedSubmit}
                         disabled={!speedInput || speedInput < 0 || speedInput > 100}
-                        sx={{ flexShrink: 0, fontSize: '0.75rem' }}
+                        sx={{ flexShrink: 0, fontSize: '0.65rem' }}
                         size="small"
                       >
-                        Set Speed
+                        Set
                       </Button>
                     </Box>
-                    <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
+                    <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.65rem' }}>
                       Speed range: 0-100%
                     </Typography>
                   </Box>
@@ -482,39 +556,84 @@ const BluetoothControl = ({ device, onClose }) => {
               {activeTab === 1 && (
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-                    <Typography variant="h6" sx={{ fontSize: '1rem' }}>Device Diagnostics</Typography>
+                    <Typography variant="h6" sx={{ fontSize: '0.9rem' }}>Device Diagnostics</Typography>
                     <Button
                       variant="contained"
                       startIcon={<RefreshIcon />}
                       onClick={() => readDiagnosticData(selectedDevice.deviceId)}
                       disabled={isLoadingDiagnostics}
-                      sx={{ flexShrink: 0, fontSize: '0.75rem' }}
+                      sx={{ flexShrink: 0, fontSize: '0.65rem' }}
                       size="small"
                     >
-                      {isLoadingDiagnostics ? <CircularProgress size={16} /> : 'Reload'}
+                      {isLoadingDiagnostics ? <CircularProgress size={14} /> : 'Reload'}
                     </Button>
                   </Box>
                   
-                  <Paper sx={{ p: 2, maxHeight: '500px', overflow: 'auto' }}>
+                  <Paper sx={{ p: 1.5, maxHeight: '400px', overflow: 'auto' }}>
                     {diagnosticData ? (
                       <Typography 
                         component="pre" 
                         sx={{ 
                           fontFamily: 'monospace', 
-                          fontSize: '0.75rem',
+                          fontSize: '0.65rem',
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
-                          lineHeight: 1.4
+                          lineHeight: 1.3
                         }}
                       >
                         {diagnosticData}
                       </Typography>
                     ) : (
-                      <Typography color="textSecondary" sx={{ fontSize: '0.8rem' }}>
+                      <Typography color="textSecondary" sx={{ fontSize: '0.7rem' }}>
                         No diagnostic data available. Click "Reload" to fetch current device status.
                       </Typography>
                     )}
                   </Paper>
+                </Box>
+              )}
+
+              {activeTab === 2 && (
+                <Box>
+                  <Typography variant="h6" sx={{ fontSize: '0.9rem', mb: 2 }}>Device Controls</Typography>
+                  
+                  <Box sx={{ mb: 3 }}>
+                    <Typography gutterBottom sx={{ fontSize: '0.75rem', mb: 1 }}>
+                      Offline Mode: {offlineMode ? 'Enabled' : 'Disabled'}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Switch
+                        checked={offlineMode}
+                        onChange={(e) => toggleOfflineMode(e.target.checked)}
+                        disabled={isLoadingOfflineMode}
+                        size="small"
+                      />
+                      <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                        {isLoadingOfflineMode ? 'Updating...' : (offlineMode ? 'Disable' : 'Enable')}
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.65rem' }}>
+                      When enabled, disables all SIM7080 operations and powers off the modem
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography gutterBottom sx={{ fontSize: '0.75rem', mb: 1 }}>
+                      Device Restart
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      color="warning"
+                      onClick={restartDevice}
+                      fullWidth
+                      sx={{ fontSize: '0.7rem' }}
+                      size="small"
+                    >
+                      Restart Device
+                    </Button>
+                    <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.65rem' }}>
+                      Restarts the ESP32 device. You'll need to reconnect after restart.
+                    </Typography>
+                  </Box>
                 </Box>
               )}
 
@@ -523,7 +642,7 @@ const BluetoothControl = ({ device, onClose }) => {
                 color="error"
                 onClick={disconnectFromDevice}
                 fullWidth
-                sx={{ mt: 2, fontSize: '0.875rem' }}
+                sx={{ mt: 2, fontSize: '0.7rem' }}
                 size="small"
               >
                 Disconnect
