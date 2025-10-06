@@ -55,7 +55,6 @@ import {
   Settings as SettingsIcon,
   Download as DownloadIcon,
   Notifications as NotificationsIcon,
-  History as HistoryIcon,
   ShowChart as ShowChartIcon,
   BarChart as BarChartIcon,
   PieChart as PieChartIcon,
@@ -90,7 +89,6 @@ import DashboardSkeleton from "./dashboard2/DashboardSkeleton";
 import DashboardSummaryTab from './dashboard2/DashboardSummaryTab';
 import DashboardChartsTab from './dashboard2/DashboardChartsTab';
 import DashboardCommandsTab from './dashboard2/DashboardCommandsTab';
-import DashboardHistoryTab from './dashboard2/DashboardHistoryTab';
 import DashboardOverviewTab from './dashboard2/DashboardOverviewTab';
 import DashboardStatisticsTab from './dashboard2/DashboardStatisticsTab';
 import DashboardAlarmsTab from './dashboard2/DashboardAlarmsTab';
@@ -1128,19 +1126,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         );
       case 4:
         return (
-          <DashboardHistoryTab
-            metricsData={metricsData}
-            metricsConfig={metricsConfig}
-            timeRange={timeRange}
-            selectedVariables={selectedVariablesChartsStats}
-            availableVariables={availableVariables}
-            onVariableChange={e => handleVariableChange(e, false)}
-            onTimeRangeChange={handleTimeRangeChange}
-            onApply={handleApply}
-          />
-        );
-      case 5:
-        return (
           <DashboardAlarmsTab
             device={device}
             metricsConfig={metricsConfig}
@@ -1433,8 +1418,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             <Tab label="Charts" {...a11yProps(1)} />
             <Tab label="Statistics" {...a11yProps(2)} />
             <Tab label="Commands" {...a11yProps(3)} />
-            <Tab label="History" {...a11yProps(4)} />
-            <Tab label="Alarms" {...a11yProps(5)} />
+            <Tab label="Alarms" {...a11yProps(4)} />
         </Tabs>
         </Box>
 
@@ -1453,9 +1437,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         </TabPanel>
         <TabPanel value={selectedTab} index={4}>
           {renderTabContent(4)}
-        </TabPanel>
-        <TabPanel value={selectedTab} index={5}>
-          {renderTabContent(5)}
         </TabPanel>
       </Container>
     </Box>

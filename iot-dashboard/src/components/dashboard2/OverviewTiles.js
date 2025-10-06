@@ -5,6 +5,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
 import InfoIcon from '@mui/icons-material/Info';
 import SettingsIcon from '@mui/icons-material/Settings';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 
 const getSeverityIcon = (severity) => {
   switch (severity?.toLowerCase()) {
@@ -19,7 +20,7 @@ const getSeverityIcon = (severity) => {
   }
 };
 
-const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAlarmsList }) => {
+const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAlarmsList, isStatus = false }) => {
   const alarmActive = Array.isArray(triggeredAlarmsList) && triggeredAlarmsList.length > 0;
 
   const getHighestSeverity = (alarms) => {
@@ -74,6 +75,15 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
       {/* Icon, title, and alarm indicator in one row */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, minHeight: 24 }}>
         {icon && <Box sx={{ mr: 1 }}>{icon}</Box>}
+        {isStatus && (
+          <FiberManualRecordIcon 
+            sx={{ 
+              mr: 1, 
+              fontSize: '1.2rem',
+              color: value === 'ON' ? '#4caf50' : '#9e9e9e'
+            }} 
+          />
+        )}
         <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 400, fontSize: '0.95rem', textAlign: 'left' }}>
           {title}
         </Typography>
@@ -181,6 +191,56 @@ const OverviewTiles = ({
                 </Typography>
               </Box>
             </Grid>
+            {/* Input States - Grouped together (2 per row) */}
+            <Grid item xs={6} sm={6}>
+              <OverviewTile
+                title="Input 1"
+                value={deviceState.in1_state === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+                isStatus={true}
+              />
+            </Grid>
+
+            <Grid item xs={6} sm={6}>
+              <OverviewTile
+                title="Input 2"
+                value={deviceState.in2_state === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+                isStatus={true}
+              />
+            </Grid>
+
+            {/* Output States - Grouped together (2 per row) */}
+            <Grid item xs={6} sm={6}>
+              <OverviewTile
+                title="Output 1"
+                value={deviceState.out1_state === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+                isStatus={true}
+              />
+            </Grid>
+
+            <Grid item xs={6} sm={6}>
+              <OverviewTile
+                title="Output 2"
+                value={deviceState.out2_state === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+                isStatus={true}
+              />
+            </Grid>
+
             {/* Charging Status */}
             <Grid item xs={6} sm={6} md={4} lg={3}>
               <OverviewTile
@@ -190,55 +250,9 @@ const OverviewTiles = ({
                 color="#2196f3"
                 isLoading={isLoading}
                 triggeredAlarmsList={[]}
+                isStatus={true}
               />
             </Grid>
-
-            {/* Input States */}
-            <Grid item xs={6} sm={6} md={4} lg={3}>
-              <OverviewTile
-                title="Input 1"
-                value={deviceState.in1_state === 1 ? 'ON' : 'OFF'}
-                icon=""
-                color="#2196f3"
-                isLoading={isLoading}
-                triggeredAlarmsList={[]}
-              />
-            </Grid>
-
-            <Grid item xs={6} sm={6} md={4} lg={3}>
-              <OverviewTile
-                title="Input 2"
-                value={deviceState.in2_state === 1 ? 'ON' : 'OFF'}
-                icon=""
-                color="#2196f3"
-                isLoading={isLoading}
-                triggeredAlarmsList={[]}
-              />
-            </Grid>
-
-            {/* Output States */}
-            <Grid item xs={6} sm={6} md={4} lg={3}>
-              <OverviewTile
-                title="Output 1"
-                value={deviceState.out1_state === 1 ? 'ON' : 'OFF'}
-                icon=""
-                color="#2196f3"
-                isLoading={isLoading}
-                triggeredAlarmsList={[]}
-              />
-            </Grid>
-
-            <Grid item xs={6} sm={6} md={4} lg={3}>
-              <OverviewTile
-                title="Output 2"
-                value={deviceState.out2_state === 1 ? 'ON' : 'OFF'}
-                icon=""
-                color="#2196f3"
-                isLoading={isLoading}
-                triggeredAlarmsList={[]}
-              />
-            </Grid>
-
 
             {/* Motor Speed */}
             <Grid item xs={6} sm={6} md={4} lg={3}>
@@ -262,6 +276,7 @@ const OverviewTiles = ({
                 color="#2196f3"
                 isLoading={isLoading}
                 triggeredAlarmsList={[]}
+                isStatus={true}
               />
             </Grid>
           </>
@@ -294,6 +309,7 @@ OverviewTile.propTypes = {
     severity: PropTypes.string,
     current_value: PropTypes.number,
   })),
+  isStatus: PropTypes.bool,
 };
 
 OverviewTiles.propTypes = {
