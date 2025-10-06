@@ -1609,7 +1609,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     setConfigureDialogOpen(true);
   };
 
-  // Update the updateDevicesData function
+  // Update the updateDevicesData function - Version 2.0 with robust error handling
   const updateDevicesData = async () => {
     try {
         const updatedData = {};
@@ -1635,12 +1635,16 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
                 const dataResult = await dataResponse.json();
                 
+                // Debug: Log the response to understand the format
+                console.log(`API Response for ${device.client_id}:`, dataResult);
+                
                 // Handle both response formats: direct {device_data: {...}} or wrapped {body: "..."}
                 let newDeviceData;
                 try {
-                  if (dataResult.body) {
+                  if (dataResult.body && typeof dataResult.body === 'string' && dataResult.body !== 'undefined' && dataResult.body !== 'null') {
                     // Old format: wrapped in body field
-                    newDeviceData = JSON.parse(dataResult.body).device_data;
+                    const parsedBody = JSON.parse(dataResult.body);
+                    newDeviceData = parsedBody.device_data;
                   } else if (dataResult.device_data) {
                     // New format: direct device_data field
                     newDeviceData = dataResult.device_data;
@@ -1650,6 +1654,21 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                   }
                 } catch (parseError) {
                   console.error(`Error parsing response for device ${device.client_id}:`, parseError);
+                  console.error('Response data:', dataResult);
+                  console.error('Body content:', dataResult.body);
+                  
+                  // Keep existing data to prevent device from going offline due to API errors
+                  const currentDeviceData = deviceData[device.client_id];
+                  if (currentDeviceData && currentDeviceData.latest_data) {
+                    console.log(`Keeping existing data for ${device.client_id} due to API error`);
+                    updatedData[device.client_id] = {
+                      ...currentDeviceData,
+                      ...device,
+                      status: 'Online', // Keep as online to prevent false offline status
+                      lastSeen: new Date()
+                    };
+                    hasUpdates = true;
+                  }
                   continue;
                 }
 
