@@ -28,7 +28,6 @@ const DashboardCommands = ({
 
   useEffect(() => {
     if (deviceState) {
-      console.log('Updating states from deviceState:', deviceState);
       setOutput1State(deviceState.out1_state === 1);
       setOutput2State(deviceState.out2_state === 1);
       setPowerSavingMode(deviceState.power_saving === 1);
@@ -71,7 +70,6 @@ const DashboardCommands = ({
         ...params
       };
 
-      console.log('Sending command with payload:', payload);
 
       const response = await fetch(COMMAND_API_URL, {
         method: 'POST',
@@ -109,30 +107,23 @@ const DashboardCommands = ({
     setIsLoading(true);
     try {
       const command = isOn ? `TOGGLE_${led}_ON` : `TOGGLE_${led}_OFF`;
-      console.log("handleSwitchChange: Attempting to send command:", command);
       
       // Send the command directly using the internal sendCommand function
       await sendCommand(command);
 
-      console.log("handleSwitchChange: Command sent successfully, waiting for verification...");
       
       // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
-      console.log('First verification after 5s');
       
       // First verification
       const latestState = await fetchDeviceState();
-      console.log('First verification state:', latestState);
       
       // Additional verification after 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
-      console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
-      console.log('Final verification state:', finalState);
       
       // Update the UI with the final state
       if (finalState) {
-        console.log('Updating UI with final state:', finalState);
         setOutput1State(finalState.out1_state === 1);
         setOutput2State(finalState.out2_state === 1);
         setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
@@ -159,30 +150,23 @@ const DashboardCommands = ({
     setIsLoading(true);
     try {
       const command = isOn ? 'POWER_SAVING_ON' : 'POWER_SAVING_OFF';
-      console.log("handlePowerSavingChange: Attempting to send command:", command);
       
       // Send the command directly using the internal sendCommand function
       await sendCommand(command);
 
-      console.log("handlePowerSavingChange: Command sent successfully, waiting for verification...");
       
       // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
-      console.log('First verification after 5s');
       
       // First verification
       const latestState = await fetchDeviceState();
-      console.log('First verification state:', latestState);
       
       // Additional verification after 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
-      console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
-      console.log('Final verification state:', finalState);
       
       // Update the UI with the final state
       if (finalState) {
-        console.log('Updating UI with final state:', finalState);
         setOutput1State(finalState.out1_state === 1); // Ensure Output states are updated
         setOutput2State(finalState.out2_state === 1); // Ensure Output states are updated
         setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
@@ -228,17 +212,13 @@ const DashboardCommands = ({
 
       // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
-      console.log('First verification after 5s');
       
       // First verification
       const latestState = await fetchDeviceState();
-      console.log('First verification state:', latestState);
       
       // Additional verification after 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
-      console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
-      console.log('Final verification state:', finalState);
       
       if (finalState) {
         setMotorSpeed(finalState.motor_speed?.toString() || "0");
@@ -275,17 +255,13 @@ const DashboardCommands = ({
 
       // Wait for 5 seconds to allow the device to process the command
       await new Promise(resolve => setTimeout(resolve, 5000));
-      console.log('First verification after 5s');
       
       // First verification
       const latestState = await fetchDeviceState();
-      console.log('First verification state:', latestState);
       
       // Additional verification after 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
-      console.log('Second verification after 10s');
       const finalState = await fetchDeviceState();
-      console.log('Final verification state:', finalState);
       
       if (finalState) {
         setOutput1State(finalState.out1_state === 1);

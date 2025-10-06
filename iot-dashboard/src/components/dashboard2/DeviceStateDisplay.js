@@ -86,11 +86,8 @@ StateCard.propTypes = {
 const DeviceStateDisplay = ({ deviceState, isLoading }) => {
   const theme = useTheme();
 
-  console.log('DeviceStateDisplay received deviceState:', deviceState);
-  console.log('DeviceStateDisplay isLoading:', isLoading);
 
   if (!deviceState) {
-    console.log('DeviceStateDisplay: No deviceState, returning null');
     return null;
   }
 

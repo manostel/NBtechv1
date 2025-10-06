@@ -394,7 +394,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
 
     try {
-      console.log(`Fetching battery state for device: ${device.client_id}`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -429,7 +428,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         throw new Error('Invalid response format from battery state API');
       }
 
-      console.log('Successfully fetched battery state:', result.battery_state);
       // Only update battery state if it's different
       if (batteryState !== result.battery_state) {
       setBatteryState(result.battery_state);
@@ -467,7 +465,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       }
 
       const result = await response.json();
-      console.log('Received latest data:', result);
 
       if (result.data_latest && Array.isArray(result.data_latest) && result.data_latest.length > 0) {
         const latestData = result.data_latest[0];
@@ -483,12 +480,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         // Only notify if status has actually changed and enough time has passed since last change
         const now = Date.now();
         if (newStatus !== deviceStatus && (!lastStatusChange || now - lastStatusChange > 180000)) {  // 3 minutes debounce
-          console.log('Device status changed:', { 
-            oldStatus: deviceStatus, 
-            newStatus,
-            timeDiffSeconds,
-            lastTimestamp: lastTimestamp.toISOString()
-          });
           DeviceNotificationService.notifyDeviceStatusChange(device, deviceStatus, newStatus);
           setDeviceStatus(newStatus);
           setLastStatusChange(now);
@@ -518,12 +509,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           setDeviceType(device.device);
         }
 
-        console.log('Updated device info:', {
-          name: latestData.device_name || device.name,
-          type: latestData.device || device.device,
-          status: newStatus,
-          timeDiffSeconds
-        });
       }
     } catch (error) {
       console.error('Error fetching latest data:', error);
@@ -586,7 +571,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       }
 
       const result = await response.json();
-      console.log('Received dashboard data:', result);
 
       if (result.data && Array.isArray(result.data) && result.data.length > 0) {
         // Process the data to round all numeric values to 2 decimal places
@@ -619,17 +603,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   };
 
   const fetchDeviceState = async () => {
-    console.log('🔍 fetchDeviceState called with device:', device);
     if (!device || !device.client_id) {
       console.error('❌ No device or client_id available');
       return;
     }
 
-    console.log('🌐 Making API call to:', STATUS_API_URL);
-    console.log('📤 Request payload:', { client_id: device.client_id });
     try {
-      console.log('🌐 About to make fetch request to:', STATUS_API_URL);
-      console.log('📡 Network request starting...', new Date().toISOString());
       const response = await fetch(STATUS_API_URL, {
         method: 'POST',
         headers: {
@@ -645,12 +624,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      console.log('✅ API response received, status:', response.status);
       const deviceState = await response.json();
-      console.log('📥 Device state response:', deviceState);
-
       setDeviceState(deviceState);
-      console.log('💾 Device state set in Dashboard:', deviceState);
       return deviceState;
     } catch (error) {
       console.error('❌ Error fetching device state:', error);
@@ -680,10 +655,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       }
 
       const data = await response.json();
-      console.log('Fetched alarms data:', data);
       setAlarms(data.alarms || []);
       setTriggeredAlarms(data.triggered_alarms || []);
-      console.log('Set triggered alarms:', data.triggered_alarms || []);
     } catch (err) {
       console.error('Error fetching alarms:', err);
       setError(err.message);
@@ -710,7 +683,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       if (!isMounted.current) return;
       
       // 3. Fetch latest data and device state together
-      console.log('🚀 Initial data fetch - calling fetchDeviceState');
       await Promise.all([
         fetchLatestData(),
         fetchDeviceState()
@@ -761,7 +733,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         
         try {
           // Fetch latest data and device state together every 30 seconds
-          console.log('🔄 Periodic data fetch - calling fetchDeviceState');
           await Promise.all([
             fetchLatestData(),
             fetchDeviceState()
@@ -895,7 +866,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   const handleSpeedInputSubmit = () => {
     const speed = parseInt(speedInput, 10);
-    console.log('Submitting speed:', speed); // Debug log
     
     if (isNaN(speed) || speed < 0 || speed > 100) {
       setSnackbar({
@@ -979,7 +949,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       }
 
       const data = await response.json();
-      console.log('Command response:', data);
 
       // Notify successful command execution
       DeviceNotificationService.notifyCommandExecuted(device, command, true);
@@ -1049,7 +1018,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       }
 
       const result = await response.json();
-      console.log('Received dashboard data:', result);
 
       if (result.data && Array.isArray(result.data) && result.data.length > 0) {
         // Update the metrics data while preserving latest data
@@ -1159,7 +1127,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
 
     try {
-      console.log(`Fetching device start time for device: ${device.client_id}`);
       
       const response = await fetch('https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-start-time', {
         method: 'POST',
@@ -1185,7 +1152,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         return;
       }
 
-      console.log('Successfully fetched device start time info:', result);
       setDeviceStartTimeInfo(result);
 
     } catch (error) {
@@ -1199,7 +1165,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     const initializeNotifications = async () => {
       const notificationsEnabled = await NotificationService.initialize();
       if (!notificationsEnabled) {
-        console.log('Notifications are disabled');
       }
     };
 

@@ -761,7 +761,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       }
 
       const dataResult = await dataResponse.json();
-      console.log('API Response:', dataResult); // Debug log
       
       // Handle both response formats: direct {device_data: {...}} or wrapped {body: "..."}
       let deviceData;

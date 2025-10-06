@@ -51,7 +51,6 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
   const overallAlarmSeverity = getHighestSeverity(triggeredAlarmsList);
   const tooltipTitle = getTooltipTitle(triggeredAlarmsList);
 
-  console.log(`OverviewTile ${title} alarmActive:`, alarmActive, 'severity:', overallAlarmSeverity);
   
   return (
     <Paper 
@@ -130,7 +129,6 @@ const OverviewTiles = ({
   triggeredAlarms,
   deviceState
 }) => {
-  console.log('OverviewTiles received triggeredAlarms:', triggeredAlarms);
 
   if (!metricsData || !metricsConfig || !selectedVariables) {
     return (
@@ -149,11 +147,9 @@ const OverviewTiles = ({
 
           // Get the latest data point
           const latestData = metricsData.data_latest?.[0] || metricsData.data?.[0] || {};
-          console.log(`Latest data for ${variable}:`, latestData[variable]);
 
           const value = latestData[variable];
           if (value === undefined || value === null) {
-            console.log(`No value found for ${variable}`);
             return null;
           }
 
@@ -162,7 +158,6 @@ const OverviewTiles = ({
             ? triggeredAlarms.filter(alarm => alarm.variable_name === variable)
             : [];
 
-          console.log(`Tile ${variable} triggered alarms:`, triggeredAlarmsList.length);
 
           return (
             <Grid item xs={6} sm={6} md={4} lg={3} key={variable}>
@@ -180,7 +175,6 @@ const OverviewTiles = ({
         })}
 
         {/* Device Status Tiles */}
-        {console.log('OverviewTiles deviceState:', deviceState)}
         {deviceState ? (
           <>
             <Grid item xs={12}>

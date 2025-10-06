@@ -75,7 +75,6 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
 
   const fetchAlarms = useCallback(async () => {
     if (!device?.client_id) {
-      console.log('No device ID available for fetching alarms');
       return;
     }
 
@@ -96,7 +95,6 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
       }
 
       const data = await response.json();
-      console.log('Fetched alarms data:', data);
       
       if (!data) {
         throw new Error('No data received from server');
@@ -147,7 +145,6 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
     const initializeNotifications = async () => {
       const notificationsEnabled = await NotificationService.initialize();
       if (!notificationsEnabled) {
-        console.log('Notifications are disabled');
       }
     };
 
@@ -171,7 +168,6 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
 
     const initializeAlarms = async () => {
       if (!device?.client_id) {
-        console.log('No device ID available');
         return;
       }
 
@@ -216,7 +212,6 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
 
     try {
       setIsLoading(true);
-      console.log('Creating alarm with data:', newAlarm);
       const response = await fetch(MANAGE_ALARMS_API_URL, {
         method: 'POST',
         headers: {
@@ -367,7 +362,6 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
   };
 
   const getSeverityIcon = (severity) => {
-    console.log('Getting icon for severity:', severity);
     const severityLevel = severity?.toLowerCase() || 'info';
     switch (severityLevel) {
       case 'error':
@@ -377,19 +371,16 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
       case 'info':
         return <InfoIcon color="info" />;
       default:
-        console.log('Using default icon for severity:', severityLevel);
         return <InfoIcon color="info" />;
     }
   };
 
   const getSeverityText = (severity) => {
-    console.log('Getting text for severity:', severity);
     const severityLevel = severity?.toLowerCase() || 'info';
     return severityLevel.charAt(0).toUpperCase() + severityLevel.slice(1);
   };
 
   const getSeverityColor = (severity) => {
-    console.log('Getting color for severity:', severity);
     const severityLevel = severity?.toLowerCase() || 'info';
     switch (severityLevel) {
       case 'error':
@@ -399,7 +390,6 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
       case 'info':
         return theme.palette.info.main;
       default:
-        console.log('Using default color for severity:', severityLevel);
         return theme.palette.info.main;
     }
   };
