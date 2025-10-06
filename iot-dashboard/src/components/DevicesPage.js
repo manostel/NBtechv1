@@ -59,6 +59,8 @@ import BluetoothControl from './BluetoothControl';
 const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
 const DEVICE_PREFERENCES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-preferences";
+const GPS_DATA_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-gps";
+const DEVICE_STATE_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/data-dashboard-state";
 const BATTERY_STATE_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
 const INACTIVE_TIMEOUT_MINUTES = 7; // Device is considered offline after 7 minutes of inactivity
 const DEVICE_DATA_UPDATE_INTERVAL = 2 * 60 * 1000; // 2 minutes in milliseconds
@@ -367,7 +369,7 @@ const getDeviceStatus = (deviceData) => {
 };
 
 // Add this new component for the Map View
-const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
+const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDeviceClick, getDeviceStatus }) => {
   const theme = useTheme();
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [isSatelliteView, setIsSatelliteView] = useState(false);
@@ -396,22 +398,16 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
     };
   }, [theme.palette.mode]);
 
-  // Mock GPS coordinates for devices (in a real app, these would come from device data)
+  // Use real GPS coordinates from API data
   const deviceLocations = useMemo(() => {
-    // Multiple device locations
-    const locations = [
-      [37.9838, 23.7275], // Athens Center
-      [37.9785, 23.7167], // Syntagma Square
-      [37.9677, 23.7281], // Acropolis
-      [37.9750, 23.7411], // Omonia Square
-      [37.9715, 23.7256], // Monastiraki
-    ];
-
-    return devices.reduce((acc, device, index) => {
-      acc[device.client_id] = locations[index % locations.length];
+    return devices.reduce((acc, device) => {
+      const gpsInfo = gpsData[device.client_id];
+      if (gpsInfo && gpsInfo.latitude && gpsInfo.longitude) {
+        acc[device.client_id] = [gpsInfo.latitude, gpsInfo.longitude];
+      }
       return acc;
     }, {});
-  }, [devices]);
+  }, [devices, gpsData]);
 
   // Calculate center point based on device locations
   const mapCenter = useMemo(() => {
@@ -516,6 +512,34 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
         >
           {isSatelliteView ? 'Satellite Imagery' : 'Street Map'}
         </Button>
+        
+        {/* GPS Status Indicator */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 1, 
+          ml: 2,
+          p: 1,
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          border: '1px solid',
+          borderColor: 'divider'
+        }}>
+          {gpsLoading ? (
+            <>
+              <CircularProgress size={16} />
+              <Typography variant="caption" color="text.secondary">
+                Loading GPS data...
+              </Typography>
+            </>
+          ) : (
+            <>
+              <Typography variant="caption" color="text.secondary">
+                📍 GPS: {Object.keys(gpsData).length} devices
+              </Typography>
+            </>
+          )}
+        </Box>
       </Box>
       <MapContainer
         center={mapCenter}
@@ -541,11 +565,17 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
           const deviceInfo = deviceData[device.client_id];
           const metricsVisibility = deviceInfo?.metrics_visibility || {};
           const latestData = deviceInfo?.latest_data || {};
+          
+          // Only render marker if device has valid GPS coordinates
+          const deviceLocation = deviceLocations[device.client_id];
+          if (!deviceLocation || !Array.isArray(deviceLocation) || deviceLocation.length !== 2) {
+            return null;
+          }
 
           return (
             <Marker
               key={device.client_id}
-              position={deviceLocations[device.client_id]}
+              position={deviceLocation}
               icon={createCustomIcon(getMarkerColor(device))}
               eventHandlers={{
                 click: () => setSelectedDevice(device),
@@ -573,23 +603,96 @@ const MapView = ({ devices, deviceData, onDeviceClick, getDeviceStatus }) => {
                     />
                   </Box>
 
-                  {/* Show metrics based on preferences, excluding status and last_seen */}
-                  {Object.entries(metricsVisibility).map(([metric, isVisible]) => {
-                    if (isVisible && 
-                        !excludedMetrics.includes(metric) && 
-                        metric !== 'battery' && 
-                        metric !== 'signal_quality' &&
-                        latestData[metric] !== undefined) {
-                      return (
-                        <Typography key={metric} variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                          {metric.split('_').map(word => 
-                            word.charAt(0).toUpperCase() + word.slice(1)
-                          ).join(' ')}: {renderMetricValue(latestData[metric], metric)}
+                  {/* Show I/O states if available */}
+                  {deviceStates[device.client_id] && (
+                    <Box sx={{ mt: 1, p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
+                      <Typography variant="caption" color="primary" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+                        I/O States
+                      </Typography>
+                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ 
+                            width: 8, 
+                            height: 8, 
+                            borderRadius: '50%', 
+                            bgcolor: deviceStates[device.client_id].in1_state === 1 ? 'success.main' : 'grey.400' 
+                          }} />
+                          <Typography variant="caption" color="text.secondary">
+                            IN1: {deviceStates[device.client_id].in1_state === 1 ? 'ON' : 'OFF'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ 
+                            width: 8, 
+                            height: 8, 
+                            borderRadius: '50%', 
+                            bgcolor: deviceStates[device.client_id].in2_state === 1 ? 'success.main' : 'grey.400' 
+                          }} />
+                          <Typography variant="caption" color="text.secondary">
+                            IN2: {deviceStates[device.client_id].in2_state === 1 ? 'ON' : 'OFF'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ 
+                            width: 8, 
+                            height: 8, 
+                            borderRadius: '50%', 
+                            bgcolor: deviceStates[device.client_id].out1_state === 1 ? 'success.main' : 'grey.400' 
+                          }} />
+                          <Typography variant="caption" color="text.secondary">
+                            OUT1: {deviceStates[device.client_id].out1_state === 1 ? 'ON' : 'OFF'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ 
+                            width: 8, 
+                            height: 8, 
+                            borderRadius: '50%', 
+                            bgcolor: deviceStates[device.client_id].out2_state === 1 ? 'success.main' : 'grey.400' 
+                          }} />
+                          <Typography variant="caption" color="text.secondary">
+                            OUT2: {deviceStates[device.client_id].out2_state === 1 ? 'ON' : 'OFF'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Show key metrics in compact format */}
+                  {(() => {
+                    // Show only the most important metrics
+                    const keyMetrics = ['motor_speed', 'temperature', 'humidity', 'pressure'];
+                    const availableMetrics = keyMetrics.filter(metric => 
+                      latestData[metric] !== undefined && latestData[metric] !== null
+                    );
+                    
+                    if (availableMetrics.length === 0) return null;
+                    
+                    const getShortLabel = (metric) => {
+                      // Return the full metric name without abbreviations
+                      return metric;
+                    };
+                    
+                    return (
+                      <Box sx={{ mt: 1, p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
+                        <Typography variant="caption" color="primary" sx={{ fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+                          Status
                         </Typography>
-                      );
-                    }
-                    return null;
-                  })}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          {availableMetrics.map((metric) => (
+                            <Box key={metric} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">
+                                {getShortLabel(metric)}
+                              </Typography>
+                              <Typography variant="caption" color="text.primary" sx={{ fontWeight: 'medium' }}>
+                                {renderMetricValue(latestData[metric], metric)}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                    );
+                  })()}
 
                   <Button 
                     variant="contained" 
@@ -639,6 +742,9 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deviceToDelete, setDeviceToDelete] = useState(null);
   const [deviceData, setDeviceData] = useState({});
+  const [gpsData, setGpsData] = useState({});
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [deviceStates, setDeviceStates] = useState({});
   const [openDialog, setOpenDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [newDevice, setNewDevice] = useState({
@@ -674,6 +780,12 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
             setIsLoading(true);
             // Fetch devices and preferences only once
             await fetchDevices();
+            // Fetch GPS data after devices are loaded
+            await fetchGPSData();
+            // Fetch device states in background (non-blocking)
+            fetchDeviceStates().catch(() => {
+              // Silently handle device state fetch errors
+            });
             setIsLoading(false);
         } catch (error) {
             console.error('Error initializing devices:', error);
@@ -687,6 +799,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     // Set up polling for device data (every 15 seconds)
     const deviceDataInterval = setInterval(() => {
         updateDevicesData();
+        fetchGPSData(); // Also fetch GPS data periodically
+        // Fetch device states in background (non-blocking)
+        fetchDeviceStates().catch(() => {
+          // Silently handle device state fetch errors
+        });
     }, DEVICE_DATA_UPDATE_INTERVAL);
 
     return () => {
@@ -826,6 +943,90 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     } catch (error) {
       console.error(`Error fetching data for device ${device.client_id}:`, error);
       return null;
+    }
+  };
+
+  const fetchGPSData = async () => {
+    if (devices.length === 0) return;
+    
+    setGpsLoading(true);
+    try {
+      const clientIds = devices.map(device => device.client_id);
+      const response = await fetch(GPS_DATA_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_ids: clientIds
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch GPS data:', response.statusText);
+        return;
+      }
+
+      const result = await response.json();
+      const gpsLocations = {};
+      
+      if (result.gps_locations) {
+        result.gps_locations.forEach(location => {
+          if (location.latitude !== null && location.longitude !== null) {
+            gpsLocations[location.client_id] = {
+              latitude: location.latitude,
+              longitude: location.longitude,
+              timestamp: location.timestamp,
+              altitude: location.altitude,
+              satellites: location.satellites
+            };
+          }
+        });
+      }
+      
+      setGpsData(gpsLocations);
+    } catch (error) {
+      console.error('Error fetching GPS data:', error);
+    } finally {
+      setGpsLoading(false);
+    }
+  };
+
+  const fetchDeviceStates = async () => {
+    if (devices.length === 0) return;
+    
+    try {
+      // Get all client IDs
+      const clientIds = devices.map(device => device.client_id);
+      
+      // Make a single API call for all devices
+      const response = await fetch(DEVICE_STATE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_ids: clientIds
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Convert array response to object keyed by client_id
+        const deviceStates = {};
+        if (result.device_states && Array.isArray(result.device_states)) {
+          result.device_states.forEach(state => {
+            deviceStates[state.client_id] = state;
+          });
+        }
+        setDeviceStates(deviceStates);
+      } else {
+        console.warn(`Device state API not available: ${response.status}`);
+      }
+    } catch (error) {
+      console.warn('Device state API not accessible:', error.message);
     }
   };
 
@@ -1939,6 +2140,9 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         <MapView 
           devices={devices} 
           deviceData={deviceData} 
+          gpsData={gpsData}
+          gpsLoading={gpsLoading}
+          deviceStates={deviceStates}
           onDeviceClick={handleDeviceClick}
           getDeviceStatus={getDeviceStatus}
         />

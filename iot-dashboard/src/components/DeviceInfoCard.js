@@ -7,19 +7,19 @@ import SignalIndicator from "./SignalIndicator";
 import PropTypes from 'prop-types';
 
 export default function DeviceInfoCard({ 
-  clientID, 
-  deviceName,
-  deviceType,
-  status, 
-  lastOnline, 
-  isLoading, 
-  batteryLevel, 
-  signalStrength,
-  showClientId,
-  onToggleClientId,
-  batteryState,
-  lastTimestamp,
-  deviceStartTimeInfo
+  clientID = '',
+  deviceName = '',
+  deviceType = '',
+  status = 'Offline',
+  lastOnline = 'Never',
+  isLoading = false,
+  batteryLevel = 0,
+  signalStrength = 0,
+  showClientId = false,
+  onToggleClientId = () => {},
+  batteryState = 'idle',
+  lastTimestamp = null,
+  deviceStartTimeInfo = null
 }) {
   const theme = useTheme();
   const [error, setError] = useState(null);
@@ -193,18 +193,3 @@ DeviceInfoCard.propTypes = {
   }),
 };
 
-DeviceInfoCard.defaultProps = {
-  clientID: '',
-  deviceName: '',
-  deviceType: '',
-  status: 'Offline',
-  lastOnline: 'Never',
-  isLoading: false,
-  batteryLevel: 0,
-  signalStrength: 0,
-  showClientId: false,
-  onToggleClientId: () => {},
-  batteryState: 'idle',
-  lastTimestamp: null,
-  deviceStartTimeInfo: null,
-};

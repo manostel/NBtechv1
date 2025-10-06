@@ -625,13 +625,19 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       }
 
       const deviceState = await response.json();
-      setDeviceState(deviceState);
-      return deviceState;
+      
+      if (deviceState) {
+        setDeviceState(deviceState);
+        return deviceState;
+      } else {
+        console.warn('⚠️ No device state found for device:', device.client_id);
+        return null;
+      }
     } catch (error) {
       console.error('❌ Error fetching device state:', error);
       if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
         console.warn('⚠️ CORS error - Lambda might not be deployed to this API Gateway');
-        console.warn('🔧 Check if fetch-dashboard-data-state Lambda is deployed to:', STATUS_API_URL);
+        console.warn('🔧 Check if fetch-device-states-bulk Lambda is deployed to:', STATUS_API_URL);
       }
       setError(error.message || 'Failed to fetch device state');
       return null;

@@ -100,11 +100,11 @@ const DeviceStateDisplay = ({ deviceState, isLoading }) => {
         </Typography>
       </Box>
       <Grid container spacing={1} sx={{ flexGrow: 1, minWidth: 0, flexWrap: 'wrap' }}>
-        {/* LED Controls */}
+        {/* Output Controls */}
         <Grid item xs={6} sm={6} md={4} lg={3}>
             <StateCard
-            title="LED 1 Control Status"
-              value={deviceState.led1_state === 1}
+            title="Output 1 Control Status"
+              value={deviceState.out1_state === 1}
               icon={<LightbulbIcon />}
             color={theme.palette.success.main}
               isBoolean={true}
@@ -112,8 +112,8 @@ const DeviceStateDisplay = ({ deviceState, isLoading }) => {
         </Grid>
         <Grid item xs={6} sm={6} md={4} lg={3}>
             <StateCard
-            title="LED 2 Control Status"
-              value={deviceState.led2_state === 1}
+            title="Output 2 Control Status"
+              value={deviceState.out2_state === 1}
               icon={<LightbulbIcon />}
             color={theme.palette.warning.main}
               isBoolean={true}

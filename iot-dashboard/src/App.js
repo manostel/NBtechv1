@@ -77,7 +77,7 @@ function App() {
       <CustomThemeProvider>
         <CssBaseline />
         <Box className="App">
-          <Router>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Box className="App-content">
               <PageTransition>
                 <Routes>
