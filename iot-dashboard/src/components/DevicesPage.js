@@ -56,10 +56,10 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import BluetoothControl from './BluetoothControl';
 
-const DEVICES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
-const DEVICE_DATA_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
-const DEVICE_PREFERENCES_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-preferences";
-const BATTERY_STATE_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
+const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
+const DEVICE_DATA_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
+const DEVICE_PREFERENCES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-preferences";
+const BATTERY_STATE_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
 const INACTIVE_TIMEOUT_MINUTES = 7; // Device is considered offline after 7 minutes of inactivity
 const DEVICE_DATA_UPDATE_INTERVAL = 2 * 60 * 1000; // 2 minutes in milliseconds
 const DEVICE_STATUS_UPDATE_INTERVAL = 70 * 1000; // 70 seconds in milliseconds
@@ -761,7 +761,20 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       }
 
       const dataResult = await dataResponse.json();
-      const deviceData = JSON.parse(dataResult.body).device_data;
+      console.log('API Response:', dataResult); // Debug log
+      
+      // Handle both response formats: direct {device_data: {...}} or wrapped {body: "..."}
+      let deviceData;
+      if (dataResult.body) {
+        // Old format: wrapped in body field
+        deviceData = JSON.parse(dataResult.body).device_data;
+      } else if (dataResult.device_data) {
+        // New format: direct device_data field
+        deviceData = dataResult.device_data;
+      } else {
+        console.error('Invalid API response format:', dataResult);
+        return null;
+      }
 
       // Validate timestamp
       if (deviceData?.latest_data?.timestamp) {
