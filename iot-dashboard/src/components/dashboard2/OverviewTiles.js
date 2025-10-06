@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
 import InfoIcon from '@mui/icons-material/Info';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 const getSeverityIcon = (severity) => {
   switch (severity?.toLowerCase()) {
@@ -116,7 +117,8 @@ const OverviewTiles = ({
   metricsConfig, 
   selectedVariables, 
   isLoading,
-  triggeredAlarms
+  triggeredAlarms,
+  deviceState
 }) => {
   console.log('OverviewTiles received triggeredAlarms:', triggeredAlarms);
 
@@ -166,6 +168,110 @@ const OverviewTiles = ({
             </Grid>
           );
         })}
+
+        {/* Device Status Tiles */}
+        {console.log('OverviewTiles deviceState:', deviceState)}
+        {deviceState ? (
+          <>
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2 }}>
+                <SettingsIcon sx={{ color: 'text.primary', fontSize: '1.25rem' }} />
+                <Typography variant="h6" sx={{ fontSize: '1rem', color: 'text.primary' }}>
+                  Device Status
+                </Typography>
+              </Box>
+            </Grid>
+            {/* Charging Status */}
+            <Grid item xs={6} sm={6} md={4} lg={3}>
+              <OverviewTile
+                title="Charging"
+                value={deviceState.charging === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+              />
+            </Grid>
+
+            {/* Input States */}
+            <Grid item xs={6} sm={6} md={4} lg={3}>
+              <OverviewTile
+                title="Input 1"
+                value={deviceState.in1_state === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+              />
+            </Grid>
+
+            <Grid item xs={6} sm={6} md={4} lg={3}>
+              <OverviewTile
+                title="Input 2"
+                value={deviceState.in2_state === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+              />
+            </Grid>
+
+            {/* Output States */}
+            <Grid item xs={6} sm={6} md={4} lg={3}>
+              <OverviewTile
+                title="Output 1"
+                value={deviceState.out1_state === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+              />
+            </Grid>
+
+            <Grid item xs={6} sm={6} md={4} lg={3}>
+              <OverviewTile
+                title="Output 2"
+                value={deviceState.out2_state === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+              />
+            </Grid>
+
+
+            {/* Motor Speed */}
+            <Grid item xs={6} sm={6} md={4} lg={3}>
+              <OverviewTile
+                title="Motor Speed"
+                value={deviceState.motor_speed || 0}
+                unit="%"
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+              />
+            </Grid>
+
+            {/* Power Saving */}
+            <Grid item xs={6} sm={6} md={4} lg={3}>
+              <OverviewTile
+                title="Power Saving"
+                value={deviceState.power_saving === 1 ? 'ON' : 'OFF'}
+                icon=""
+                color="#2196f3"
+                isLoading={isLoading}
+                triggeredAlarmsList={[]}
+              />
+            </Grid>
+          </>
+        ) : (
+          <Grid item xs={12}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 2 }}>
+              No device state data available
+            </Typography>
+          </Grid>
+        )}
       </Grid>
     </Box>
   );

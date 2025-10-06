@@ -3,7 +3,6 @@ import { Box, Grid, Typography, Paper, List, ListItem, ListItemIcon, ListItemTex
 import { Error as ErrorIcon, Warning as WarningIcon, Info as InfoIcon, ShowChart as ShowChartIcon } from '@mui/icons-material';
 import OverviewTiles from './OverviewTiles';
 import VariableSelector from './VariableSelector';
-import DeviceStateDisplay from './DeviceStateDisplay';
 import PropTypes from 'prop-types';
 import MetricCard from './MetricCard';
 
@@ -159,14 +158,10 @@ const DashboardOverviewTab = ({
           selectedVariables={selectedVariables}
           isLoading={isLoading}
           triggeredAlarms={triggeredAlarms}
+          deviceState={deviceState}
         />
       </Box>
 
-      {/* Device State Display */}
-      <DeviceStateDisplay
-        deviceState={deviceState}
-        isLoading={isLoading}
-      />
     </Box>
   );
 };

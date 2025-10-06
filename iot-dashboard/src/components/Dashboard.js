@@ -112,7 +112,7 @@ ChartJS.register(
 
 const DASHBOARD_DATA_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
 const DASHBOARD_LATEST_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-latest";
-const STATUS_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-status";
+const STATUS_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/data-dashboard-state";
 const VARIABLES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-variables";
 const COMMAND_API_URL = "https://1r9r7s5b01.execute-api.eu-central-1.amazonaws.com/default/send-command";
 const BATTERY_STATE_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
@@ -621,12 +621,17 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   };
 
   const fetchDeviceState = async () => {
+    console.log('🔍 fetchDeviceState called with device:', device);
     if (!device || !device.client_id) {
-      console.error('No device or client_id available');
+      console.error('❌ No device or client_id available');
       return;
     }
 
+    console.log('🌐 Making API call to:', STATUS_API_URL);
+    console.log('📤 Request payload:', { client_id: device.client_id });
     try {
+      console.log('🌐 About to make fetch request to:', STATUS_API_URL);
+      console.log('📡 Network request starting...', new Date().toISOString());
       const response = await fetch(STATUS_API_URL, {
         method: 'POST',
         headers: {
@@ -642,13 +647,19 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      console.log('✅ API response received, status:', response.status);
       const deviceState = await response.json();
-      console.log('Device state response:', deviceState);
+      console.log('📥 Device state response:', deviceState);
 
       setDeviceState(deviceState);
+      console.log('💾 Device state set in Dashboard:', deviceState);
       return deviceState;
     } catch (error) {
-      console.error('Error fetching device state:', error);
+      console.error('❌ Error fetching device state:', error);
+      if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+        console.warn('⚠️ CORS error - Lambda might not be deployed to this API Gateway');
+        console.warn('🔧 Check if fetch-dashboard-data-state Lambda is deployed to:', STATUS_API_URL);
+      }
       setError(error.message || 'Failed to fetch device state');
       return null;
     }
@@ -701,6 +712,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       if (!isMounted.current) return;
       
       // 3. Fetch latest data and device state together
+      console.log('🚀 Initial data fetch - calling fetchDeviceState');
       await Promise.all([
         fetchLatestData(),
         fetchDeviceState()
@@ -751,6 +763,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         
         try {
           // Fetch latest data and device state together every 30 seconds
+          console.log('🔄 Periodic data fetch - calling fetchDeviceState');
           await Promise.all([
             fetchLatestData(),
             fetchDeviceState()

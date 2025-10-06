@@ -4,7 +4,10 @@ import {
   Lightbulb as LightbulbIcon,
   Speed as SpeedIcon,
   Power as PowerIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  BatteryChargingFull as ChargingIcon,
+  Input as InputIcon,
+  Output as OutputIcon
 } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 
@@ -83,7 +86,13 @@ StateCard.propTypes = {
 const DeviceStateDisplay = ({ deviceState, isLoading }) => {
   const theme = useTheme();
 
-  if (!deviceState) return null;
+  console.log('DeviceStateDisplay received deviceState:', deviceState);
+  console.log('DeviceStateDisplay isLoading:', isLoading);
+
+  if (!deviceState) {
+    console.log('DeviceStateDisplay: No deviceState, returning null');
+    return null;
+  }
 
   return (
     <Box sx={{ mt: 2, width: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -94,6 +103,7 @@ const DeviceStateDisplay = ({ deviceState, isLoading }) => {
         </Typography>
       </Box>
       <Grid container spacing={1} sx={{ flexGrow: 1, minWidth: 0, flexWrap: 'wrap' }}>
+        {/* LED Controls */}
         <Grid item xs={6} sm={6} md={4} lg={3}>
             <StateCard
             title="LED 1 Control Status"
@@ -112,6 +122,8 @@ const DeviceStateDisplay = ({ deviceState, isLoading }) => {
               isBoolean={true}
             />
         </Grid>
+        
+        {/* Motor and Power */}
         <Grid item xs={6} sm={6} md={4} lg={3}>
             <StateCard
               title="Motor Speed Control"
@@ -127,6 +139,57 @@ const DeviceStateDisplay = ({ deviceState, isLoading }) => {
               value={deviceState.power_saving === 1}
               icon={<PowerIcon />}
             color={theme.palette.error.main}
+              isBoolean={true}
+            />
+        </Grid>
+
+        {/* Device Status */}
+        <Grid item xs={6} sm={6} md={4} lg={3}>
+            <StateCard
+            title="Charging Status"
+              value={deviceState.charging === 1}
+              icon={<ChargingIcon />}
+            color={theme.palette.success.main}
+              isBoolean={true}
+            />
+        </Grid>
+
+        {/* Input States */}
+        <Grid item xs={6} sm={6} md={4} lg={3}>
+            <StateCard
+            title="Input 1 Status"
+              value={deviceState.in1_state === 1}
+              icon={<InputIcon />}
+            color={theme.palette.primary.main}
+              isBoolean={true}
+            />
+        </Grid>
+        <Grid item xs={6} sm={6} md={4} lg={3}>
+            <StateCard
+            title="Input 2 Status"
+              value={deviceState.in2_state === 1}
+              icon={<InputIcon />}
+            color={theme.palette.secondary.main}
+              isBoolean={true}
+            />
+        </Grid>
+
+        {/* Output States */}
+        <Grid item xs={6} sm={6} md={4} lg={3}>
+            <StateCard
+            title="Output 1 Status"
+              value={deviceState.out1_state === 1}
+              icon={<OutputIcon />}
+            color={theme.palette.success.main}
+              isBoolean={true}
+            />
+        </Grid>
+        <Grid item xs={6} sm={6} md={4} lg={3}>
+            <StateCard
+            title="Output 2 Status"
+              value={deviceState.out2_state === 1}
+              icon={<OutputIcon />}
+            color={theme.palette.warning.main}
               isBoolean={true}
             />
         </Grid>

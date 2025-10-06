@@ -13,8 +13,8 @@ const DashboardCommands = ({
   fetchDeviceState,
   setSnackbar
 }) => {
-  const [led1State, setLed1State] = useState(false);
-  const [led2State, setLed2State] = useState(false);
+  const [output1State, setOutput1State] = useState(false);
+  const [output2State, setOutput2State] = useState(false);
   const [motorSpeed, setMotorSpeed] = useState('');
   const [powerSavingMode, setPowerSavingMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,9 +28,9 @@ const DashboardCommands = ({
 
   useEffect(() => {
     if (deviceState) {
-      console.log('Updating LED states from deviceState:', deviceState);
-      setLed1State(deviceState.led1_state === 1);
-      setLed2State(deviceState.led2_state === 1);
+      console.log('Updating states from deviceState:', deviceState);
+      setOutput1State(deviceState.out1_state === 1);
+      setOutput2State(deviceState.out2_state === 1);
       setPowerSavingMode(deviceState.power_saving === 1);
       if (deviceState.motor_speed !== undefined) {
         setMotorSpeed(deviceState.motor_speed.toString());
@@ -43,13 +43,13 @@ const DashboardCommands = ({
 
     switch (command) {
       case 'TOGGLE_1_ON':
-        return state.led1_state === 1;
+        return state.out1_state === 1;
       case 'TOGGLE_1_OFF':
-        return state.led1_state === 0;
+        return state.out1_state === 0;
       case 'TOGGLE_2_ON':
-        return state.led2_state === 1;
+        return state.out2_state === 1;
       case 'TOGGLE_2_OFF':
-        return state.led2_state === 0;
+        return state.out2_state === 0;
       case 'SET_SPEED':
         return state.motor_speed === params.speed;
       case 'RESTART':
@@ -133,8 +133,8 @@ const DashboardCommands = ({
       // Update the UI with the final state
       if (finalState) {
         console.log('Updating UI with final state:', finalState);
-        setLed1State(finalState.led1_state === 1);
-        setLed2State(finalState.led2_state === 1);
+        setOutput1State(finalState.out1_state === 1);
+        setOutput2State(finalState.out2_state === 1);
         setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
         setPowerSavingMode(finalState.power_saving === 1);
       }
@@ -183,8 +183,8 @@ const DashboardCommands = ({
       // Update the UI with the final state
       if (finalState) {
         console.log('Updating UI with final state:', finalState);
-        setLed1State(finalState.led1_state === 1); // Ensure LED states are updated
-        setLed2State(finalState.led2_state === 1); // Ensure LED states are updated
+        setOutput1State(finalState.out1_state === 1); // Ensure Output states are updated
+        setOutput2State(finalState.out2_state === 1); // Ensure Output states are updated
         setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
         setPowerSavingMode(finalState.power_saving === 1);
       }
@@ -288,8 +288,8 @@ const DashboardCommands = ({
       console.log('Final verification state:', finalState);
       
       if (finalState) {
-        setLed1State(finalState.led1_state === 1);
-        setLed2State(finalState.led2_state === 1);
+        setOutput1State(finalState.out1_state === 1);
+        setOutput2State(finalState.out2_state === 1);
         setMotorSpeed(finalState.motor_speed?.toString() || "0");
         setPowerSavingMode(finalState.power_saving === 1);
       }
@@ -314,13 +314,13 @@ const DashboardCommands = ({
       )}
       {!isLoading && (
         <>
-          <Typography variant="subtitle1" sx={{ fontSize: '1rem', fontWeight: 400, mb: 0.5 }}>LED Control</Typography>
+          <Typography variant="subtitle1" sx={{ fontSize: '1rem', fontWeight: 400, mb: 0.5 }}>Output Control</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography sx={{ fontSize: '0.95rem' }}>LED 1</Typography>
+            <Typography sx={{ fontSize: '0.95rem' }}>Output 1</Typography>
             <Switch
-              checked={led1State}
+              checked={output1State}
               onChange={(e) => handleSwitchChange(1, e.target.checked)}
-              inputProps={{ 'aria-label': 'LED 1 switch' }}
+              inputProps={{ 'aria-label': 'Output 1 switch' }}
               size="small"
               sx={{
                 '& .MuiSwitch-switchBase': {
@@ -336,11 +336,11 @@ const DashboardCommands = ({
             />
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography sx={{ fontSize: '0.95rem' }}>LED 2</Typography>
+            <Typography sx={{ fontSize: '0.95rem' }}>Output 2</Typography>
             <Switch
-              checked={led2State}
+              checked={output2State}
               onChange={(e) => handleSwitchChange(2, e.target.checked)}
-              inputProps={{ 'aria-label': 'LED 2 switch' }}
+              inputProps={{ 'aria-label': 'Output 2 switch' }}
               size="small"
               sx={{
                 '& .MuiSwitch-switchBase': {
@@ -434,6 +434,7 @@ const DashboardCommands = ({
               }}
             />
           </Box>
+
 
           <Typography variant="subtitle1" sx={{ fontSize: '1rem', fontWeight: 400, mt: 1, mb: 0.5 }}>Device Actions</Typography>
           <Button

@@ -44,10 +44,13 @@ def get_latest_state(client_id):
         return {
             'client_id': latest_state['client_id'],
             'timestamp': latest_state['timestamp'],
-            'led1_state': int(latest_state['led1_state']),  # Convert to int
-            'led2_state': int(latest_state['led2_state']),  # Convert to int
-            'motor_speed': int(latest_state['motor_speed']),  # Convert to int
-            'power_saving': int(latest_state['power_saving'])  # Convert to int
+            'charging': int(latest_state.get('charging', 0)),
+            'in1_state': int(latest_state.get('in1_state', 0)),
+            'in2_state': int(latest_state.get('in2_state', 0)),
+            'motor_speed': int(latest_state.get('motor_speed', 0)),
+            'out1_state': int(latest_state.get('out1_state', 0)),
+            'out2_state': int(latest_state.get('out2_state', 0)),
+            'power_saving': int(latest_state.get('power_saving', 0))
         }
 
     except Exception as e:
@@ -78,23 +81,23 @@ def lambda_handler(event, context):
             client_id = body.get('client_id')
         
         if not client_id:
-            return {
+            return create_cors_response(400, {
                 "error": "Missing client_id parameter"
-            }
+            })
 
         # Get the latest state
         latest_state = get_latest_state(client_id)
         
         if not latest_state:
-            return {
+            return create_cors_response(404, {
                 "error": f"No state found for device {client_id}"
-            }
+            })
 
-        # Return just the state data
-        return latest_state
+        # Return the state data with CORS headers
+        return create_cors_response(200, latest_state)
 
     except Exception as e:
         print(f"Error processing request: {str(e)}")
-        return {
+        return create_cors_response(500, {
             "error": f"Internal server error: {str(e)}"
-        } 
+        }) 
