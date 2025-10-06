@@ -1634,8 +1634,24 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                 if (!dataResponse.ok) continue;
 
                 const dataResult = await dataResponse.json();
-                const parsedBody = JSON.parse(dataResult.body);
-                const newDeviceData = parsedBody.device_data;
+                
+                // Handle both response formats: direct {device_data: {...}} or wrapped {body: "..."}
+                let newDeviceData;
+                try {
+                  if (dataResult.body) {
+                    // Old format: wrapped in body field
+                    newDeviceData = JSON.parse(dataResult.body).device_data;
+                  } else if (dataResult.device_data) {
+                    // New format: direct device_data field
+                    newDeviceData = dataResult.device_data;
+                  } else {
+                    console.error('Invalid API response format:', dataResult);
+                    continue;
+                  }
+                } catch (parseError) {
+                  console.error(`Error parsing response for device ${device.client_id}:`, parseError);
+                  continue;
+                }
 
                 if (!newDeviceData) continue;
 
