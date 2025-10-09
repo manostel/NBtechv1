@@ -1,8 +1,9 @@
 import React from "react";
 import { Box, useTheme, Typography } from "@mui/material";
 import { FaBatteryFull, FaBolt, FaArrowUp, FaArrowDown, FaPause } from "react-icons/fa";
+import { HelpOutline } from "@mui/icons-material";
 
-export default function BatteryIndicator({ value, isCharging, batteryState }) {
+export default function BatteryIndicator({ value, isCharging, batteryState, charging }) {
   const theme = useTheme();
   
   // Get battery icon color based on level
@@ -12,17 +13,16 @@ export default function BatteryIndicator({ value, isCharging, batteryState }) {
     return theme.palette.error.main;
   };
 
-  // Get state icon based on battery state
+  // Get state icon based on charging status (1 = charging, 0 = not charging)
   const getStateIcon = () => {
-    switch (batteryState) {
-      case 'charging':
-        return <FaBolt size={12} style={{ color: theme.palette.success.main }} />;
-      case 'discharging':
-        return <FaArrowDown size={12} style={{ color: theme.palette.error.main }} />;
-      case 'idle':
-        return <FaPause size={12} style={{ color: theme.palette.warning.main }} />;
-      default:
-        return null;
+    // Only use charging field from API (1 or 0)
+    if (charging === 1) {
+      return <FaBolt size={12} style={{ color: theme.palette.success.main }} />;
+    } else if (charging === 0) {
+      return <FaArrowDown size={12} style={{ color: theme.palette.error.main }} />;
+    } else {
+      // Any other value (undefined, null, etc.) - show question mark
+      return <HelpOutline sx={{ fontSize: 12, color: theme.palette.text.secondary }} />;
     }
   };
 

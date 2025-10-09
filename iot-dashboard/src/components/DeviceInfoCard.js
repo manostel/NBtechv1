@@ -18,6 +18,7 @@ export default function DeviceInfoCard({
   showClientId = false,
   onToggleClientId = () => {},
   batteryState = 'idle',
+  charging = undefined,
   lastTimestamp = null,
   deviceStartTimeInfo = null
 }) {
@@ -165,7 +166,7 @@ export default function DeviceInfoCard({
 
             {/* Indicators row */}
             <Box display="flex" alignItems="flex-end" gap={1}>
-              <BatteryIndicator value={batteryLevel} batteryState={batteryState} size="small" />
+              <BatteryIndicator value={batteryLevel} batteryState={batteryState} charging={charging} size="small" />
               <SignalIndicator value={signalStrength} size="small" />
                 </Box>
           </Box>
@@ -187,6 +188,7 @@ DeviceInfoCard.propTypes = {
   showClientId: PropTypes.bool,
   onToggleClientId: PropTypes.func,
   batteryState: PropTypes.string,
+  charging: PropTypes.number,
   lastTimestamp: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
   deviceStartTimeInfo: PropTypes.shape({
     timestamp: PropTypes.string,

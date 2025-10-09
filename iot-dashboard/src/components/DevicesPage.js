@@ -597,6 +597,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                     <BatteryIndicator 
                       value={latestData.battery || 0} 
                       batteryState={deviceInfo?.battery_state}
+                      charging={deviceStates[device.client_id]?.charging}
                     />
                     <SignalIndicator 
                       value={latestData.signal_quality || 0} 
@@ -2026,7 +2027,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                         <Box sx={{ display: 'flex', gap: 2, my: 2 }}>
                           <BatteryIndicator 
                             value={Number(latestData.battery) || 0} 
-                            batteryState={currentDeviceData.battery_state || 'idle'} 
+                            batteryState={currentDeviceData.battery_state || 'idle'}
+                            charging={deviceStates[device.client_id]?.charging}
                           />
                           <SignalIndicator value={Number(latestData.signal_quality) || 0} />
                         </Box>

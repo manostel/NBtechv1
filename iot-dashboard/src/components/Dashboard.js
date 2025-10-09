@@ -1337,6 +1337,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           showClientId={showClientId}
           onToggleClientId={() => setShowClientId(!showClientId)}
           batteryState={batteryState}
+          charging={deviceState?.charging}
           lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
           deviceStartTimeInfo={deviceStartTimeInfo}
         />
