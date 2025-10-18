@@ -117,21 +117,70 @@ export default function DeviceInfoCard({
           {/* Left side: ID and Timing Information */}
           <Box display="flex" flexDirection="column" gap={0.5}>
             <Box display="flex" alignItems="center" gap={0.5}>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                ID: {showClientId ? clientID : '••••••••••••'}
-              </Typography>
+               <Typography 
+                 variant="body2" 
+                 sx={{ 
+                   fontSize: '0.75rem',
+                   fontFamily: '"Roboto Mono", "Courier New", monospace',
+                   fontWeight: 500,
+                   letterSpacing: '0.02em',
+                   color: 'white'
+                 }}
+               >
+                 ID: {showClientId ? clientID : '••••••••••••'}
+               </Typography>
               <IconButton onClick={onToggleClientId} size="small" sx={{ p: 0.5 }}>
                 {showClientId ? <VisibilityOff sx={{ fontSize: '0.875rem' }} /> : <Visibility sx={{ fontSize: '0.875rem' }} />}
               </IconButton>
             </Box>
             <Box display="flex" flexDirection="column" gap={0}>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                Startup: {deviceStartTimeInfo?.timestamp ? new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A' : new Date(deviceStartTimeInfo.timestamp).toLocaleString() : 'N/A'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                Last update: {lastOnline || 'N/A'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+               <Typography 
+                 variant="body2" 
+                 sx={{ 
+                   fontSize: '0.75rem',
+                   fontFamily: '"Roboto Mono", "Courier New", monospace',
+                   fontWeight: 500,
+                   letterSpacing: '0.02em',
+                   color: 'white'
+                 }}
+               >
+                 Startup: {deviceStartTimeInfo?.timestamp ? 
+                   new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A' : 
+                   new Date(deviceStartTimeInfo.timestamp).toLocaleString('en-GB', {
+                     year: 'numeric',
+                     month: '2-digit',
+                     day: '2-digit',
+                     hour: '2-digit',
+                     minute: '2-digit',
+                     second: '2-digit',
+                     hour12: false
+                   }) : 'N/A'}
+               </Typography>
+               <Typography 
+                 variant="body2" 
+                 sx={{ 
+                   fontSize: '0.75rem',
+                   fontFamily: '"Roboto Mono", "Courier New", monospace',
+                   fontWeight: 500,
+                   letterSpacing: '0.02em',
+                   color: 'white'
+                 }}
+               >
+                 Last Sync: {lastTimestamp ? 
+                   new Date(lastTimestamp).toLocaleString('en-GB', { hour12: false }) : 
+                   'N/A'
+                 }
+               </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontSize: '0.75rem',
+                  fontFamily: '"Roboto Mono", "Courier New", monospace',
+                  fontWeight: 500,
+                  letterSpacing: '0.02em',
+                  color: 'white'
+                }}
+              >
                 Uptime: {currentUptimeDisplay}
               </Typography>
             </Box>
@@ -157,6 +206,9 @@ export default function DeviceInfoCard({
                     fontWeight: 'bold',
                     lineHeight: 'normal',
                     fontSize: '0.75rem',
+                    fontFamily: '"Roboto Mono", "Courier New", monospace',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase'
                   }}
                 >
                     {status}
