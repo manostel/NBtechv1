@@ -110,8 +110,18 @@ def check_and_trigger_subscriptions_sync(device_id, device_data, message_type):
         
         # Check each subscription
         for subscription in subscriptions:
+            # Loop prevention: Skip subscriptions if this is a command message
+            # (which means it was triggered by another subscription)
+            if message_type == 'command':
+                logger.info(f"Skipping subscription {subscription['subscription_id']} - command message detected (loop prevention)")
+                continue
+                
             # Only check subscriptions that match the message type
             if check_single_subscription_sync(subscription, device_data, message_type):
+                # Execute command actions if any
+                if subscription.get('commands'):
+                    execute_multiple_commands_sync(subscription)
+                
                 trigger_subscription_notification_sync(subscription, device_data, message_type)
                 triggered_count += 1
         

@@ -291,6 +291,25 @@ export default function DashboardSubscriptionsTab({
         return;
       }
 
+      // Check for potential loops - only if monitoring outputs AND using output commands on same device
+      const hasOutputCommands = formData.commands.some(cmd => 
+        cmd.action === 'out1' || cmd.action === 'out2'
+      );
+      const isMonitoringOutputs = formData.parameter_type === 'outputs';
+      const hasOutputCommandsOnSameDevice = formData.commands.some(cmd => 
+        (cmd.action === 'out1' || cmd.action === 'out2') && cmd.target_device === formData.device_id
+      );
+      
+      // Check if there are existing subscriptions monitoring outputs on this device
+      const existingOutputSubscriptions = subscriptions.filter(sub => 
+        sub.device_id === formData.device_id && sub.parameter_type === 'outputs'
+      );
+      
+      if (isMonitoringOutputs && hasOutputCommandsOnSameDevice && existingOutputSubscriptions.length > 0) {
+        setError('⚠️ Loop Prevention: Cannot create subscription that monitors outputs on a device that already has output subscriptions. This would create an infinite loop.');
+        return;
+      }
+
       setLoading(true);
       
       const subscriptionData = {
@@ -537,101 +556,155 @@ export default function DashboardSubscriptionsTab({
   };
 
   const renderSubscriptionCard = (subscription) => (
-    <Card key={subscription.subscription_id} sx={{ mb: 2 }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          {getParameterIcon(subscription.parameter_type, subscription.parameter_name)}
-          <Box sx={{ ml: 1, flexGrow: 1 }}>
-            <Typography variant="h6" component="div">
-              {getDeviceName(subscription.device_id)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {PARAMETER_TYPES[subscription.parameter_type]?.label} - {subscription.parameter_name}
-            </Typography>
+    <Grid item xs={12} sm={6} lg={4}>
+      <Card 
+        key={subscription.subscription_id} 
+        sx={{ 
+          height: '100%',
+          borderRadius: 3,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          border: '1px solid #f0f0f0',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+            transform: 'translateY(-2px)'
+          }
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ 
+                p: 1.5, 
+                borderRadius: 2, 
+                bgcolor: subscription.enabled ? 'success.light' : 'grey.100',
+                mr: 2
+              }}>
+                {getParameterIcon(subscription.parameter_type, subscription.parameter_name)}
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  {getDeviceName(subscription.device_id)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {PARAMETER_TYPES[subscription.parameter_type]?.label} • {subscription.parameter_name}
+                </Typography>
+              </Box>
+            </Box>
+            <Chip
+              label={subscription.enabled ? 'Active' : 'Inactive'}
+              color={subscription.enabled ? 'success' : 'default'}
+              size="small"
+              sx={{ fontWeight: 600 }}
+            />
           </Box>
-          <Chip
-            label={subscription.enabled ? 'Active' : 'Inactive'}
-            color={subscription.enabled ? 'success' : 'default'}
-            size="small"
-          />
-        </Box>
-        
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          {getConditionDescription(subscription)}
-        </Typography>
-        
-        {subscription.description && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {subscription.description}
+          
+          <Typography variant="body2" sx={{ mb: 2, fontWeight: 500 }}>
+            {getConditionDescription(subscription)}
           </Typography>
-        )}
-        
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Chip
-            label={subscription.notification_method.replace('_', ' ')}
-            size="small"
-            variant="outlined"
-          />
-          <Chip
-            label={subscription.condition_type}
-            size="small"
-            variant="outlined"
-          />
-          {subscription.commands && subscription.commands.some(cmd => cmd.action !== 'none') && (
-            subscription.commands
-              .filter(cmd => cmd.action !== 'none')
-              .map((cmd, index) => (
-                <Chip
-                  key={index}
-                  label={`${cmd.action} = ${cmd.value} → ${getDeviceName(cmd.target_device)}`}
-                  size="small"
-                  color="primary"
-                  variant="outlined"
-                />
-              ))
+          
+          {subscription.description && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {subscription.description}
+            </Typography>
           )}
-        </Box>
-      </CardContent>
-      
-      <CardActions>
-        <Button
-          size="small"
-          startIcon={<EditIcon />}
-          onClick={() => handleEditSubscription(subscription)}
-        >
-          Edit
-        </Button>
-        <Button
-          size="small"
-          color="error"
-          startIcon={<DeleteIcon />}
-          onClick={() => handleDeleteSubscription(subscription.subscription_id)}
-        >
-          Delete
-        </Button>
-        <Button
-          size="small"
-          startIcon={subscription.enabled ? <NotificationsOffIcon /> : <NotificationsIcon />}
-          onClick={() => handleToggleSubscription(subscription.subscription_id, !subscription.enabled)}
-        >
-          {subscription.enabled ? 'Disable' : 'Enable'}
-        </Button>
-      </CardActions>
-    </Card>
+          
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+            <Chip
+              label={subscription.notification_method.replace('_', ' ')}
+              size="small"
+              variant="outlined"
+              color="primary"
+            />
+            <Chip
+              label={subscription.condition_type}
+              size="small"
+              variant="outlined"
+            />
+            {subscription.commands && subscription.commands.some(cmd => cmd.action !== 'none') && (
+              subscription.commands
+                .filter(cmd => cmd.action !== 'none')
+                .map((cmd, index) => (
+                  <Chip
+                    key={index}
+                    label={`${cmd.action} = ${cmd.value}`}
+                    size="small"
+                    color="secondary"
+                    variant="outlined"
+                  />
+                ))
+            )}
+          </Box>
+        </CardContent>
+        
+        <CardActions sx={{ p: 2, pt: 0, justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              size="small"
+              startIcon={<EditIcon />}
+              onClick={() => handleEditSubscription(subscription)}
+              sx={{ textTransform: 'none', fontWeight: 500 }}
+            >
+              Edit
+            </Button>
+            <Button
+              size="small"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={() => handleDeleteSubscription(subscription.subscription_id)}
+              sx={{ textTransform: 'none', fontWeight: 500 }}
+            >
+              Delete
+            </Button>
+          </Box>
+          <Button
+            size="small"
+            variant={subscription.enabled ? 'outlined' : 'contained'}
+            startIcon={subscription.enabled ? <NotificationsOffIcon /> : <NotificationsIcon />}
+            onClick={() => handleToggleSubscription(subscription.subscription_id, !subscription.enabled)}
+            sx={{ textTransform: 'none', fontWeight: 500 }}
+          >
+            {subscription.enabled ? 'Disable' : 'Enable'}
+          </Button>
+        </CardActions>
+      </Card>
+    </Grid>
   );
 
   const renderCreateDialog = () => (
-    <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
-      <DialogTitle>Create New Subscription</DialogTitle>
+    <Dialog 
+      open={createDialogOpen} 
+      onClose={() => setCreateDialogOpen(false)} 
+      maxWidth="md" 
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 3 }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          Configure Device Monitoring Rule
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Set up automated monitoring and responses for your device
+        </Typography>
+      </DialogTitle>
       <DialogContent>
         <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item xs={12}>
-            <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-              Trigger Conditions
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Configure the conditions that will activate this subscription
-            </Typography>
+        <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+          Trigger Conditions
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Configure the conditions that will activate this subscription
+        </Typography>
+        
+        {/* Loop Prevention Warning */}
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography variant="body2">
+            <strong>⚠️ Loop Prevention:</strong> Avoid creating subscriptions that monitor outputs on devices that already have output subscriptions, as this can create infinite loops.
+          </Typography>
+        </Alert>
           </Grid>
           
           <Grid item xs={12} sm={6}>
@@ -750,12 +823,12 @@ export default function DashboardSubscriptionsTab({
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Description (Optional)"
+              label="Rule Description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               multiline
               rows={2}
-              helperText="Add a description to help identify this subscription"
+              helperText="Provide a descriptive name for this monitoring rule"
             />
           </Grid>
           
@@ -861,7 +934,7 @@ export default function DashboardSubscriptionsTab({
                   onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
                 />
               }
-              label="Enable subscription immediately"
+              label="Activate monitoring rule"
             />
           </Grid>
         </Grid>
@@ -873,15 +946,30 @@ export default function DashboardSubscriptionsTab({
           variant="contained"
           disabled={loading || !formData.device_id || !formData.parameter_name}
         >
-          {loading ? <CircularProgress size={20} /> : 'Create Subscription'}
+          {loading ? <CircularProgress size={20} /> : 'Create Rule'}
         </Button>
       </DialogActions>
     </Dialog>
   );
 
   const renderEditDialog = () => (
-    <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
-      <DialogTitle>Edit Subscription</DialogTitle>
+    <Dialog 
+      open={editDialogOpen} 
+      onClose={() => setEditDialogOpen(false)} 
+      maxWidth="md" 
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 3 }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          Edit Monitoring Rule
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Modify your existing monitoring configuration
+        </Typography>
+      </DialogTitle>
       <DialogContent>
         {/* Same form as create dialog */}
         {renderCreateDialog()}
@@ -893,7 +981,7 @@ export default function DashboardSubscriptionsTab({
           variant="contained"
           disabled={loading || !formData.device_id || !formData.parameter_name}
         >
-          {loading ? <CircularProgress size={20} /> : 'Update Subscription'}
+          {loading ? <CircularProgress size={20} /> : 'Update Rule'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -920,28 +1008,27 @@ export default function DashboardSubscriptionsTab({
   
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h5" component="h2">
-            Device Subscriptions
+      {/* Header Section */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
+            Your Subscriptions
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {userLimits.current_subscriptions} of {userLimits.max_subscriptions} subscriptions used
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Chip
-            label={`${userLimits.remaining_subscriptions} remaining`}
-            color={userLimits.can_create_more ? 'success' : 'error'}
-            variant="outlined"
-          />
           <Button
             variant="contained"
+            size="large"
             startIcon={<AddIcon />}
             onClick={() => setCreateDialogOpen(true)}
             disabled={!userLimits.can_create_more}
+            sx={{ 
+              px: 3, 
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
           >
-            Create Subscription
+            New Rule
           </Button>
         </Box>
       </Box>
@@ -960,53 +1047,59 @@ export default function DashboardSubscriptionsTab({
 
 
       {subscriptions.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <NotificationsIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" gutterBottom>
-            No Subscriptions Yet
+        <Paper 
+          sx={{ 
+            p: 6, 
+            textAlign: 'center',
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+            border: '1px dashed #e0e0e0'
+          }}
+        >
+          <Box sx={{ 
+            width: 80, 
+            height: 80, 
+            borderRadius: '50%', 
+            bgcolor: 'primary.light', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            mx: 'auto',
+            mb: 3
+          }}>
+            <NotificationsIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+          </Box>
+          <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+            No monitoring rules yet
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Create your first subscription to get notified about device changes
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
+            Create your first monitoring rule to get automated alerts and responses when device parameters change.
           </Typography>
           <Button
             variant="contained"
+            size="large"
             startIcon={<AddIcon />}
             onClick={() => setCreateDialogOpen(true)}
             disabled={!userLimits.can_create_more}
+            sx={{ 
+              px: 4, 
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
           >
-            Create Your First Subscription
+            Create First Rule
           </Button>
         </Paper>
       ) : (
-        <Grid container spacing={2}>
-          {subscriptions.map(renderSubscriptionCard)}
-        </Grid>
+        <Box>
+          <Grid container spacing={3}>
+            {subscriptions.map(renderSubscriptionCard)}
+          </Grid>
+        </Box>
       )}
 
-      {/* Demo/Setup Information */}
-      <Paper sx={{ p: 3, mt: 3, bgcolor: 'info.light', color: 'info.contrastText' }}>
-        <Typography variant="h6" gutterBottom>
-          🚀 Subscription System Setup
-        </Typography>
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          The subscription system is ready to use! Here's what you can do:
-        </Typography>
-        <Box component="ul" sx={{ pl: 2, mb: 2 }}>
-          <li>Subscribe to device parameter changes (IN1, IN2, OUT1, OUT2, temperature, humidity, etc.)</li>
-          <li>Set custom conditions (above/below thresholds, equals, any change)</li>
-          <li>Choose notification methods (in-app, email, or both)</li>
-          <li>Get real-time alerts when conditions are met</li>
-        </Box>
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          <strong>Next Steps:</strong>
-        </Typography>
-        <Box component="ol" sx={{ pl: 2, mb: 2 }}>
-          <li>Deploy the subscription Lambda functions to AWS</li>
-          <li>Create the required DynamoDB tables</li>
-          <li>Set up IoT Core Rules for your devices</li>
-          <li>Test with real device data</li>
-        </Box>
-      </Paper>
 
       {renderCreateDialog()}
       {renderEditDialog()}
