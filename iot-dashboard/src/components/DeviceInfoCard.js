@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, Typography, Box, CircularProgress, IconButton } from "@mui/material";
+import { Card, CardContent, Typography, Box, CircularProgress, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, Grid, Chip, Divider } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Sync, AccessTime, PlayArrow, Info, Close } from '@mui/icons-material';
 import BatteryIndicator from "./BatteryIndicator";
 import SignalIndicator from "./SignalIndicator";
 import PropTypes from 'prop-types';
@@ -25,6 +25,8 @@ export default function DeviceInfoCard({
   const theme = useTheme();
   const [error, setError] = useState(null);
   const [currentUptimeDisplay, setCurrentUptimeDisplay] = useState('N/A');
+  const [dialogOpen, setDialogOpen] = useState(false);
+
 
   // Effect to update uptime display based on deviceStartTimeInfo and status
   useEffect(() => {
@@ -109,18 +111,35 @@ export default function DeviceInfoCard({
   }
 
   return (
-    <Card sx={{ minWidth: 275, mb: 1, p: 0.5 }}>
-      <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+    <>
+    <Card 
+      sx={{ 
+        minWidth: 275, 
+        mb: { xs: 0.5, sm: 1 }, 
+        p: { xs: 0.25, sm: 0.5 },
+        cursor: 'pointer',
+        transition: 'all 0.2s ease-in-out',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: theme.shadows[4]
+        }
+      }}
+      onClick={() => setDialogOpen(true)}
+    >
+      <CardContent sx={{ 
+        p: { xs: 0.75, sm: 1 }, 
+        '&:last-child': { pb: { xs: 0.75, sm: 1 } }
+      }}>
         {/* Main content area below Device Name/Type */}
         <Box display="flex" justifyContent="space-between" width="100%" alignItems="flex-end">
 
           {/* Left side: ID and Timing Information */}
-          <Box display="flex" flexDirection="column" gap={0.5}>
+          <Box display="flex" flexDirection="column" gap={{ xs: 0.25, sm: 0.5 }}>
             <Box display="flex" alignItems="center" gap={0.5}>
                <Typography 
                  variant="body2" 
                  sx={{ 
-                   fontSize: '0.75rem',
+                   fontSize: { xs: '0.7rem', sm: '0.75rem' },
                    fontFamily: '"Roboto Mono", "Courier New", monospace',
                    fontWeight: 500,
                    letterSpacing: '0.02em',
@@ -129,72 +148,96 @@ export default function DeviceInfoCard({
                >
                  ID: {showClientId ? clientID : '••••••••••••'}
                </Typography>
-              <IconButton onClick={onToggleClientId} size="small" sx={{ p: 0.5 }}>
-                {showClientId ? <VisibilityOff sx={{ fontSize: '0.875rem' }} /> : <Visibility sx={{ fontSize: '0.875rem' }} />}
+              <IconButton onClick={onToggleClientId} size="small" sx={{ p: { xs: 0.25, sm: 0.5 } }}>
+                {showClientId ? <VisibilityOff sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }} /> : <Visibility sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }} />}
               </IconButton>
             </Box>
             <Box display="flex" flexDirection="column" gap={0}>
-               <Typography 
-                 variant="body2" 
-                 sx={{ 
-                   fontSize: '0.75rem',
-                   fontFamily: '"Roboto Mono", "Courier New", monospace',
-                   fontWeight: 500,
-                   letterSpacing: '0.02em',
-                   color: 'white'
-                 }}
-               >
-                 Startup: {deviceStartTimeInfo?.timestamp ? 
-                   new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A' : 
-                   new Date(deviceStartTimeInfo.timestamp).toLocaleString('en-GB', {
-                     year: 'numeric',
-                     month: '2-digit',
-                     day: '2-digit',
-                     hour: '2-digit',
-                     minute: '2-digit',
-                     second: '2-digit',
-                     hour12: false
-                   }) : 'N/A'}
-               </Typography>
-               <Typography 
-                 variant="body2" 
-                 sx={{ 
-                   fontSize: '0.75rem',
-                   fontFamily: '"Roboto Mono", "Courier New", monospace',
-                   fontWeight: 500,
-                   letterSpacing: '0.02em',
-                   color: 'white'
-                 }}
-               >
-                 Last Sync: {lastTimestamp ? 
-                   new Date(lastTimestamp).toLocaleString('en-GB', { hour12: false }) : 
-                   'N/A'
-                 }
-               </Typography>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  fontSize: '0.75rem',
-                  fontFamily: '"Roboto Mono", "Courier New", monospace',
-                  fontWeight: 500,
-                  letterSpacing: '0.02em',
-                  color: 'white'
-                }}
-              >
-                Uptime: {currentUptimeDisplay}
-              </Typography>
+               <Box display="flex" alignItems="center" gap={0.5}>
+                 <PlayArrow 
+                   sx={{ 
+                     fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                     color: 'white'
+                   }} 
+                 />
+                 <Typography 
+                   variant="body2" 
+                   sx={{ 
+                     fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                     fontFamily: '"Roboto Mono", "Courier New", monospace',
+                     fontWeight: 500,
+                     letterSpacing: '0.02em',
+                     color: 'white'
+                   }}
+                 >
+                   {deviceStartTimeInfo?.timestamp ? 
+                     new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A' : 
+                     new Date(deviceStartTimeInfo.timestamp).toLocaleString('en-GB', {
+                       year: 'numeric',
+                       month: '2-digit',
+                       day: '2-digit',
+                       hour: '2-digit',
+                       minute: '2-digit',
+                       second: '2-digit',
+                       hour12: false
+                     }) : 'N/A'}
+                 </Typography>
+               </Box>
+               <Box display="flex" alignItems="center" gap={0.5}>
+                 <Sync 
+                   sx={{ 
+                     fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                     color: 'white'
+                   }} 
+                 />
+                 <Typography 
+                   variant="body2" 
+                   sx={{ 
+                     fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                     fontFamily: '"Roboto Mono", "Courier New", monospace',
+                     fontWeight: 500,
+                     letterSpacing: '0.02em',
+                     color: 'white'
+                   }}
+                 >
+                   {lastTimestamp ? 
+                     new Date(lastTimestamp).toLocaleString('en-GB', { hour12: false }) : 
+                     'N/A'
+                   }
+                 </Typography>
+               </Box>
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <AccessTime 
+                  sx={{ 
+                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                    color: 'white'
+                  }} 
+                />
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                    fontFamily: '"Roboto Mono", "Courier New", monospace',
+                    fontWeight: 500,
+                    letterSpacing: '0.02em',
+                    color: 'white'
+                  }}
+                >
+                  {currentUptimeDisplay}
+                </Typography>
+              </Box>
             </Box>
           </Box>
 
           {/* Right side: Status and Indicators */}
-          <Box display="flex" flexDirection="column" alignItems="flex-end" justifyContent="flex-end" gap={0.5}>
+          <Box display="flex" flexDirection="column" alignItems="flex-end" justifyContent="flex-end" gap={{ xs: 0.25, sm: 0.5 }}>
             {/* Status row */}
-            <Box display="flex" justifyContent="center" width="100%" pb={0.5}>
+            <Box display="flex" justifyContent="center" width="100%" pb={{ xs: 0.25, sm: 0.5 }}>
               <Box display="flex" alignItems="center" gap={0.5}>
                   <Box
                     sx={{
-                    width: 6,
-                    height: 6,
+                    width: { xs: 5, sm: 6 },
+                    height: { xs: 5, sm: 6 },
                     borderRadius: '50%',
                     backgroundColor: getStatusColor(status),
                     }}
@@ -205,19 +248,19 @@ export default function DeviceInfoCard({
                     color: getStatusColor(status),
                     fontWeight: 'bold',
                     lineHeight: 'normal',
-                    fontSize: '0.75rem',
+                    fontSize: { xs: '0.7rem', sm: '0.75rem' },
                     fontFamily: '"Roboto Mono", "Courier New", monospace',
                     letterSpacing: '0.05em',
                     textTransform: 'uppercase'
                   }}
                 >
-                    {status}
-                  </Typography>
+                  {status}
+                </Typography>
                 </Box>
             </Box>
 
             {/* Indicators row */}
-            <Box display="flex" alignItems="flex-end" gap={1}>
+            <Box display="flex" alignItems="flex-end" gap={{ xs: 0.75, sm: 1 }}>
               <BatteryIndicator value={batteryLevel} batteryState={batteryState} charging={charging} size="small" />
               <SignalIndicator value={signalStrength} size="small" />
                 </Box>
@@ -225,6 +268,214 @@ export default function DeviceInfoCard({
         </Box>
       </CardContent>
     </Card>
+
+    {/* Detailed Information Dialog */}
+    <Dialog 
+      open={dialogOpen} 
+      onClose={() => setDialogOpen(false)}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+          color: 'white'
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        pb: 1
+      }}>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Info sx={{ fontSize: '1.5rem' }} />
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Device Information
+          </Typography>
+        </Box>
+        <IconButton 
+          onClick={() => setDialogOpen(false)}
+          sx={{ color: 'white' }}
+        >
+          <Close />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ pt: 2 }}>
+        <Grid container spacing={3}>
+          {/* Device Overview */}
+          <Grid item xs={12}>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+                {deviceName}
+              </Typography>
+              <Typography variant="body1" color="grey.300" sx={{ mb: 2 }}>
+                {deviceType}
+              </Typography>
+              <Box display="flex" alignItems="center" gap={1}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: getStatusColor(status),
+                  }}
+                />
+                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                  Status: {status}
+                </Typography>
+              </Box>
+            </Box>
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 2 }} />
+          </Grid>
+
+          {/* Device ID */}
+          <Grid item xs={12} sm={6}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'grey.300' }}>
+              Device ID
+            </Typography>
+            <Typography variant="body1" sx={{ 
+              fontFamily: '"Roboto Mono", "Courier New", monospace',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              p: 1,
+              borderRadius: 1
+            }}>
+              {clientID}
+            </Typography>
+          </Grid>
+
+          {/* Battery & Signal */}
+          <Grid item xs={12} sm={6}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'grey.300' }}>
+              Battery & Signal
+            </Typography>
+            <Box display="flex" alignItems="center" gap={2}>
+              <BatteryIndicator value={batteryLevel} batteryState={batteryState} charging={charging} size="medium" />
+              <SignalIndicator value={signalStrength} size="medium" />
+            </Box>
+          </Grid>
+
+          {/* Timing Information */}
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: 'grey.300' }}>
+              Timing Information
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
+                  <PlayArrow sx={{ fontSize: '1.2rem' }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Startup Time
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ 
+                  fontFamily: '"Roboto Mono", "Courier New", monospace',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  p: 1,
+                  borderRadius: 1
+                }}>
+                  {deviceStartTimeInfo?.timestamp ? 
+                    new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A' : 
+                    new Date(deviceStartTimeInfo.timestamp).toLocaleString('en-GB', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: false
+                    }) : 'N/A'}
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} sm={4}>
+                <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
+                  <Sync sx={{ fontSize: '1.2rem' }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Last Sync
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ 
+                  fontFamily: '"Roboto Mono", "Courier New", monospace',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  p: 1,
+                  borderRadius: 1
+                }}>
+                  {lastTimestamp ? 
+                    new Date(lastTimestamp).toLocaleString('en-GB', { hour12: false }) : 
+                    'N/A'}
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} sm={4}>
+                <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
+                  <AccessTime sx={{ fontSize: '1.2rem' }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Uptime
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ 
+                  fontFamily: '"Roboto Mono", "Courier New", monospace',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  p: 1,
+                  borderRadius: 1
+                }}>
+                  {currentUptimeDisplay}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Grid>
+
+          {/* Additional Info */}
+          <Grid item xs={12}>
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 2 }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'grey.300' }}>
+              Additional Information
+            </Typography>
+            <Box display="flex" flexWrap="wrap" gap={1}>
+              <Chip 
+                label={`Battery: ${batteryLevel}%`}
+                size="small"
+                sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+              />
+              <Chip 
+                label={`Signal: ${signalStrength}%`}
+                size="small"
+                sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+              />
+              <Chip 
+                label={`State: ${batteryState}`}
+                size="small"
+                sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+              />
+              {charging !== undefined && (
+                <Chip 
+                  label={`Charging: ${charging ? 'Yes' : 'No'}`}
+                  size="small"
+                  sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                />
+              )}
+            </Box>
+          </Grid>
+        </Grid>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2 }}>
+        <Button 
+          onClick={() => setDialogOpen(false)}
+          variant="contained"
+          sx={{ 
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            '&:hover': { backgroundColor: 'rgba(255,255,255,0.3)' }
+          }}
+        >
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 }
 

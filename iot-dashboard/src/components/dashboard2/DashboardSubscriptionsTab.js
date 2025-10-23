@@ -1313,16 +1313,18 @@ export default function DashboardSubscriptionsTab({
           </Typography>
           <Button
             variant="contained"
-            size="large"
+            size="medium"
             startIcon={<AddIcon />}
             onClick={() => setCreateDialogOpen(true)}
             disabled={!userLimits.can_create_more}
             sx={{ 
-              px: 3, 
-              py: 1.5,
+              px: { xs: 2, sm: 3 }, 
+              py: { xs: 1, sm: 1.5 },
               borderRadius: 2,
               textTransform: 'none',
-              fontWeight: 600
+              fontWeight: 600,
+              fontSize: { xs: '0.8rem', sm: '0.875rem' },
+              minHeight: { xs: '36px', sm: '40px' }
             }}
           >
             New Subscription
