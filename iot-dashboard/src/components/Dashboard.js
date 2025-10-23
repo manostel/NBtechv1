@@ -92,6 +92,7 @@ import DashboardCommandsTab from './dashboard2/DashboardCommandsTab';
 import DashboardOverviewTab from './dashboard2/DashboardOverviewTab';
 import DashboardStatisticsTab from './dashboard2/DashboardStatisticsTab';
 import DashboardAlarmsTab from './dashboard2/DashboardAlarmsTab';
+import DashboardSubscriptionsTab from './dashboard2/DashboardSubscriptionsTab';
 import DeviceNotificationService from '../utils/DeviceNotificationService';
 import NotificationService from '../utils/NotificationService';
 import './Dashboard.css';
@@ -773,6 +774,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   // Event handlers
   const handleTabChange = (event, newValue) => {
+    console.log('Dashboard tab changed to:', newValue);
     setSelectedTab(newValue);
   };
 
@@ -1042,6 +1044,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   };
 
   const renderTabContent = (tabValue) => {
+    console.log('renderTabContent called with tabValue:', tabValue);
     switch (tabValue) {
       case 0:
         return (
@@ -1104,6 +1107,15 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             device={device}
             metricsConfig={metricsConfig}
             onAlarmToggle={fetchAlarms}
+          />
+        );
+      case 5:
+        console.log('Rendering DashboardSubscriptionsTab with props:', { device, user, onNotification: setSnackbar });
+        return (
+          <DashboardSubscriptionsTab
+            device={device}
+            user={user}
+            onNotification={setSnackbar}
           />
         );
       default:
@@ -1391,6 +1403,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             <Tab label="Statistics" {...a11yProps(2)} />
             <Tab label="Commands" {...a11yProps(3)} />
             <Tab label="Alarms" {...a11yProps(4)} />
+            <Tab label="Subscriptions" {...a11yProps(5)} />
         </Tabs>
         </Box>
 
@@ -1409,6 +1422,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         </TabPanel>
         <TabPanel value={selectedTab} index={4}>
           {renderTabContent(4)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={5}>
+          {renderTabContent(5)}
         </TabPanel>
       </Container>
     </Box>
