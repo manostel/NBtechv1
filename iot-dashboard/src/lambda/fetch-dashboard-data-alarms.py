@@ -186,10 +186,26 @@ def lambda_handler(event, context):
                 is_triggered = True
                 
             if is_triggered:
+                # Update the last_triggered timestamp in the database
+                try:
+                    alarms_table.update_item(
+                        Key={
+                            'client_id': client_id,
+                            'alarm_id': alarm['alarm_id']
+                        },
+                        UpdateExpression='SET last_triggered = :ts',
+                        ExpressionAttributeValues={
+                            ':ts': datetime.now(timezone.utc).isoformat()
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to update last_triggered for alarm {alarm['alarm_id']}: {str(e)}")
+                
                 triggered_alarms.append({
                     **alarm,
                     'current_value': current_value,
-                    'severity': alarm.get('severity', 'info')
+                    'severity': alarm.get('severity', 'info'),
+                    'last_triggered': datetime.now(timezone.utc).isoformat()
                 })
         
         return {

@@ -305,10 +305,22 @@ def lambda_handler(event, context):
             
         elif operation == 'get':
             alarms = get_device_alarms(client_id)
+            
+            # Check for triggered alarms and update last_triggered
+            triggered_alarms = check_alarms(client_id)
+            
+            # Get updated alarms with last_triggered timestamps
+            updated_alarms = get_device_alarms(client_id)
+            
             return {
                 'statusCode': 200,
                 'headers': get_cors_headers(),
-                'body': json.dumps(alarms, default=decimal_default)
+                'body': json.dumps({
+                    'client_id': client_id,
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                    'alarms': updated_alarms,
+                    'triggered_alarms': triggered_alarms
+                }, default=decimal_default)
             }
 
         elif operation == 'check':
