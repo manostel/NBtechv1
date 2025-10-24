@@ -1311,22 +1311,17 @@ export default function DashboardSubscriptionsTab({
           <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
             Your Subscriptions
           </Typography>
-          <Button
-            variant="contained"
-            size="medium"
-            startIcon={<AddIcon />}
-            onClick={() => setCreateDialogOpen(true)}
-            disabled={!userLimits.can_create_more}
-            sx={{ 
-              px: { xs: 2, sm: 3 }, 
-              py: { xs: 1, sm: 1.5 },
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: { xs: '0.8rem', sm: '0.875rem' },
-              minHeight: { xs: '36px', sm: '40px' }
-            }}
-          >
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<AddIcon />}
+          onClick={() => setCreateDialogOpen(true)}
+          disabled={!userLimits.can_create_more}
+          sx={{ 
+            textTransform: 'none',
+            fontWeight: 600
+          }}
+        >
             New Subscription
           </Button>
         </Box>
