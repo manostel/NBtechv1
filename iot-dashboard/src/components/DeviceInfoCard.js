@@ -32,6 +32,8 @@ export default function DeviceInfoCard({
   useEffect(() => {
     let intervalId;
 
+    console.log('DeviceInfoCard uptime effect - status:', status, 'deviceStartTimeInfo:', deviceStartTimeInfo);
+
     // Check if device is online and we have a valid startup timestamp
     if (status !== "Offline" && deviceStartTimeInfo?.timestamp) {
       const startupTime = new Date(deviceStartTimeInfo.timestamp);

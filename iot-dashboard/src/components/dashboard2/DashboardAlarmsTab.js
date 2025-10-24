@@ -634,7 +634,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
               p: 1, 
               borderRadius: 1.5,
               boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-              border: '1px solid #f0f0f0',
+              border: '1px solid #e3f2fd',
               transition: 'all 0.3s ease',
               '&:hover': {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
@@ -766,7 +766,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                     height: '100%',
                     borderRadius: 3,
                     boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                    border: '1px solid #f0f0f0',
+                    border: '1px solid #e3f2fd',
                     transition: 'all 0.3s ease',
                     '&:hover': {
                       boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
@@ -868,7 +868,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
               p: 1, 
               borderRadius: 1.5,
               boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-              border: '1px solid #f0f0f0',
+              border: '1px solid #e3f2fd',
               transition: 'all 0.3s ease',
               '&:hover': {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
@@ -1006,7 +1006,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                     height: '100%',
                     borderRadius: 3,
                     boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                    border: '1px solid #f0f0f0',
+                    border: '1px solid #e3f2fd',
                     transition: 'all 0.3s ease',
                     '&:hover': {
                       boxShadow: '0 8px 30px rgba(0,0,0,0.12)',

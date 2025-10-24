@@ -68,7 +68,13 @@ const DEVICE_STATUS_UPDATE_INTERVAL = 70 * 1000; // 70 seconds in milliseconds
 const BATTERY_STATE_UPDATE_INTERVAL = 15 * 1000; // 15 seconds in milliseconds
 
 const DeviceSkeleton = () => (
-  <Paper sx={{ p: 2, height: '100%' }}>
+  <Paper sx={{ 
+    p: 2, 
+    height: '100%',
+    borderRadius: 3,
+    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+    border: '1px solid #f0f0f0'
+  }}>
     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
       <Skeleton variant="circular" width={24} height={24} sx={{ mr: 1 }} />
       <Skeleton variant="text" width="60%" height={24} />
@@ -112,19 +118,19 @@ const DeviceCardSkeleton = () => {
     return (
         <Grid item xs={12} sm={6} md={4}>
             <Paper
-                elevation={1}
+                elevation={0}
                 sx={{
                     p: 2,
-                    bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
+                    borderRadius: 3,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                    border: '1px solid #e3f2fd',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 1,
                     height: '100%',
-                    transition: 'background-color 0.3s ease, transform 0.2s ease',
+                    transition: 'all 0.3s ease',
                     '& .MuiSkeleton-root': {
-                        bgcolor: theme.palette.mode === 'dark' 
-                            ? 'rgba(255, 255, 255, 0.1)' 
-                            : 'rgba(0, 0, 0, 0.1)',
+                        bgcolor: 'rgba(0, 0, 0, 0.1)',
                         transition: 'background-color 0.3s ease'
                     }
                 }}
@@ -383,9 +389,13 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
       .leaflet-popup-content-wrapper {
         background-color: ${theme.palette.background.paper} !important;
         color: ${theme.palette.text.primary} !important;
+        border: 1px solid #e3f2fd !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
       }
       .leaflet-popup-tip {
         background-color: ${theme.palette.background.paper} !important;
+        border: 1px solid #e3f2fd !important;
       }
       .leaflet-popup-close-button {
         color: ${theme.palette.text.primary} !important;
@@ -494,19 +504,23 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
         right: 10, 
         zIndex: 1000,
         bgcolor: theme.palette.background.paper,
-        borderRadius: 1,
-        boxShadow: theme.shadows[2],
-        p: 1
+        borderRadius: 3,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        p: 1,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2
       }}>
         <Button
           variant={isSatelliteView ? "contained" : "outlined"}
           size="small"
           onClick={() => setIsSatelliteView(!isSatelliteView)}
           sx={{
-            color: theme.palette.mode === 'dark' ? 'white' : 'inherit',
-            borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.23)' : 'inherit',
+            color: isSatelliteView ? 'white' : '#4CAF50',
+            borderColor: isSatelliteView ? 'inherit' : '#4CAF50',
             '&:hover': {
-              borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
+              borderColor: isSatelliteView ? 'inherit' : '#45a049',
+              backgroundColor: isSatelliteView ? 'inherit' : 'rgba(76, 175, 80, 0.1)'
             }
           }}
         >
@@ -517,13 +531,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
-          gap: 1, 
-          ml: 2,
-          p: 1,
-          bgcolor: 'background.paper',
-          borderRadius: 1,
-          border: '1px solid',
-          borderColor: 'divider'
+          gap: 1
         }}>
           {gpsLoading ? (
             <>
@@ -583,7 +591,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
             >
               <Popup>
                 <Box sx={{ 
-                  p: 1, 
+                  p: 2, 
                   minWidth: 200,
                   bgcolor: theme.palette.background.paper,
                   color: theme.palette.text.primary
@@ -1934,16 +1942,15 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                     <Grid item xs={12} sm={6} md={4} key={device.client_id}>
                       <Paper
                         sx={{
-                          p: 1.5,
-                          bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
+                          p: 2,
+                          borderRadius: 3,
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                          border: '1px solid #e3f2fd',
                           cursor: 'pointer',
                           transition: 'all 0.3s ease',
                           '&:hover': {
-                            transform: 'translateY(-4px)',
-                            boxShadow: theme.shadows[6],
-                            bgcolor: theme.palette.mode === 'dark' 
-                              ? 'action.hover' 
-                              : 'background.paper'
+                            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                            transform: 'translateY(-2px)'
                           },
                           display: 'flex',
                           flexDirection: 'column',
@@ -2135,12 +2142,14 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                   <Paper
                     sx={{
                       p: 2,
-                      bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.paper',
+                      borderRadius: 3,
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                      border: '1px solid #e3f2fd',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
                       '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: theme.shadows[6],
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                        transform: 'translateY(-2px)'
                       },
                       display: 'flex',
                       flexDirection: 'column',

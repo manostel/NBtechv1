@@ -19,14 +19,13 @@ const MetricCard = ({ title, value, unit, isText = false, icon, color }) => {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid',
-        borderColor: theme.palette.divider,
-        borderRadius: 2,
-        bgcolor: theme.palette.background.paper,
-        transition: 'all 0.2s ease-in-out',
+        borderRadius: 3,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        border: '1px solid #e3f2fd',
+        transition: 'all 0.3s ease',
         '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: theme.shadows[2]
+          boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          transform: 'translateY(-2px)'
         }
       }}
     >

@@ -114,6 +114,7 @@ export default function DashboardSubscriptionsTab({
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [success, setSuccess] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -144,9 +145,18 @@ export default function DashboardSubscriptionsTab({
 
   // Load subscriptions and devices on component mount
   useEffect(() => {
-    loadSubscriptions();
-    loadDevices();
-    loadUserLimits();
+    const loadAllData = async () => {
+      try {
+        await Promise.all([
+          loadSubscriptions(),
+          loadDevices(),
+          loadUserLimits()
+        ]);
+      } finally {
+        setDataLoaded(true);
+      }
+    };
+    loadAllData();
     
     // Initialize notification service
     SubscriptionNotificationService.connect();
@@ -588,7 +598,7 @@ export default function DashboardSubscriptionsTab({
           flexDirection: 'column',
           borderRadius: 3,
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          border: '1px solid #f0f0f0',
+          border: '1px solid #e3f2fd',
           transition: 'all 0.3s ease',
           '&:hover': {
             boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
@@ -1284,21 +1294,13 @@ export default function DashboardSubscriptionsTab({
     </Dialog>
   );
 
-  if (loading && subscriptions.length === 0) {
+  console.log('DashboardSubscriptionsTab about to render, subscriptions:', subscriptions.length);
+  
+  // Show loading state until data is fetched
+  if (!dataLoaded) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
         <CircularProgress />
-      </Box>
-    );
-  }
-
-  console.log('DashboardSubscriptionsTab about to render, subscriptions:', subscriptions.length);
-  
-  // Simple fallback to ensure something always renders
-  if (!user) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h6">Loading user data...</Typography>
       </Box>
     );
   }

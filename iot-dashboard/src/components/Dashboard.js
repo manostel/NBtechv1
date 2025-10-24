@@ -283,7 +283,20 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
   // Add new state variable for last status change
   const [lastStatusChange, setLastStatusChange] = useState(null);
-  const STATUS_CHANGE_COOLDOWN = 30000; // 30 seconds cooldown between status changes
+  const [lastNotificationTime, setLastNotificationTime] = useState(null);
+  const [statusHistory, setStatusHistory] = useState([]);
+  const STATUS_CHANGE_COOLDOWN = 300000; // 5 minutes cooldown between status changes
+  const NOTIFICATION_COOLDOWN = 600000; // 10 minutes cooldown between notifications
+  const STATUS_HISTORY_LIMIT = 5; // Keep last 5 status checks
+
+  // Helper function to check if status has been stable
+  const isStatusStable = (currentStatus) => {
+    if (statusHistory.length < 3) return true; // Not enough history yet
+    
+    // Check if the last 3 status checks were the same
+    const recentHistory = statusHistory.slice(-3);
+    return recentHistory.every(entry => entry.status === currentStatus);
+  };
 
   useEffect(() => {
     if (metricsConfig) {
@@ -471,17 +484,50 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         const latestData = result.data_latest[0];
         const summary = result.summary_latest || {};
 
-        // Update device status based on timestamp
+        // Update device status based on timestamp with hysteresis
         const lastTimestamp = new Date(latestData.timestamp);
         const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
         
-        // For 1-minute data intervals with SIM7080 retry policy, consider device offline if no data for 3 minutes
-        const newStatus = timeDiffSeconds <= 180 ? "Online" : "Offline";
+        // Hysteresis: Use different thresholds for going online vs offline
+        // Going offline: 7 minutes (420 seconds) - match DevicesPage
+        // Going online: 5 minutes (300 seconds) - more sensitive to coming back online
+        let newStatus;
+        if (deviceStatus === "Online") {
+          newStatus = timeDiffSeconds <= 420 ? "Online" : "Offline";
+        } else {
+          newStatus = timeDiffSeconds <= 300 ? "Online" : "Offline";
+        }
         
-        // Only notify if status has actually changed and enough time has passed since last change
+        // Update status history
         const now = Date.now();
-        if (newStatus !== deviceStatus && (!lastStatusChange || now - lastStatusChange > 180000)) {  // 3 minutes debounce
-          DeviceNotificationService.notifyDeviceStatusChange(device, deviceStatus, newStatus);
+        setStatusHistory(prev => {
+          const newHistory = [...prev, { status: newStatus, timestamp: now, timeDiff: timeDiffSeconds }];
+          return newHistory.slice(-STATUS_HISTORY_LIMIT);
+        });
+        
+        // Check if status has actually changed
+        if (newStatus !== deviceStatus) {
+          // Check if enough time has passed since last status change
+          const timeSinceLastChange = !lastStatusChange ? Infinity : now - lastStatusChange;
+          
+          // Check if enough time has passed since last notification
+          const timeSinceLastNotification = !lastNotificationTime ? Infinity : now - lastNotificationTime;
+          
+          // Only notify if:
+          // 1. Status actually changed
+          // 2. Enough time since last status change (5 minutes)
+          // 3. Enough time since last notification (10 minutes)
+          // 4. Status has been stable (not flipping back and forth)
+          const shouldNotify = timeSinceLastChange > STATUS_CHANGE_COOLDOWN && 
+                              timeSinceLastNotification > NOTIFICATION_COOLDOWN &&
+                              isStatusStable(newStatus);
+          
+          if (shouldNotify) {
+            console.log(`Device status changed: ${deviceStatus} → ${newStatus} (${Math.round(timeDiffSeconds)}s ago)`);
+            DeviceNotificationService.notifyDeviceStatusChange(device, deviceStatus, newStatus);
+            setLastNotificationTime(now);
+          }
+          
           setDeviceStatus(newStatus);
           setLastStatusChange(now);
         }
@@ -747,7 +793,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         } finally {
           isFetching.current = false;
         }
-      }, 30000); // 30 seconds for latest data and device state
+      }, 60000); // 1 minute for latest data and device state (reduced frequency)
 
       const batteryStateInterval = setInterval(async () => {
         if (isFetching.current) return;
@@ -758,7 +804,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         } finally {
           isFetching.current = false;
         }
-      }, 150000); // 2.5 minutes for battery state
+      }, 300000); // 5 minutes for battery state (reduced frequency)
 
       // Cleanup intervals on unmount
       return () => {
@@ -1163,6 +1209,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
       const result = await response.json();
       
+      console.log('Device start time API response:', result);
+      
       if (!result || (result.timestamp === undefined && result.uptime === undefined)) {
         console.warn('Invalid response format from start time API:', result);
         // Don't throw an error, just set to null or handle appropriately
@@ -1170,6 +1218,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         return;
       }
 
+      console.log('Setting device start time info:', result);
       setDeviceStartTimeInfo(result);
 
     } catch (error) {

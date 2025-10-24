@@ -1,7 +1,7 @@
 import json
 import boto3
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
 
@@ -256,6 +256,21 @@ def check_single_subscription_sync(subscription, device_data, message_type):
         )
         
         if should_trigger:
+            # Enhanced loop prevention: Check cooldown period
+            if not check_subscription_cooldown_sync(subscription['subscription_id']):
+                logger.info(f"Subscription {subscription['subscription_id']} in cooldown period - skipping")
+                return False
+            
+            # Enhanced loop prevention: Check for self-triggering commands
+            if check_self_triggering_loop_sync(subscription, device_data):
+                logger.warning(f"Subscription {subscription['subscription_id']} would create self-triggering loop - skipping")
+                return False
+            
+            # Enhanced loop prevention: Validate command targets
+            if not validate_command_targets_sync(subscription):
+                logger.warning(f"Subscription {subscription['subscription_id']} has invalid command targets - skipping")
+                return False
+            
             # Update subscription trigger info
             update_subscription_trigger_sync(subscription['subscription_id'])
             
@@ -367,19 +382,20 @@ def evaluate_subscription_condition(condition_type, current_value, threshold_val
 def get_last_parameter_value_sync(device_id, parameter_name):
     """Get the last known value for a parameter (synchronous version)"""
     try:
-        # Get from device data table
-        device_data_table = dynamodb.Table('IoT_DeviceData')
-        response = device_data_table.query(
-            KeyConditionExpression=Key('client_id').eq(device_id),
-            Limit=1,
-            ScanIndexForward=False
+        # Get from subscription data table
+        subscription_data_table = dynamodb.Table('IoT_SubscriptionData')
+        
+        response = subscription_data_table.get_item(
+            Key={
+                'device_id': device_id,
+                'parameter_name': parameter_name
+            }
         )
         
-        if not response.get('Items'):
-            return None
+        if 'Item' in response:
+            return response['Item'].get('last_value')
         
-        latest_data = response['Items'][0]
-        return latest_data.get(parameter_name)
+        return None
         
     except Exception as e:
         logger.error(f"Error getting last parameter value: {e}")
@@ -409,29 +425,25 @@ async def get_last_parameter_value(device_id, parameter_name):
 def store_parameter_value_sync(device_id, parameter_name, value):
     """Store the current parameter value for future comparison (synchronous version)"""
     try:
-        device_data_table = dynamodb.Table('IoT_DeviceData')
+        # Instead of storing in IoT_DeviceData, store in a separate table for subscription tracking
+        # This prevents flooding the main device data table
+        subscription_data_table = dynamodb.Table('IoT_SubscriptionData')
         
-        # Try to update existing item first
-        try:
-            device_data_table.update_item(
-                Key={'client_id': device_id},
-                UpdateExpression=f'SET {parameter_name} = :value, last_updated = :timestamp',
-                ExpressionAttributeValues={
-                    ':value': value,
-                    ':timestamp': datetime.now(timezone.utc).isoformat()
-                }
-            )
-        except Exception as update_error:
-            # If update fails, try to put a new item with proper schema
-            logger.warning(f"Update failed, trying to create new item: {update_error}")
-            device_data_table.put_item(
-                Item={
-                    'client_id': device_id,
-                    'timestamp': datetime.now(timezone.utc).isoformat(),
-                    parameter_name: value,
-                    'last_updated': datetime.now(timezone.utc).isoformat()
-                }
-            )
+        current_timestamp = datetime.now(timezone.utc).isoformat()
+        
+        # Store/update the parameter value for this device
+        subscription_data_table.put_item(
+            Item={
+                'device_id': device_id,
+                'parameter_name': parameter_name,
+                'last_value': value,
+                'last_updated': current_timestamp,
+                'ttl': int((datetime.now(timezone.utc) + timedelta(days=7)).timestamp())  # Auto-delete after 7 days
+            }
+        )
+        
+        logger.info(f"Stored parameter {parameter_name}={value} for device {device_id}")
+        
     except Exception as e:
         logger.error(f"Error storing parameter value: {e}")
 
@@ -809,3 +821,174 @@ async def execute_command_action(subscription):
     except Exception as e:
         logger.error(f"Error executing command action: {e}")
         return False
+
+# =============================================================================
+# ROBUST SAFEGUARD FUNCTIONS
+# =============================================================================
+
+def check_subscription_cooldown_sync(subscription_id):
+    """Check if subscription is in cooldown period to prevent spam"""
+    try:
+        # Get subscription data to check last trigger time
+        response = subscriptions_table.get_item(
+            Key={'subscription_id': subscription_id}
+        )
+        
+        if 'Item' not in response:
+            return True  # No previous trigger, allow
+        
+        subscription = response['Item']
+        last_triggered = subscription.get('last_triggered')
+        
+        if not last_triggered:
+            return True  # Never triggered, allow
+        
+        # Parse last trigger time
+        last_trigger_time = datetime.fromisoformat(last_triggered.replace('Z', '+00:00'))
+        current_time = datetime.now(timezone.utc)
+        
+        # Cooldown period: 30 seconds minimum between triggers
+        cooldown_seconds = 30
+        time_diff = (current_time - last_trigger_time).total_seconds()
+        
+        if time_diff < cooldown_seconds:
+            logger.info(f"Subscription {subscription_id} cooldown: {cooldown_seconds - time_diff:.1f}s remaining")
+            return False
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error checking cooldown for subscription {subscription_id}: {e}")
+        return True  # Allow on error to avoid blocking
+
+def check_self_triggering_loop_sync(subscription, device_data):
+    """Check if subscription would create a self-triggering loop"""
+    try:
+        subscription_id = subscription['subscription_id']
+        device_id = subscription['device_id']
+        parameter_name = subscription['parameter_name']
+        commands = subscription.get('commands', [])
+        
+        # Check each command for potential loops
+        for command in commands:
+            if command.get('action') == 'none':
+                continue
+                
+            target_device = command.get('target_device', device_id)
+            command_action = command.get('action', '')
+            
+            # Loop prevention: Don't send commands to the same device being monitored
+            if target_device == device_id:
+                # Check if the command would affect the monitored parameter
+                if would_command_affect_parameter(command_action, parameter_name):
+                    logger.warning(f"Loop detected: {command_action} would affect {parameter_name}")
+                    return True
+                    
+            # Additional loop prevention: Check for parameter coupling
+            if is_parameter_coupled(parameter_name, command_action):
+                logger.warning(f"Parameter coupling detected: {parameter_name} <-> {command_action}")
+                return True
+        
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error checking self-triggering loop: {e}")
+        return False  # Allow on error
+
+def validate_command_targets_sync(subscription):
+    """Validate that command targets are safe and won't cause loops"""
+    try:
+        device_id = subscription['device_id']
+        commands = subscription.get('commands', [])
+        
+        for command in commands:
+            if command.get('action') == 'none':
+                continue
+                
+            target_device = command.get('target_device', device_id)
+            command_action = command.get('action', '')
+            command_value = command.get('value', '')
+            
+            # Validate command format
+            if not is_valid_command_format(command_action, command_value):
+                logger.warning(f"Invalid command format: {command_action}={command_value}")
+                return False
+                
+            # Check for dangerous command combinations
+            if is_dangerous_command_combination(device_id, target_device, command_action):
+                logger.warning(f"Dangerous command combination detected: {command_action} to {target_device}")
+                return False
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error validating command targets: {e}")
+        return False
+
+def would_command_affect_parameter(command_action, parameter_name):
+    """Check if a command would affect the monitored parameter"""
+    # Map command actions to parameters they affect
+    command_parameter_map = {
+        'out1': ['outputs.OUT1', 'outputs.out1'],
+        'out2': ['outputs.OUT2', 'outputs.out2'],
+        'in1': ['inputs.IN1', 'inputs.in1'],
+        'in2': ['inputs.IN2', 'inputs.in2'],
+        'speed': ['outputs.speed', 'motor_speed'],
+        'power_saving': ['outputs.power_saving', 'power_saving']
+    }
+    
+    affected_parameters = command_parameter_map.get(command_action.lower(), [])
+    return parameter_name.lower() in [p.lower() for p in affected_parameters]
+
+def is_parameter_coupled(parameter_name, command_action):
+    """Check if parameters are coupled (changing one affects the other)"""
+    # Known parameter couplings
+    coupled_groups = [
+        ['outputs.OUT1', 'outputs.OUT2'],  # OUT1 and OUT2 might be coupled
+        ['inputs.IN1', 'inputs.IN2'],     # IN1 and IN2 might be coupled
+        ['outputs.speed', 'motor_speed'],  # Speed parameters
+        ['battery', 'power_saving']        # Battery and power saving
+    ]
+    
+    for group in coupled_groups:
+        if parameter_name.lower() in [p.lower() for p in group]:
+            if command_action.lower() in [p.lower().replace('outputs.', '').replace('inputs.', '') for p in group]:
+                return True
+    
+    return False
+
+def is_valid_command_format(command_action, command_value):
+    """Validate command format"""
+    valid_actions = ['out1', 'out2', 'in1', 'in2', 'speed', 'power_saving', 'restart', 'none']
+    
+    if command_action not in valid_actions:
+        return False
+        
+    # Validate value format based on action
+    if command_action in ['out1', 'out2', 'in1', 'in2']:
+        return command_value in ['0', '1', 'on', 'off', 'true', 'false']
+    elif command_action == 'speed':
+        try:
+            speed = int(command_value)
+            return 0 <= speed <= 100
+        except:
+            return False
+    elif command_action == 'power_saving':
+        return command_value in ['0', '1', 'on', 'off', 'true', 'false']
+    elif command_action == 'restart':
+        return True  # No value needed for restart
+        
+    return True
+
+def is_dangerous_command_combination(device_id, target_device, command_action):
+    """Check for dangerous command combinations"""
+    # Restart commands are always dangerous
+    if command_action == 'restart':
+        return True
+        
+    # Multiple output commands to same device
+    if command_action in ['out1', 'out2'] and target_device == device_id:
+        # This could create rapid state changes
+        return True
+        
+    return False

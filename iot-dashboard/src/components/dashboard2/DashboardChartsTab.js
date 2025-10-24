@@ -344,7 +344,7 @@ const DashboardChartsTab = ({
           height: isFullscreen ? '100vh' : '400px',
           transition: 'height 0.3s ease',
           backgroundColor: '#1a1f3c',
-          borderRadius: 1,
+          borderRadius: 3,
           p: 0,
           m: 0,
           mt: 0,
@@ -445,20 +445,21 @@ const DashboardChartsTab = ({
         {selectedVariables.map(metricKey => (
           <Grid item xs={12} md={6} key={metricKey}>
             <Paper 
-              elevation={2}
+              elevation={0}
               sx={{ 
                 p: 0,
                 m: 0,
                 mt: 0,
                 mb: 0,
-                px: 0,
-                borderRadius: 1,
-                transition: 'transform 0.2s ease-in-out',
-                backgroundColor: '#1a1f3c',
+                borderRadius: 3,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                border: '1px solid #e3f2fd',
+                backgroundColor: 'white',
+                transition: 'all 0.3s ease',
                 width: '100%',
                 '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: 3
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                  transform: 'translateY(-2px)'
                 }
               }}
             >
