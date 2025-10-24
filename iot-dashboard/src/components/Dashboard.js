@@ -95,6 +95,7 @@ import DashboardAlarmsTab from './dashboard2/DashboardAlarmsTab';
 import DashboardSubscriptionsTab from './dashboard2/DashboardSubscriptionsTab';
 import DeviceNotificationService from '../utils/DeviceNotificationService';
 import NotificationService from '../utils/NotificationService';
+import { useGlobalTimer } from '../hooks/useGlobalTimer';
 import './Dashboard.css';
 
 // Register Chart.js components
@@ -146,6 +147,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
+  // Global timer hook
+  const { updateDeviceStatus, getDeviceStatus } = useGlobalTimer();
   const [selectedTab, setSelectedTab] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [metricsData, setMetricsData] = useState(null);
@@ -184,7 +188,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
   const [batteryData, setBatteryData] = useState([]);
   const [signalQualityData, setSignalQualityData] = useState([]);
   const [lastSeen, setLastSeen] = useState(null);
-  const [deviceStatus, setDeviceStatus] = useState("Offline");
+  const [deviceStatus, setDeviceStatus] = useState(null); // Initialize as null to avoid false status changes
   const [clientID, setClientID] = useState("Unknown");
   const [deviceName, setDeviceName] = useState("Unknown");
   const [deviceType, setDeviceType] = useState("N/A");
@@ -484,53 +488,23 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         const latestData = result.data_latest[0];
         const summary = result.summary_latest || {};
 
-        // Update device status based on timestamp with hysteresis
-        const lastTimestamp = new Date(latestData.timestamp);
-        const timeDiffSeconds = (new Date() - lastTimestamp) / 1000;
+        // Use global timer for status monitoring
+        const deviceData = {
+          latest_data: latestData
+        };
         
-        // Hysteresis: Use different thresholds for going online vs offline
-        // Going offline: 7 minutes (420 seconds) - match DevicesPage
-        // Going online: 5 minutes (300 seconds) - more sensitive to coming back online
-        let newStatus;
-        if (deviceStatus === "Online") {
-          newStatus = timeDiffSeconds <= 420 ? "Online" : "Offline";
-        } else {
-          newStatus = timeDiffSeconds <= 300 ? "Online" : "Offline";
-        }
+        console.log(`Dashboard: Updating device ${device.client_id} with data:`, deviceData);
         
-        // Update status history
-        const now = Date.now();
-        setStatusHistory(prev => {
-          const newHistory = [...prev, { status: newStatus, timestamp: now, timeDiff: timeDiffSeconds }];
-          return newHistory.slice(-STATUS_HISTORY_LIMIT);
-        });
+        // Update device status using global timer
+        updateDeviceStatus(device.client_id, deviceData);
         
-        // Check if status has actually changed
-        if (newStatus !== deviceStatus) {
-          // Check if enough time has passed since last status change
-          const timeSinceLastChange = !lastStatusChange ? Infinity : now - lastStatusChange;
-          
-          // Check if enough time has passed since last notification
-          const timeSinceLastNotification = !lastNotificationTime ? Infinity : now - lastNotificationTime;
-          
-          // Only notify if:
-          // 1. Status actually changed
-          // 2. Enough time since last status change (5 minutes)
-          // 3. Enough time since last notification (10 minutes)
-          // 4. Status has been stable (not flipping back and forth)
-          const shouldNotify = timeSinceLastChange > STATUS_CHANGE_COOLDOWN && 
-                              timeSinceLastNotification > NOTIFICATION_COOLDOWN &&
-                              isStatusStable(newStatus);
-          
-          if (shouldNotify) {
-            console.log(`Device status changed: ${deviceStatus} → ${newStatus} (${Math.round(timeDiffSeconds)}s ago)`);
-            DeviceNotificationService.notifyDeviceStatusChange(device, deviceStatus, newStatus);
-            setLastNotificationTime(now);
-          }
-          
-          setDeviceStatus(newStatus);
-          setLastStatusChange(now);
-        }
+        // Get the current status from global timer
+        const newStatus = getDeviceStatus(device.client_id);
+        
+        console.log(`Dashboard: Device ${device.client_id} status from global timer: ${newStatus}`);
+        
+        // Update local state
+        setDeviceStatus(newStatus);
         
         // Update metrics data with latest values
         setMetricsData(prevData => ({
@@ -540,7 +514,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         }));
 
         // Update device info
-        setLastSeen(lastTimestamp);
+        setLastSeen(new Date(latestData.timestamp));
         setClientID(device.client_id);
         
         // Set device name and type from the latest data
@@ -851,7 +825,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     
     timestamps.forEach((timestamp, index) => {
       const row = [
-        new Date(timestamp).toLocaleString(),
+        new Date(timestamp).toLocaleString('en-GB', { hour12: false }),
         metricsData.temperature?.[index]?.value || '',
         metricsData.humidity?.[index]?.value || '',
         metricsData.battery?.[index]?.value || '',
@@ -1390,9 +1364,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           clientID={device?.client_id || "Unknown"}
           deviceName={device?.device_name || "Unknown"}
           deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
-          status={deviceStatus}
-          lastOnline={lastSeen ? lastSeen.toLocaleString() : 
-            device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString() : "N/A"}
+          status={deviceStatus || "Offline"}
+          lastOnline={lastSeen ? lastSeen.toLocaleString('en-GB', { hour12: false }) : 
+            device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString('en-GB', { hour12: false }) : "N/A"}
           batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
           signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
           showClientId={showClientId}

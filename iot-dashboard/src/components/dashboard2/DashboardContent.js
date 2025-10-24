@@ -20,7 +20,7 @@ export default function DashboardContent({
         deviceName={device.device_name}
         deviceType={device.device_type || device.latest_data?.device || 'Unknown'}
         status={deviceState.status}
-        lastOnline={deviceState.timestamp ? new Date(deviceState.timestamp).toLocaleString() : "N/A"}
+        lastOnline={deviceState.timestamp ? new Date(deviceState.timestamp).toLocaleString('en-GB', { hour12: false }) : "N/A"}
         batteryLevel={metricsData.battery?.[metricsData.battery.length - 1]}
         signalStrength={metricsData.signal_quality?.[metricsData.signal_quality.length - 1]}
       />

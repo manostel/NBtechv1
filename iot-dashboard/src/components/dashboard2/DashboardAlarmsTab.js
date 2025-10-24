@@ -822,7 +822,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                           fontWeight: 500
                         }}>
                           {alarm.last_triggered ? 
-                            new Date(alarm.last_triggered).toLocaleString('en-US', {
+                            new Date(alarm.last_triggered).toLocaleString('en-GB', {
                               month: '2-digit',
                               day: '2-digit',
                               year: 'numeric',
@@ -1068,7 +1068,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                             fontWeight: 500
                           }}>
                             {alarm.last_triggered ? 
-                              new Date(alarm.last_triggered).toLocaleString('en-US', {
+                              new Date(alarm.last_triggered).toLocaleString('en-GB', {
                                 month: '2-digit',
                                 day: '2-digit',
                                 year: 'numeric',

@@ -671,7 +671,7 @@ export default function DashboardSubscriptionsTab({
               </Box>
               <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.primary' }}>
                 {subscription.last_triggered 
-                  ? new Date(subscription.last_triggered).toLocaleString('en-US', {
+                  ? new Date(subscription.last_triggered).toLocaleString('en-GB', {
                       year: 'numeric',
                       month: '2-digit',
                       day: '2-digit',

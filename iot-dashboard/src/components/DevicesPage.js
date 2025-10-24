@@ -55,6 +55,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import BluetoothControl from './BluetoothControl';
+import { useGlobalTimer } from '../hooks/useGlobalTimer';
 
 const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
@@ -348,31 +349,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Move getDeviceStatus outside the main component
-const getDeviceStatus = (deviceData) => {
-  try {
-    if (!deviceData?.latest_data?.timestamp) {
-      return { status: 'Offline', lastSeen: null };
-    }
-    
-    const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
-    const now = new Date();
-    
-    if (isNaN(lastUpdateTime.getTime())) {
-      return { status: 'Offline', lastSeen: null };
-    }
-    
-    const diffInMinutes = (now - lastUpdateTime) / (1000 * 60);
-    
-    return {
-      status: diffInMinutes <= INACTIVE_TIMEOUT_MINUTES ? 'Online' : 'Offline',
-      lastSeen: lastUpdateTime
-    };
-  } catch (error) {
-    console.error('Error calculating device status:', error);
-    return { status: 'Offline', lastSeen: null };
-  }
-};
 
 // Add this new component for the Map View
 const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDeviceClick, getDeviceStatus }) => {
@@ -450,7 +426,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
   }, [deviceLocations]);
 
   const getMarkerColor = (device) => {
-    const status = getDeviceStatus(deviceData[device.client_id]);
+    const status = getDeviceStatus(deviceData[device.client_id], device.client_id);
     return status.status === 'Online' 
       ? theme.palette.mode === 'dark' ? '#66bb6a' : '#4CAF50'  // Lighter green in dark mode
       : theme.palette.mode === 'dark' ? '#ef5350' : '#F44336'; // Lighter red in dark mode
@@ -737,6 +713,38 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const { currentTheme, setTheme } = useCustomTheme();
+  
+  // Global timer hook
+  const { updateDeviceStatus, getDeviceStatus: getGlobalDeviceStatus } = useGlobalTimer();
+  
+  console.log('DevicesPage: Global timer functions available:', { updateDeviceStatus: !!updateDeviceStatus, getDeviceStatus: !!getGlobalDeviceStatus });
+
+  // Local getDeviceStatus function that uses the global timer
+  const getDeviceStatus = (deviceData, deviceId) => {
+    try {
+      if (!deviceData?.latest_data?.timestamp) {
+        console.log(`DevicesPage: Device ${deviceId} - No timestamp data, returning Offline`);
+        return { status: 'Offline', lastSeen: null };
+      }
+      
+      console.log(`DevicesPage: Processing device ${deviceId} with data:`, deviceData);
+      
+      // Don't call updateDeviceStatus during render to avoid infinite loops
+      // Just get the current status from global timer
+      const status = getGlobalDeviceStatus(deviceId);
+      const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
+      
+      console.log(`DevicesPage: Device ${deviceId} - Status calculated as ${status}, last seen: ${lastUpdateTime}`);
+      
+      return {
+        status: status,
+        lastSeen: lastUpdateTime
+      };
+    } catch (error) {
+      console.error('Error calculating device status:', error);
+      return { status: 'Offline', lastSeen: null };
+    }
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addDeviceOpen, setAddDeviceOpen] = useState(false);
   const [newClientId, setNewClientId] = useState("");
@@ -776,6 +784,19 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const [configureDialogOpen, setConfigureDialogOpen] = useState(false);
   const [configuringDevice, setConfiguringDevice] = useState(null);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+
+  // Update device status when deviceData changes (not during render)
+  useEffect(() => {
+    if (deviceData && Object.keys(deviceData).length > 0) {
+      Object.keys(deviceData).forEach(deviceId => {
+        const deviceDataItem = deviceData[deviceId];
+        if (deviceDataItem?.latest_data?.timestamp) {
+          console.log(`DevicesPage: Updating device status for ${deviceId} in useEffect`);
+          updateDeviceStatus(deviceId, deviceDataItem);
+        }
+      });
+    }
+  }, [deviceData, updateDeviceStatus]);
   const [deviceStatuses, setDeviceStatuses] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -820,27 +841,6 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     };
 }, [user.email]);
 
-  const updateDeviceStatus = useCallback((deviceId, newStatus) => {
-    setDeviceStatuses(prev => {
-      // Only update if status has been different for at least 5 seconds
-      const currentStatus = prev[deviceId]?.status;
-      const lastUpdate = prev[deviceId]?.lastUpdate;
-      const now = Date.now();
-      
-      if (currentStatus === newStatus || 
-          (lastUpdate && now - lastUpdate < 5000)) {
-        return prev;
-      }
-      
-      return {
-        ...prev,
-        [deviceId]: {
-          status: newStatus,
-          lastUpdate: now
-        }
-      };
-    });
-  }, []);
 
   const fetchBatteryState = async (clientId) => {
     try {
@@ -1936,7 +1936,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                   // Safely get device data and latest data
                   const currentDeviceData = deviceData[device.client_id] || {};
                   const latestData = currentDeviceData.latest_data || {};
-                  const deviceStatus = getDeviceStatus(currentDeviceData);
+                  const deviceStatus = getDeviceStatus(currentDeviceData, device.client_id);
 
                   return (
                     <Grid item xs={12} sm={6} md={4} key={device.client_id}>
@@ -2084,7 +2084,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                         {/* Last Updated */}
                         <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1 }}>
                           Last Updated: {latestData.timestamp ? 
-                            new Date(latestData.timestamp).toLocaleString() : 
+                            new Date(latestData.timestamp).toLocaleString('en-GB', { hour12: false }) : 
                             'Never'
                           }
                         </Typography>
@@ -2190,7 +2190,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           gpsLoading={gpsLoading}
           deviceStates={deviceStates}
           onDeviceClick={handleDeviceClick}
-          getDeviceStatus={getDeviceStatus}
+          getDeviceStatus={(deviceData, deviceId) => getDeviceStatus(deviceData, deviceId)}
         />
         </Box>
       )}
