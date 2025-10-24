@@ -104,7 +104,13 @@ export default function DeviceInfoCard({
 
   if (error) {
     return (
-      <Card sx={{ minWidth: 275, mb: 2 }}>
+      <Card sx={{ 
+        minWidth: 275, 
+        mb: 2,
+        borderRadius: 3,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        border: '1px solid #e3f2fd'
+      }}>
         <CardContent>
           <Typography color="error">{error}</Typography>
         </CardContent>
@@ -120,10 +126,13 @@ export default function DeviceInfoCard({
         mb: { xs: 0.5, sm: 1 }, 
         p: { xs: 0.25, sm: 0.5 },
         cursor: 'pointer',
-        transition: 'all 0.2s ease-in-out',
+        borderRadius: 3,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        border: '1px solid #e3f2fd',
+        transition: 'all 0.3s ease',
         '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: theme.shadows[4]
+          boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          transform: 'translateY(-2px)'
         }
       }}
       onClick={() => setDialogOpen(true)}

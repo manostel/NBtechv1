@@ -1407,24 +1407,27 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
         {/* Tabs */}
         <Box sx={{ 
-          borderBottom: 1, 
-          borderColor: 'divider',
+          borderRadius: 3,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          border: '1px solid #e3f2fd',
           mb: 2,
           overflowX: 'auto',
+          width: 'fit-content',
+          maxWidth: '100%',
           pl: { xs: 0, sm: 0 },
           pr: { xs: 0, sm: 0 },
           '&::-webkit-scrollbar': {
             height: '6px',
           },
           '&::-webkit-scrollbar-track': {
-            background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+            background: 'rgba(0,0,0,0.1)',
             borderRadius: '3px',
           },
           '&::-webkit-scrollbar-thumb': {
-            background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+            background: 'rgba(0,0,0,0.2)',
             borderRadius: '3px',
             '&:hover': {
-              background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+              background: 'rgba(0,0,0,0.3)',
             },
           },
         }}>
@@ -1443,8 +1446,26 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
                 fontSize: '0.875rem',
                 textTransform: 'none',
                 fontWeight: 500,
-              px: 2,
-              },
+                px: 2,
+                color: theme.palette.text.secondary,
+                borderRadius: 2,
+                margin: '4px',
+                transition: 'all 0.3s ease',
+                '&.Mui-selected': {
+                  color: theme.palette.primary.main,
+                  fontWeight: 600,
+                  backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                },
+                '&:hover': {
+                  color: theme.palette.primary.light,
+                  backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                }
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: theme.palette.primary.main,
+              height: '3px',
+              borderRadius: '2px'
+            }
           }}
         >
             <Tab label="Overview" {...a11yProps(0)} />
