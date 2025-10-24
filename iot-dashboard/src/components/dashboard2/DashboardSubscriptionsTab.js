@@ -589,9 +589,8 @@ export default function DashboardSubscriptionsTab({
   };
 
   const renderSubscriptionCard = (subscription) => (
-    <Grid item xs={12} sm={6} lg={4}>
+    <Grid item xs={12} sm={6} lg={4} key={subscription.subscription_id}>
       <Card 
-        key={subscription.subscription_id} 
         sx={{ 
           height: '100%',
           display: 'flex',
@@ -660,8 +659,13 @@ export default function DashboardSubscriptionsTab({
               borderColor: 'grey.200' 
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                  Last triggered
+                <Typography variant="caption" color="text.secondary" sx={{ 
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5
+                }}>
+                  Last Triggered
                 </Typography>
                 {subscription.trigger_count > 0 && (
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>

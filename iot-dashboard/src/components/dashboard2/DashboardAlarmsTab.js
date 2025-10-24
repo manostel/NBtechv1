@@ -43,7 +43,11 @@ import {
   Edit as EditIcon,
   NotificationsOff as NotificationsOffIcon,
   FilterList as FilterListIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  TrendingUp as TrendingUpIcon,
+  DeviceHub as DeviceIcon,
+  Input as InputIcon,
+  Output as OutputIcon
 } from '@mui/icons-material';
 import NotificationService from '../../utils/NotificationService';
 
@@ -61,6 +65,46 @@ const defaultMetricsConfig = {
   thermistor_temp: { label: 'Thermistor Temperature', unit: '°C' }
 };
 
+// Extended parameter types for alarms
+const ALARM_PARAMETER_TYPES = {
+  metrics: {
+    label: 'Metrics',
+    icon: <TrendingUpIcon />,
+    parameters: {
+      battery: { label: 'Battery', unit: '%', type: 'numeric' },
+      temperature: { label: 'Temperature', unit: '°C', type: 'numeric' },
+      humidity: { label: 'Humidity', unit: '%', type: 'numeric' },
+      pressure: { label: 'Pressure', unit: 'hPa', type: 'numeric' },
+      signal_quality: { label: 'Signal Quality', unit: '%', type: 'numeric' }
+    }
+  },
+  status: {
+    label: 'Device Status',
+    icon: <DeviceIcon />,
+    parameters: {
+      status: { label: 'State', unit: '', type: 'status' }
+    }
+  },
+  inputs: {
+    label: 'Inputs',
+    icon: <InputIcon />,
+    parameters: {
+      'inputs.IN1': { label: 'Input 1', unit: '', type: 'boolean' },
+      'inputs.IN2': { label: 'Input 2', unit: '', type: 'boolean' }
+    }
+  },
+  outputs: {
+    label: 'Outputs',
+    icon: <OutputIcon />,
+    parameters: {
+      'outputs.OUT1': { label: 'Output 1', unit: '', type: 'boolean' },
+      'outputs.OUT2': { label: 'Output 2', unit: '', type: 'boolean' },
+      'outputs.speed': { label: 'Motor Speed', unit: '', type: 'numeric' },
+      'outputs.charging': { label: 'Charging Status', unit: '', type: 'boolean' }
+    }
+  }
+};
+
 const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAlarmToggle }) => {
   const theme = useTheme();
   const [alarms, setAlarms] = useState([]);
@@ -75,6 +119,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
   const [isInitializing, setIsInitializing] = useState(true);
   const lastAlarmNotificationRef = useRef({});
   const [newAlarm, setNewAlarm] = useState({
+    parameter_type: 'metrics',
     variable_name: '',
     condition: 'above',
     threshold: '',
@@ -82,16 +127,129 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
     enabled: true,
     severity: 'warning'
   });
+
+  // Get available conditions based on parameter type and variable
+  const getAvailableConditions = (parameterType, variableName) => {
+    if (!parameterType || !variableName) return [];
+    
+    const parameterConfig = ALARM_PARAMETER_TYPES[parameterType]?.parameters[variableName];
+    if (!parameterConfig) return [];
+
+    switch (parameterConfig.type) {
+      case 'numeric':
+        return [
+          { value: 'above', label: 'Above Threshold' },
+          { value: 'below', label: 'Below Threshold' },
+          { value: 'equals', label: 'Equals Value' }
+        ];
+      case 'boolean':
+        return [
+          { value: 'equals', label: 'Equals' },
+          { value: 'not_equals', label: 'Not Equals' },
+          { value: 'change', label: 'Any Change' }
+        ];
+      case 'status':
+        return [
+          { value: 'equals', label: 'Equals' },
+          { value: 'not_equals', label: 'Not Equals' },
+          { value: 'change', label: 'Any Change' }
+        ];
+      default:
+        return [
+          { value: 'change', label: 'Any Change' }
+        ];
+    }
+  };
+
+  // Get threshold input based on parameter type and condition
+  const getThresholdInput = (parameterType, variableName, condition) => {
+    if (!parameterType || !variableName || condition === 'change') {
+      return null; // No threshold needed for 'change' condition
+    }
+
+    const parameterConfig = ALARM_PARAMETER_TYPES[parameterType]?.parameters[variableName];
+    if (!parameterConfig) return null;
+
+    switch (parameterConfig.type) {
+      case 'numeric':
+        return (
+          <TextField
+            label="Threshold Value"
+            type="number"
+            value={newAlarm.threshold}
+            onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
+            fullWidth
+            InputProps={{
+              endAdornment: parameterConfig.unit ? 
+                <Typography variant="body2" color="text.secondary">
+                  {parameterConfig.unit}
+                </Typography> : null
+            }}
+          />
+        );
+      case 'boolean':
+        return (
+          <FormControl fullWidth>
+            <InputLabel>Value</InputLabel>
+            <Select
+              value={newAlarm.threshold}
+              onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
+              label="Value"
+            >
+              <MenuItem value="true">True</MenuItem>
+              <MenuItem value="false">False</MenuItem>
+            </Select>
+          </FormControl>
+        );
+      case 'status':
+        return (
+          <FormControl fullWidth>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={newAlarm.threshold}
+              onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
+              label="Status"
+            >
+              <MenuItem value="Online">Online</MenuItem>
+              <MenuItem value="Offline">Offline</MenuItem>
+            </Select>
+          </FormControl>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Get filtered variables based on parameter type
+  const getFilteredVariables = (parameterType) => {
+    if (parameterType === 'all') {
+      // Return all variables from all types
+      const allVariables = {};
+      Object.values(ALARM_PARAMETER_TYPES).forEach(type => {
+        Object.assign(allVariables, type.parameters);
+      });
+      Object.assign(allVariables, metricsConfig);
+      return Object.entries(allVariables);
+    }
+    
+    if (ALARM_PARAMETER_TYPES[parameterType]) {
+      return Object.entries(ALARM_PARAMETER_TYPES[parameterType].parameters);
+    }
+    
+    return Object.entries(metricsConfig);
+  };
   const [activeTab, setActiveTab] = useState(0);
   const [filters, setFilters] = useState({
     severity: 'all',
     status: 'all',
-    variable: 'all'
+    variable: 'all',
+    parameterType: 'all'
   });
   const [triggeredFilters, setTriggeredFilters] = useState({
     severity: 'all',
     variable: 'all',
-    timeRange: 'all'
+    timeRange: 'all',
+    parameterType: 'all'
   });
 
   const fetchAlarms = useCallback(async () => {
@@ -222,7 +380,8 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
   }, [device?.client_id, fetchAlarms]);
 
   const handleAddAlarm = async () => {
-    if (!newAlarm.variable_name || !newAlarm.threshold) {
+    // Check if required fields are filled
+    if (!newAlarm.variable_name || (!newAlarm.threshold && newAlarm.condition !== 'change')) {
       setSnackbar({
         open: true,
         message: 'Please fill in all required fields',
@@ -243,7 +402,9 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
           operation: 'create',
           alarm: {
             ...newAlarm,
-            threshold: parseFloat(newAlarm.threshold)
+            threshold: newAlarm.condition === 'change' ? null : 
+              (ALARM_PARAMETER_TYPES[newAlarm.parameter_type]?.parameters[newAlarm.variable_name]?.type === 'numeric' ? 
+                parseFloat(newAlarm.threshold) : newAlarm.threshold)
           }
         })
       });
@@ -256,7 +417,9 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
       const newAlarmData = {
         alarm_id: `temp_${Date.now()}`, // Temporary ID, will be updated on next fetch
         ...newAlarm,
-        threshold: parseFloat(newAlarm.threshold)
+        threshold: newAlarm.condition === 'change' ? null : 
+          (ALARM_PARAMETER_TYPES[newAlarm.parameter_type]?.parameters[newAlarm.variable_name]?.type === 'numeric' ? 
+            parseFloat(newAlarm.threshold) : newAlarm.threshold)
       };
       setAlarms(prevAlarms => [...prevAlarms, newAlarmData]);
       
@@ -267,8 +430,9 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
 
     setNewAlarmDialog(false);
     setNewAlarm({
+        parameter_type: 'metrics',
         variable_name: '',
-      condition: 'above',
+        condition: 'above',
         threshold: '',
         description: '',
         enabled: true,
@@ -526,6 +690,14 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
         return false;
       }
       
+      // Parameter type filter
+      if (filters.parameterType !== 'all') {
+        const alarmParameterType = alarm.parameter_type || 'metrics'; // Default to metrics for backward compatibility
+        if (alarmParameterType !== filters.parameterType) {
+          return false;
+        }
+      }
+      
       return true;
     });
   };
@@ -562,6 +734,14 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
           case 'last_week':
             if (timeDiff > 7 * 24 * 60 * 60 * 1000) return false;
             break;
+        }
+      }
+      
+      // Parameter type filter
+      if (triggeredFilters.parameterType !== 'all') {
+        const alarmParameterType = alarm.parameter_type || 'metrics'; // Default to metrics for backward compatibility
+        if (alarmParameterType !== triggeredFilters.parameterType) {
+          return false;
         }
       }
       
@@ -647,55 +827,77 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                   Filter Triggered Alarms
                 </Typography>
               </Box>
-              <Grid container spacing={1}>
-                <Grid item xs={12} sm={4} key="severity-filter">
+              <Grid container spacing={0.5}>
+                <Grid item xs={6} sm={3} key="severity-filter">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.7rem' }}>Severity</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>Severity</InputLabel>
                     <Select
                       value={triggeredFilters.severity}
-                      onChange={(e) => setTriggeredFilters({ ...triggeredFilters, severity: e.target.value })}
+                      onChange={(e) => setTriggeredFilters({ ...triggeredFilters, severity: e.target.value, parameterType: 'all', variable: 'all' })}
                       label="Severity"
-                      sx={{ fontSize: '0.75rem' }}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.75rem' }}>All Severities</MenuItem>
-                      <MenuItem value="error" sx={{ fontSize: '0.75rem' }}>Error</MenuItem>
-                      <MenuItem value="warning" sx={{ fontSize: '0.75rem' }}>Warning</MenuItem>
-                      <MenuItem value="info" sx={{ fontSize: '0.75rem' }}>Info</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="error" sx={{ fontSize: '0.7rem', py: 0.3 }}>Error</MenuItem>
+                      <MenuItem value="warning" sx={{ fontSize: '0.7rem', py: 0.3 }}>Warning</MenuItem>
+                      <MenuItem value="info" sx={{ fontSize: '0.7rem', py: 0.3 }}>Info</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={4} key="variable-filter">
+                <Grid item xs={6} sm={3} key="parameter-type-filter-triggered">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.7rem' }}>Variable</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>Type</InputLabel>
+                    <Select
+                      value={triggeredFilters.parameterType}
+                      onChange={(e) => setTriggeredFilters({ ...triggeredFilters, parameterType: e.target.value, variable: 'all' })}
+                      label="Type"
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]) => (
+                        <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            {config.icon}
+                            {config.label}
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3} key="variable-filter">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>Variable</InputLabel>
                     <Select
                       value={triggeredFilters.variable}
                       onChange={(e) => setTriggeredFilters({ ...triggeredFilters, variable: e.target.value })}
                       label="Variable"
-                      sx={{ fontSize: '0.75rem' }}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                      disabled={triggeredFilters.parameterType === 'all'}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.75rem' }}>All Variables</MenuItem>
-                      {Object.entries(metricsConfig).map(([key, config]) => (
-                        <MenuItem key={key} value={key} sx={{ fontSize: '0.75rem' }}>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      {getFilteredVariables(triggeredFilters.parameterType).map(([key, config]) => (
+                        <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
                           {config.label}
                         </MenuItem>
                       ))}
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={4} key="time-range-filter">
+                <Grid item xs={6} sm={3} key="time-range-filter">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.7rem' }}>Time Range</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>Time</InputLabel>
                     <Select
                       value={triggeredFilters.timeRange}
                       onChange={(e) => setTriggeredFilters({ ...triggeredFilters, timeRange: e.target.value })}
-                      label="Time Range"
-                      sx={{ fontSize: '0.75rem' }}
+                      label="Time"
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.75rem' }}>All Time</MenuItem>
-                      <MenuItem value="last_hour" sx={{ fontSize: '0.75rem' }}>Last Hour</MenuItem>
-                      <MenuItem value="last_6_hours" sx={{ fontSize: '0.75rem' }}>Last 6 Hours</MenuItem>
-                      <MenuItem value="last_24_hours" sx={{ fontSize: '0.75rem' }}>Last 24 Hours</MenuItem>
-                      <MenuItem value="last_week" sx={{ fontSize: '0.75rem' }}>Last Week</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="last_hour" sx={{ fontSize: '0.7rem', py: 0.3 }}>1H</MenuItem>
+                      <MenuItem value="last_6_hours" sx={{ fontSize: '0.7rem', py: 0.3 }}>6H</MenuItem>
+                      <MenuItem value="last_24_hours" sx={{ fontSize: '0.7rem', py: 0.3 }}>24H</MenuItem>
+                      <MenuItem value="last_week" sx={{ fontSize: '0.7rem', py: 0.3 }}>Week</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -704,7 +906,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                 <Button
                   size="small"
                   startIcon={<ClearIcon sx={{ fontSize: '0.8rem' }} />}
-                  onClick={() => setTriggeredFilters({ severity: 'all', variable: 'all', timeRange: 'all' })}
+                  onClick={() => setTriggeredFilters({ severity: 'all', variable: 'all', timeRange: 'all', parameterType: 'all' })}
                   sx={{ 
                     textTransform: 'none',
                     fontWeight: 500,
@@ -881,53 +1083,75 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                   Filter Alarms
                 </Typography>
               </Box>
-              <Grid container spacing={1}>
-                <Grid item xs={12} sm={4} key="severity-filter-manage">
+              <Grid container spacing={0.5}>
+                <Grid item xs={6} sm={3} key="severity-filter-manage">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.7rem' }}>Severity</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>Severity</InputLabel>
                     <Select
                       value={filters.severity}
-                      onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
+                      onChange={(e) => setFilters({ ...filters, severity: e.target.value, parameterType: 'all', variable: 'all' })}
                       label="Severity"
-                      sx={{ fontSize: '0.75rem' }}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.75rem' }}>All Severities</MenuItem>
-                      <MenuItem value="error" sx={{ fontSize: '0.75rem' }}>Error</MenuItem>
-                      <MenuItem value="warning" sx={{ fontSize: '0.75rem' }}>Warning</MenuItem>
-                      <MenuItem value="info" sx={{ fontSize: '0.75rem' }}>Info</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="error" sx={{ fontSize: '0.7rem', py: 0.3 }}>Error</MenuItem>
+                      <MenuItem value="warning" sx={{ fontSize: '0.7rem', py: 0.3 }}>Warning</MenuItem>
+                      <MenuItem value="info" sx={{ fontSize: '0.7rem', py: 0.3 }}>Info</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={4} key="status-filter-manage">
+                <Grid item xs={6} sm={3} key="parameter-type-filter-manage">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.7rem' }}>Status</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>Type</InputLabel>
                     <Select
-                      value={filters.status}
-                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                      label="Status"
-                      sx={{ fontSize: '0.75rem' }}
+                      value={filters.parameterType}
+                      onChange={(e) => setFilters({ ...filters, parameterType: e.target.value, variable: 'all' })}
+                      label="Type"
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.75rem' }}>All Status</MenuItem>
-                      <MenuItem value="enabled" sx={{ fontSize: '0.75rem' }}>Enabled</MenuItem>
-                      <MenuItem value="disabled" sx={{ fontSize: '0.75rem' }}>Disabled</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]) => (
+                        <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            {config.icon}
+                            {config.label}
+                          </Box>
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={4} key="variable-filter-manage">
+                <Grid item xs={6} sm={3} key="variable-filter-manage">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.7rem' }}>Variable</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>Variable</InputLabel>
                     <Select
                       value={filters.variable}
                       onChange={(e) => setFilters({ ...filters, variable: e.target.value })}
                       label="Variable"
-                      sx={{ fontSize: '0.75rem' }}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                      disabled={filters.parameterType === 'all'}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.75rem' }}>All Variables</MenuItem>
-                      {Object.entries(metricsConfig).map(([key, config]) => (
-                        <MenuItem key={key} value={key} sx={{ fontSize: '0.75rem' }}>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      {getFilteredVariables(filters.parameterType).map(([key, config]) => (
+                        <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
                           {config.label}
                         </MenuItem>
                       ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3} key="status-filter-manage">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>Status</InputLabel>
+                    <Select
+                      value={filters.status}
+                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                      label="Status"
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="enabled" sx={{ fontSize: '0.7rem', py: 0.3 }}>Enabled</MenuItem>
+                      <MenuItem value="disabled" sx={{ fontSize: '0.7rem', py: 0.3 }}>Disabled</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -936,7 +1160,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
                 <Button
                   size="small"
                   startIcon={<ClearIcon sx={{ fontSize: '0.8rem' }} />}
-                  onClick={() => setFilters({ severity: 'all', status: 'all', variable: 'all' })}
+                  onClick={() => setFilters({ severity: 'all', status: 'all', variable: 'all', parameterType: 'all' })}
                   sx={{ 
                     textTransform: 'none',
                     fontWeight: 500,
@@ -1131,29 +1355,53 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
             <FormControl fullWidth>
-              <InputLabel>Variable</InputLabel>
+              <InputLabel>Parameter Type</InputLabel>
+              <Select
+                value={newAlarm.parameter_type || 'metrics'}
+                onChange={(e) => setNewAlarm({ ...newAlarm, parameter_type: e.target.value, variable_name: '' })}
+                label="Parameter Type"
+              >
+                {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]) => (
+                  <MenuItem key={key} value={key}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {config.icon}
+                      {config.label}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>Parameter</InputLabel>
               <Select
                 value={newAlarm.variable_name}
                 onChange={(e) => setNewAlarm({ ...newAlarm, variable_name: e.target.value })}
-                label="Variable"
+                label="Parameter"
+                disabled={!newAlarm.parameter_type}
               >
-                {metricsConfig && Object.entries(metricsConfig).map(([key, config]) => (
-                  <MenuItem key={key} value={key}>
-                    {config.label}
-                  </MenuItem>
-              ))}
+                {newAlarm.parameter_type && ALARM_PARAMETER_TYPES[newAlarm.parameter_type] && 
+                  Object.entries(ALARM_PARAMETER_TYPES[newAlarm.parameter_type].parameters).map(([key, config]) => (
+                    <MenuItem key={key} value={key}>
+                      {config.label}
+                    </MenuItem>
+                  ))
+                }
               </Select>
             </FormControl>
 
             <FormControl fullWidth>
               <InputLabel>Condition</InputLabel>
               <Select
-              value={newAlarm.condition}
-              onChange={(e) => setNewAlarm({ ...newAlarm, condition: e.target.value })}
+                value={newAlarm.condition}
+                onChange={(e) => setNewAlarm({ ...newAlarm, condition: e.target.value })}
                 label="Condition"
-            >
-                <MenuItem value="above">Above</MenuItem>
-                <MenuItem value="below">Below</MenuItem>
+              >
+                {getAvailableConditions(newAlarm.parameter_type, newAlarm.variable_name).map(condition => (
+                  <MenuItem key={condition.value} value={condition.value}>
+                    {condition.label}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
@@ -1170,19 +1418,7 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
               </Select>
             </FormControl>
 
-            <TextField
-              label="Threshold"
-              type="number"
-              value={newAlarm.threshold}
-              onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
-              fullWidth
-              InputProps={{
-                endAdornment: newAlarm.variable_name && metricsConfig[newAlarm.variable_name]?.unit ? 
-                  <Typography variant="body2" color="text.secondary">
-                    {metricsConfig[newAlarm.variable_name].unit}
-                  </Typography> : null
-              }}
-            />
+            {getThresholdInput(newAlarm.parameter_type, newAlarm.variable_name, newAlarm.condition)}
 
             <TextField
               label="Description"
