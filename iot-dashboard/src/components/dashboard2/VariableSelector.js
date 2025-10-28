@@ -58,7 +58,7 @@ const VariableSelector = ({
               color: 'text.primary',
               fontSize: '0.8rem',
               height: '32px',
-              borderRadius: '20px',
+              borderRadius: 2,
               paddingLeft: '12px',
               paddingRight: '32px',
               backgroundColor: 'inherit',
@@ -85,7 +85,7 @@ const VariableSelector = ({
           sx={{
             fontSize: '0.8rem',
             height: '32px',
-            borderRadius: '20px',
+            borderRadius: 2,
             color: 'text.primary',
             backgroundColor: 'inherit',
             '& .MuiSelect-icon': {

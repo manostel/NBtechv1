@@ -214,9 +214,9 @@ const OverviewTiles = ({
         {deviceState ? (
           <>
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2, mt: 1, py: 0.5 }}>
                 <SettingsIcon sx={{ color: 'text.primary', fontSize: '1.25rem' }} />
-                <Typography variant="h6" sx={{ fontSize: '1rem', color: 'text.primary' }}>
+                <Typography variant="h6" sx={{ fontSize: '1rem', color: 'text.primary', lineHeight: 1.2 }}>
                   Device Status
                 </Typography>
               </Box>
