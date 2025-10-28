@@ -1078,6 +1078,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             onVariableChange={e => handleVariableChange(e, true)}
             triggeredAlarms={triggeredAlarms}
             deviceStartTimeInfo={deviceStartTimeInfo}
+            device={device}
+            user={user}
           />
         );
       case 1:

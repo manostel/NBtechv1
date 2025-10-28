@@ -12,7 +12,12 @@ import {
   CardContent,
   Grid,
   Chip,
-  Divider
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions
 } from '@mui/material';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
@@ -44,6 +49,7 @@ const DashboardCommands = ({
     message: '',
     loading: false
   });
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false);
 
   useEffect(() => {
     if (deviceState) {
@@ -300,6 +306,13 @@ const DashboardCommands = ({
     }
   };
 
+  const openRestartDialog = () => setRestartDialogOpen(true);
+  const closeRestartDialog = () => setRestartDialogOpen(false);
+  const confirmRestart = async () => {
+    closeRestartDialog();
+    await handleRestart();
+  };
+
   if (isLoading) {
     return (
       <Box sx={{ 
@@ -335,23 +348,11 @@ const DashboardCommands = ({
             }
           }}>
             <CardContent sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ 
-                  p: 1, 
-                  borderRadius: 1, 
-                  bgcolor: 'primary.dark',
-                  mr: 1.5
-                }}>
-                  <PowerIcon sx={{ color: 'white', fontSize: '1.2rem' }} />
-                </Box>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, fontSize: '1.1rem' }}>
-                    Output Controls
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.9rem' }}>
-                    Toggle device outputs on/off
-                  </Typography>
-                </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                <PowerIcon sx={{ color: 'text.secondary', fontSize: '1.1rem', mr: 1 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                  Output Controls
+                </Typography>
               </Box>
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -360,18 +361,23 @@ const DashboardCommands = ({
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'space-between',
-                  p: 1.5,
-                  borderRadius: 1,
+                  p: 1.25,
+                  borderRadius: 2,
                   border: '1px solid',
-                  borderColor: 'divider'
+                  borderColor: 'divider',
+                  backgroundColor: 'rgba(0,0,0,0.02)'
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
                       Output 1
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {output1State ? 'ON' : 'OFF'}
-                    </Typography>
+                    <Chip 
+                      size="small" 
+                      label={output1State ? 'ON' : 'OFF'} 
+                      variant="outlined"
+                      color={output1State ? 'success' : 'default'}
+                      sx={{ fontSize: '0.75rem', height: '20px' }}
+                    />
                   </Box>
                   <Switch
                     checked={output1State}
@@ -397,18 +403,23 @@ const DashboardCommands = ({
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'space-between',
-                  p: 1.5,
-                  borderRadius: 1,
+                  p: 1.25,
+                  borderRadius: 2,
                   border: '1px solid',
-                  borderColor: 'divider'
+                  borderColor: 'divider',
+                  backgroundColor: 'rgba(0,0,0,0.02)'
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
                       Output 2
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {output2State ? 'ON' : 'OFF'}
-                    </Typography>
+                    <Chip 
+                      size="small" 
+                      label={output2State ? 'ON' : 'OFF'} 
+                      variant="outlined"
+                      color={output2State ? 'success' : 'default'}
+                      sx={{ fontSize: '0.75rem', height: '20px' }}
+                    />
                   </Box>
                   <Switch
                     checked={output2State}
@@ -447,23 +458,11 @@ const DashboardCommands = ({
             }
           }}>
             <CardContent sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ 
-                  p: 1, 
-                  borderRadius: 1, 
-                  bgcolor: '#1565c0',
-                  mr: 1.5
-                }}>
-                  <SpeedIcon sx={{ color: 'white', fontSize: '1.2rem' }} />
-                </Box>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, fontSize: '1.1rem' }}>
-                    Motor Speed
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.9rem' }}>
-                    Control motor speed (0-100%)
-                  </Typography>
-                </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                <SpeedIcon sx={{ color: 'text.secondary', fontSize: '1.1rem', mr: 1 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                  Motor Speed
+                </Typography>
               </Box>
 
               <form onSubmit={handleSpeedSubmit}>
@@ -485,18 +484,20 @@ const DashboardCommands = ({
                 />
                 <Button
                   type="submit"
-                  variant="contained"
+                  variant="outlined"
                   fullWidth
                   disabled={isVerifying}
                   startIcon={isVerifying ? <CircularProgress size={20} /> : <SpeedIcon />}
                   sx={{
                     height: '40px',
                     borderRadius: 2,
-                    fontWeight: 600,
+                    fontWeight: 500,
                     textTransform: 'none',
-                    bgcolor: '#1565c0',
+                    borderColor: 'text.secondary',
+                    color: 'text.primary',
                     '&:hover': {
-                      bgcolor: '#0d47a1'
+                      borderColor: 'text.primary',
+                      backgroundColor: 'rgba(0,0,0,0.04)'
                     }
                   }}
                 >
@@ -518,8 +519,8 @@ const DashboardCommands = ({
         </Card>
       </Grid>
 
-      {/* Power Saving & Actions Card */}
-      <Grid item xs={12} sm={12} md={4}>
+      {/* Power Saving Tile */}
+      <Grid item xs={12} sm={6} md={4}>
         <Card sx={{ 
           borderRadius: 3,
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
@@ -531,107 +532,91 @@ const DashboardCommands = ({
           }
         }}>
           <CardContent sx={{ p: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {/* Power Saving */}
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-                  <Box sx={{ 
-                    p: 1, 
-                    borderRadius: 1, 
-                    bgcolor: 'success.dark',
-                    mr: 1.5
-                  }}>
-                    <BatterySaverIcon sx={{ color: 'white', fontSize: '1.2rem' }} />
-                  </Box>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, fontSize: '1.1rem' }}>
-                      Power Saving Mode
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.9rem' }}>
-                      Enable energy-efficient operation
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between',
-                  p: 1.5,
-                  borderRadius: 1,
-                  border: '1px solid',
-                  borderColor: 'divider'
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      Power Saving
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {powerSavingMode ? 'ENABLED' : 'DISABLED'}
-                    </Typography>
-                  </Box>
-                  <Switch
-                    checked={powerSavingMode}
-                    onChange={(e) => handlePowerSavingChange(e.target.checked)}
-                    inputProps={{ 'aria-label': 'Power Saving Mode switch' }}
-                    size="small"
-                    sx={{
-                      '& .MuiSwitch-switchBase': {
-                        borderRadius: '16px',
-                      },
-                      '& .MuiSwitch-thumb': {
-                        borderRadius: '16px',
-                      },
-                      '& .MuiSwitch-track': {
-                        borderRadius: '16px',
-                      },
-                    }}
-                  />
-                </Box>
-              </Box>
-
-              {/* Device Actions */}
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-                  <Box sx={{ 
-                    p: 1, 
-                    borderRadius: 1, 
-                    bgcolor: '#d32f2f',
-                    mr: 1.5
-                  }}>
-                    <RestartAltIcon sx={{ color: 'white', fontSize: '1.2rem' }} />
-                  </Box>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, fontSize: '1.1rem' }}>
-                      Device Actions
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.9rem' }}>
-                      Restart and system controls
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Button
-                  variant="contained"
-                  startIcon={<RestartAltIcon />}
-                  onClick={handleRestart}
-                  fullWidth
-                  disabled={isLoading}
-                  sx={{
-                    height: '40px',
-                    borderRadius: 2,
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    bgcolor: '#d32f2f',
-                    '&:hover': {
-                      bgcolor: '#b71c1c'
-                    }
-                  }}
-                >
-                  Restart Device
-                </Button>
-              </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+              <BatterySaverIcon sx={{ fontSize: '1.1rem', color: 'text.secondary', mr: 1 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                Power Saving Mode
+              </Typography>
             </Box>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              p: 1.25,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              backgroundColor: 'rgba(0,0,0,0.02)'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                  Status
+                </Typography>
+                <Chip 
+                  size="small" 
+                  label={powerSavingMode ? 'Enabled' : 'Disabled'} 
+                  variant="outlined"
+                  color={powerSavingMode ? 'success' : 'default'}
+                  sx={{ fontSize: '0.75rem', height: '20px' }}
+                />
+              </Box>
+              <Switch
+                checked={powerSavingMode}
+                onChange={(e) => handlePowerSavingChange(e.target.checked)}
+                inputProps={{ 'aria-label': 'Power Saving Mode switch' }}
+                size="small"
+                sx={{
+                  '& .MuiSwitch-switchBase': { borderRadius: '16px' },
+                  '& .MuiSwitch-thumb': { borderRadius: '16px' },
+                  '& .MuiSwitch-track': { borderRadius: '16px' },
+                }}
+              />
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* Restart Device Tile */}
+      <Grid item xs={12} sm={6} md={4}>
+        <Card sx={{ 
+          borderRadius: 3,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          border: '1px solid #f0f0f0',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+            transform: 'translateY(-2px)'
+          }
+        }}>
+          <CardContent sx={{ p: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+              <RestartAltIcon sx={{ fontSize: '1.1rem', color: 'text.secondary', mr: 1 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                Restart Device
+              </Typography>
+            </Box>
+
+            <Button
+              variant="outlined"
+              startIcon={<RestartAltIcon />}
+              onClick={openRestartDialog}
+              fullWidth
+              disabled={isLoading}
+              sx={{
+                height: '40px',
+                borderRadius: 2,
+                fontWeight: 500,
+                textTransform: 'none',
+                borderColor: 'error.main',
+                color: 'error.main',
+                '&:hover': {
+                  borderColor: 'error.dark',
+                  backgroundColor: 'rgba(244, 67, 54, 0.04)'
+                }
+              }}
+            >
+              Restart Device
+            </Button>
           </CardContent>
         </Card>
       </Grid>
@@ -647,6 +632,20 @@ const DashboardCommands = ({
         action={commandFeedback.loading && <CircularProgress color="inherit" size={20} />}
       />
     )}
+
+    {/* Restart Confirmation Dialog */}
+    <Dialog open={restartDialogOpen} onClose={closeRestartDialog} maxWidth="xs" fullWidth>
+      <DialogTitle>Restart device?</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          This will immediately send a restart command to the device. Ongoing operations will be interrupted. Do you want to proceed?
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={closeRestartDialog} variant="outlined">Cancel</Button>
+        <Button onClick={confirmRestart} variant="contained" color="error">Restart</Button>
+      </DialogActions>
+    </Dialog>
   </Box>
   );
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Grid, Typography, Paper, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
 import { Error as ErrorIcon, Warning as WarningIcon, Info as InfoIcon, ShowChart as ShowChartIcon } from '@mui/icons-material';
 import OverviewTiles from './OverviewTiles';
+import OverviewChart from './OverviewChart';
 import VariableSelector from './VariableSelector';
 import PropTypes from 'prop-types';
 import MetricCard from './MetricCard';
@@ -86,7 +87,9 @@ const DashboardOverviewTab = ({
   deviceState,
   isLoading,
   onVariableChange,
-  triggeredAlarms
+  triggeredAlarms,
+  device,
+  user
 }) => {
   if (!metricsData || !metricsConfig) {
     return (
@@ -162,6 +165,17 @@ const DashboardOverviewTab = ({
         />
       </Box>
 
+      {/* Overview Chart */}
+      <Box sx={{ mt: 2 }}>
+        <OverviewChart
+          metricsConfig={metricsConfig}
+          selectedVariables={selectedVariables}
+          isLoading={isLoading}
+          device={device}
+          user={user}
+        />
+      </Box>
+
     </Box>
   );
 };
@@ -174,7 +188,9 @@ DashboardOverviewTab.propTypes = {
   deviceState: PropTypes.object,
   isLoading: PropTypes.bool,
   onVariableChange: PropTypes.func,
-  triggeredAlarms: PropTypes.array
+  triggeredAlarms: PropTypes.array,
+  device: PropTypes.object,
+  user: PropTypes.object
 };
 
 export default DashboardOverviewTab; 

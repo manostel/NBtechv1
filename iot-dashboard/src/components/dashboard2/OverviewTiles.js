@@ -1,5 +1,5 @@
-import React from 'react';
-import { Grid, Paper, Typography, Box, CircularProgress, Tooltip } from '@mui/material';
+import React, { useState } from 'react';
+import { Grid, Paper, Typography, Box, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
 import PropTypes from 'prop-types';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
@@ -22,6 +22,7 @@ const getSeverityIcon = (severity) => {
 
 const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAlarmsList, isStatus = false }) => {
   const alarmActive = Array.isArray(triggeredAlarmsList) && triggeredAlarmsList.length > 0;
+  const [alarmDialogOpen, setAlarmDialogOpen] = React.useState(false);
 
   const getHighestSeverity = (alarms) => {
     if (!alarms || alarms.length === 0) return 'info';
@@ -55,6 +56,7 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
   return (
     <Paper 
       elevation={0}
+      onClick={alarmActive ? () => setAlarmDialogOpen(true) : undefined}
       sx={{ 
         p: 2,
         height: '100%',
@@ -64,6 +66,7 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         border: '1px solid #e3f2fd',
         transition: 'all 0.3s ease',
+        cursor: alarmActive ? 'pointer' : 'default',
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
           transform: 'translateY(-2px)'
@@ -116,6 +119,40 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
           )}
         </Box>
       )}
+      <Dialog open={alarmDialogOpen} onClose={() => setAlarmDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{`Alarms - ${title}`}</DialogTitle>
+        <DialogContent dividers>
+          {alarmActive ? (
+            <List dense>
+              {triggeredAlarmsList.map((alarm, index) => (
+                <ListItem key={index} alignItems="flex-start">
+                  <ListItemIcon>
+                    {getSeverityIcon(alarm.severity)}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={alarm.description || 'Alarm triggered'}
+                    secondary={`Severity: ${alarm.severity || 'info'}${alarm.threshold !== undefined ? ` • Threshold: ${alarm.threshold}` : ''}${alarm.current_value !== undefined ? ` • Current: ${alarm.current_value}` : ''}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Typography variant="body2">No alarms triggered.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setAlarmDialogOpen(false);
+            }} 
+            variant="contained"
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };
