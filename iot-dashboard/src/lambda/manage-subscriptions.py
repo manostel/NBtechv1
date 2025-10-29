@@ -69,6 +69,50 @@ def validate_subscription_data(subscription_data):
     
     return True, "Valid"
 
+def check_conflicting_subscriptions(user_email, device_id, parameter_name, condition_type, subscription_id=None):
+    """Check for conflicting active subscriptions"""
+    try:
+        # Get all user subscriptions
+        user_subscriptions = get_user_subscriptions(user_email)
+        
+        # Find active subscriptions monitoring the same parameter
+        conflicting = []
+        for sub in user_subscriptions:
+            # Skip the subscription being updated
+            if subscription_id and sub.get('subscription_id') == subscription_id:
+                continue
+            
+            # Check if it's monitoring the same parameter
+            if (sub.get('device_id') == device_id and 
+                sub.get('parameter_name') == parameter_name and 
+                sub.get('enabled') == True):
+                
+                # Always add to conflicting list (even without commands, for condition checks)
+                sub_commands = sub.get('commands', [])
+                if sub_commands:
+                    # Check for conflicting commands
+                    for cmd in sub_commands:
+                        if cmd.get('action') != 'none':
+                            conflicting.append({
+                                'subscription_id': sub.get('subscription_id'),
+                                'description': sub.get('description', ''),
+                                'condition_type': sub.get('condition_type'),
+                                'command': cmd
+                            })
+                else:
+                    # No commands, but still conflicting if same condition (especially "change")
+                    conflicting.append({
+                        'subscription_id': sub.get('subscription_id'),
+                        'description': sub.get('description', ''),
+                        'condition_type': sub.get('condition_type'),
+                        'command': None  # No command conflicts, but condition might conflict
+                    })
+        
+        return conflicting
+    except Exception as e:
+        logger.error(f"Error checking conflicting subscriptions: {e}")
+        return []
+
 def get_available_parameters(device_id, parameter_type):
     """Get available parameters for a device based on parameter type"""
     try:
@@ -145,6 +189,49 @@ def create_subscription(user_email, subscription_data):
         if subscription_data['parameter_name'] not in available_params:
             return False, f"Parameter {subscription_data['parameter_name']} is not available for this device"
         
+        # Check for conflicting active subscriptions
+        conflicting = check_conflicting_subscriptions(
+            user_email, 
+            subscription_data['device_id'], 
+            subscription_data['parameter_name'],
+            subscription_data['condition_type']
+        )
+        
+        if conflicting:
+            # Special case: Multiple "change" condition subscriptions will always conflict
+            if subscription_data['condition_type'] == 'change':
+                for conflict in conflicting:
+                    if conflict.get('condition_type') == 'change':
+                        return False, f"Another subscription is already monitoring '{subscription_data['parameter_name']}' with a 'change' condition. Only one 'change' subscription is allowed per parameter. Please disable the existing subscription or use a different condition type like 'above' or 'below'."
+            
+            # Check if new subscription has commands that conflict
+            new_commands = subscription_data.get('commands', [])
+            for new_cmd in new_commands:
+                if new_cmd.get('action') == 'none':
+                    continue
+                
+                new_action = new_cmd.get('action')
+                new_value = new_cmd.get('value', '')
+                new_target = new_cmd.get('target_device', subscription_data['device_id'])
+                
+                # Check against existing conflicting subscriptions
+                for conflict in conflicting:
+                    conflict_cmd = conflict.get('command')
+                    
+                    # Skip if no command in conflict (handled by condition check above)
+                    if conflict_cmd is None:
+                        continue
+                    
+                    conflict_action = conflict_cmd.get('action')
+                    conflict_value = conflict_cmd.get('value', '')
+                    conflict_target = conflict_cmd.get('target_device', subscription_data['device_id'])
+                    
+                    # If same action and target device, but different value, it's a conflict
+                    if (new_action == conflict_action and 
+                        new_target == conflict_target and 
+                        new_value != conflict_value):
+                        return False, f"Another active subscription monitoring '{subscription_data['parameter_name']}' would trigger a different command for {conflict_action} ({conflict_value} vs {new_value}). This would cause conflicting actions. Please disable the existing subscription or adjust your command settings."
+        
         # Generate unique subscription ID
         timestamp = datetime.now(timezone.utc).timestamp()
         subscription_id = f"{user_email}_{subscription_data['device_id']}_{subscription_data['parameter_name']}_{timestamp}"
@@ -199,8 +286,52 @@ def update_subscription(user_email, subscription_id, subscription_data):
         if subscription_data['parameter_name'] not in available_params:
             return False, f"Parameter {subscription_data['parameter_name']} is not available for this device"
         
-        # Update subscription
-        update_expression = "SET device_id = :device_id, parameter_type = :parameter_type, parameter_name = :parameter_name, condition_type = :condition_type, threshold_value = :threshold_value, notification_method = :notification_method, enabled = :enabled, description = :description, updated_at = :updated_at"
+        # Check for conflicting active subscriptions (excluding the one being updated)
+        conflicting = check_conflicting_subscriptions(
+            user_email, 
+            subscription_data['device_id'], 
+            subscription_data['parameter_name'],
+            subscription_data['condition_type'],
+            subscription_id=subscription_id
+        )
+        
+        if conflicting:
+            # Special case: Multiple "change" condition subscriptions will always conflict
+            if subscription_data['condition_type'] == 'change':
+                for conflict in conflicting:
+                    if conflict.get('condition_type') == 'change':
+                        return False, f"Another subscription is already monitoring '{subscription_data['parameter_name']}' with a 'change' condition. Only one 'change' subscription is allowed per parameter. Please disable the existing subscription or use a different condition type like 'above' or 'below'."
+            
+            # Check if updated subscription has commands that conflict
+            new_commands = subscription_data.get('commands', [])
+            for new_cmd in new_commands:
+                if new_cmd.get('action') == 'none':
+                    continue
+                
+                new_action = new_cmd.get('action')
+                new_value = new_cmd.get('value', '')
+                new_target = new_cmd.get('target_device', subscription_data['device_id'])
+                
+                # Check against existing conflicting subscriptions
+                for conflict in conflicting:
+                    conflict_cmd = conflict.get('command')
+                    
+                    # Skip if no command in conflict (handled by condition check above)
+                    if conflict_cmd is None:
+                        continue
+                    
+                    conflict_action = conflict_cmd.get('action')
+                    conflict_value = conflict_cmd.get('value', '')
+                    conflict_target = conflict_cmd.get('target_device', subscription_data['device_id'])
+                    
+                    # If same action and target device, but different value, it's a conflict
+                    if (new_action == conflict_action and 
+                        new_target == conflict_target and 
+                        new_value != conflict_value):
+                        return False, f"Another active subscription monitoring '{subscription_data['parameter_name']}' would trigger a different command for {conflict_action} ({conflict_value} vs {new_value}). This would cause conflicting actions. Please disable the existing subscription or adjust your command settings."
+        
+        # Update subscription - include commands in the update
+        update_expression = "SET device_id = :device_id, parameter_type = :parameter_type, parameter_name = :parameter_name, condition_type = :condition_type, threshold_value = :threshold_value, notification_method = :notification_method, enabled = :enabled, description = :description, commands = :commands, updated_at = :updated_at"
         
         expression_values = {
             ':device_id': subscription_data['device_id'],
@@ -211,6 +342,7 @@ def update_subscription(user_email, subscription_id, subscription_data):
             ':notification_method': subscription_data['notification_method'],
             ':enabled': subscription_data.get('enabled', True),
             ':description': subscription_data.get('description', ''),
+            ':commands': subscription_data.get('commands', []),
             ':updated_at': datetime.now(timezone.utc).isoformat()
         }
         
@@ -389,7 +521,8 @@ def lambda_handler(event, context):
                     'success': True
                 })
             else:
-                return cors_response(400, {
+                # Return 200 with success: false for easier frontend error handling
+                return cors_response(200, {
                     'error': result,
                     'success': False
                 })
@@ -411,7 +544,8 @@ def lambda_handler(event, context):
                     'success': True
                 })
             else:
-                return cors_response(400, {
+                # Return 200 with success: false for easier frontend error handling
+                return cors_response(200, {
                     'error': result,
                     'success': False
                 })

@@ -28,7 +28,7 @@ export default function BatteryIndicator({ value, isCharging, batteryState, char
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
-      <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, height: 20 }}>
         <FaBatteryFull size={16} style={{ color: getBatteryColor(value) }} />
         {batteryState && (
           <Box sx={{ 

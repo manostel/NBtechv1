@@ -70,11 +70,13 @@ const BATTERY_STATE_UPDATE_INTERVAL = 15 * 1000; // 15 seconds in milliseconds
 
 const DeviceSkeleton = () => (
   <Paper sx={{ 
-    p: 2, 
-    height: '100%',
-    borderRadius: 3,
-    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-    border: '1px solid #f0f0f0'
+  p: 2, 
+  height: '100%',
+  borderRadius: 3,
+  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+  border: '1px solid #e3f2fd',
+  background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
+  color: '#E0E0E0'
   }}>
     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
       <Skeleton variant="circular" width={24} height={24} sx={{ mr: 1 }} />
@@ -590,56 +592,95 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
 
                   {/* Show I/O states if available */}
                   {deviceStates[device.client_id] && (
-                    <Box sx={{ mt: 1, p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
-                      <Typography variant="caption" color="primary" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+                    <Box sx={{ 
+                      mt: 1, 
+                      p: 1, 
+                      bgcolor: 'rgba(255,255,255,0.05)', 
+                      borderRadius: 2,
+                      border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                      <Typography variant="caption" sx={{ 
+                        fontWeight: 600, 
+                        display: 'block', 
+                        mb: 0.75, 
+                        color: theme.palette.text.primary,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        fontSize: '0.7rem'
+                      }}>
                         I/O States
                       </Typography>
-                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box sx={{ 
-                            width: 8, 
-                            height: 8, 
-                            borderRadius: '50%', 
-                            bgcolor: deviceStates[device.client_id].in1_state === 1 ? 'success.main' : 'grey.400' 
-                          }} />
-                          <Typography variant="caption" color="text.secondary">
-                            IN1: {deviceStates[device.client_id].in1_state === 1 ? 'ON' : 'OFF'}
-                          </Typography>
+                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
+                        {/* Inputs */}
+                        <Box>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Box sx={{ 
+                                width: 6, 
+                                height: 6, 
+                                borderRadius: '50%', 
+                                backgroundColor: deviceStates[device.client_id]?.in1_state ? '#4caf50' : '#f44336' 
+                              }} />
+                              <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontSize: '0.7rem' }}>
+                                IN1: {deviceStates[device.client_id]?.in1_state ? 'ON' : 'OFF'}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Box sx={{ 
+                                width: 6, 
+                                height: 6, 
+                                borderRadius: '50%', 
+                                backgroundColor: deviceStates[device.client_id]?.in2_state ? '#4caf50' : '#f44336' 
+                              }} />
+                              <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontSize: '0.7rem' }}>
+                                IN2: {deviceStates[device.client_id]?.in2_state ? 'ON' : 'OFF'}
+                              </Typography>
+                            </Box>
+                          </Box>
                         </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box sx={{ 
-                            width: 8, 
-                            height: 8, 
-                            borderRadius: '50%', 
-                            bgcolor: deviceStates[device.client_id].in2_state === 1 ? 'success.main' : 'grey.400' 
-                          }} />
-                          <Typography variant="caption" color="text.secondary">
-                            IN2: {deviceStates[device.client_id].in2_state === 1 ? 'ON' : 'OFF'}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box sx={{ 
-                            width: 8, 
-                            height: 8, 
-                            borderRadius: '50%', 
-                            bgcolor: deviceStates[device.client_id].out1_state === 1 ? 'success.main' : 'grey.400' 
-                          }} />
-                          <Typography variant="caption" color="text.secondary">
-                            OUT1: {deviceStates[device.client_id].out1_state === 1 ? 'ON' : 'OFF'}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box sx={{ 
-                            width: 8, 
-                            height: 8, 
-                            borderRadius: '50%', 
-                            bgcolor: deviceStates[device.client_id].out2_state === 1 ? 'success.main' : 'grey.400' 
-                          }} />
-                          <Typography variant="caption" color="text.secondary">
-                            OUT2: {deviceStates[device.client_id].out2_state === 1 ? 'ON' : 'OFF'}
-                          </Typography>
+                        
+                        {/* Outputs */}
+                        <Box>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Box sx={{ 
+                                width: 6, 
+                                height: 6, 
+                                borderRadius: '50%', 
+                                backgroundColor: deviceStates[device.client_id]?.out1_state ? '#4caf50' : '#f44336' 
+                              }} />
+                              <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontSize: '0.7rem' }}>
+                                OUT1: {deviceStates[device.client_id]?.out1_state ? 'ON' : 'OFF'}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Box sx={{ 
+                                width: 6, 
+                                height: 6, 
+                                borderRadius: '50%', 
+                                backgroundColor: deviceStates[device.client_id]?.out2_state ? '#4caf50' : '#f44336' 
+                              }} />
+                              <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontSize: '0.7rem' }}>
+                                OUT2: {deviceStates[device.client_id]?.out2_state ? 'ON' : 'OFF'}
+                              </Typography>
+                            </Box>
+                          </Box>
                         </Box>
                       </Box>
+                      
+                      {/* Motor Speed - Inline */}
+                      {deviceStates[device.client_id]?.motor_speed !== undefined && (
+                        <Box sx={{ mt: 0.75, pt: 0.75, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem' }}>
+                              Motor:
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontWeight: 600, fontSize: '0.7rem' }}>
+                              {deviceStates[device.client_id]?.motor_speed}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      )}
                     </Box>
                   )}
 
@@ -655,21 +696,35 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                     
                     const getShortLabel = (metric) => {
                       // Return the full metric name without abbreviations
-                      return metric;
+                      return metric.charAt(0).toUpperCase() + metric.slice(1).replace(/_/g, ' ');
                     };
                     
                     return (
-                      <Box sx={{ mt: 1, p: 1, bgcolor: 'background.default', borderRadius: 1 }}>
-                        <Typography variant="caption" color="primary" sx={{ fontWeight: 'bold', display: 'block', mb: 0.5 }}>
-                          Status
+                      <Box sx={{ 
+                        mt: 1, 
+                        p: 1, 
+                        bgcolor: 'rgba(255,255,255,0.05)', 
+                        borderRadius: 2,
+                        border: '1px solid rgba(255,255,255,0.1)'
+                      }}>
+                        <Typography variant="caption" sx={{ 
+                          fontWeight: 600, 
+                          display: 'block', 
+                          mb: 0.75, 
+                          color: theme.palette.text.primary,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          fontSize: '0.7rem'
+                        }}>
+                          Metrics
                         </Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           {availableMetrics.map((metric) => (
                             <Box key={metric} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {getShortLabel(metric)}
+                              <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem' }}>
+                                {getShortLabel(metric)}:
                               </Typography>
-                              <Typography variant="caption" color="text.primary" sx={{ fontWeight: 'medium' }}>
+                              <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontWeight: 600, fontSize: '0.7rem' }}>
                                 {renderMetricValue(latestData[metric], metric)}
                               </Typography>
                             </Box>
@@ -1946,6 +2001,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                           borderRadius: 3,
                           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
                           border: '1px solid #e3f2fd',
+                          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
+                          color: '#E0E0E0',
                           cursor: 'pointer',
                           transition: 'all 0.3s ease',
                           '&:hover': {
@@ -1964,7 +2021,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                             top: 0,
                             left: 0,
                             right: 0,
-                            height: '3px',
+                            height: '4px',
                             backgroundColor: getStatusColor(deviceStatus.status),
                             transition: 'background-color 0.3s ease',
                           }
@@ -1973,7 +2030,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                       >
                         {/* Device Header */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Typography variant="h6">
+                          <Typography variant="h6" sx={{ color: '#E0E0E0' }}>
                             {device.device_name || 'Unknown Device'}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1990,23 +2047,33 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                             {isUpdating && (
                               <CircularProgress size={12} sx={{ mr: 1 }} />
                             )}
+                            {/* Prominent Online/Offline pill */}
                             <Box
                               sx={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: '50%',
-                                backgroundColor: getStatusColor(deviceStatus.status)
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                px: 1,
+                                py: 0.25,
+                                borderRadius: '999px',
+                                border: `1px solid ${getStatusColor(deviceStatus.status)}AA`,
+                                backgroundColor: deviceStatus.status === 'Online' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.15)',
+                                color: getStatusColor(deviceStatus.status),
+                                fontWeight: 600,
+                                fontSize: '0.7rem',
+                                letterSpacing: '0.5px',
+                                textTransform: 'uppercase'
                               }}
-                            />
-                            <Typography variant="caption" sx={{ color: getStatusColor(deviceStatus.status) }}>
+                            >
+                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: getStatusColor(deviceStatus.status) }} />
                               {deviceStatus.status}
-                            </Typography>
+                            </Box>
                           </Box>
                         </Box>
 
                         {/* Device ID */}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <Typography variant="body2" color="textSecondary">
+                          <Typography variant="body2" color="textSecondary" sx={{ color: 'rgba(224,224,224,0.8)' }}>
                             ID: {showId[device.client_id] ? device.client_id : '••••••••••'}
                           </Typography>
                           <IconButton 
@@ -2025,7 +2092,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
 
                         {/* Device Type - Updated */}
                         {latestData.device && (
-                          <Typography variant="body2" color="textSecondary" gutterBottom>
+                          <Typography variant="body2" color="textSecondary" gutterBottom sx={{ color: 'rgba(224,224,224,0.8)' }}>
                             Device Type: {latestData.device}
                           </Typography>
                         )}
@@ -2040,13 +2107,107 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                           <SignalIndicator value={Number(latestData.signal_quality) || 0} />
                         </Box>
 
-                        {/* Metrics */}
-                        <Box sx={{ mt: 0.5 }}>
-                          {Object.entries(latestData).map(([key, value]) => {
-                            // Skip if value is null, undefined, or an object
-                            if (value === null || value === undefined || typeof value === 'object') return null;
+                        {/* I/O States - Compact Layout */}
+                        {deviceStates[device.client_id] && (
+                          <Box sx={{ 
+                            mt: 1, 
+                            mb: 1.5, 
+                            p: 1, 
+                            bgcolor: 'rgba(255,255,255,0.05)', 
+                            borderRadius: 2,
+                            border: '1px solid rgba(255,255,255,0.1)'
+                          }}>
+                            <Typography variant="caption" sx={{ 
+                              fontWeight: 600, 
+                              display: 'block', 
+                              mb: 0.75, 
+                              color: '#E0E0E0',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              fontSize: '0.7rem'
+                            }}>
+                              I/O States
+                            </Typography>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
+                              {/* Inputs */}
+                              <Box>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Box sx={{ 
+                                      width: 6, 
+                                      height: 6, 
+                                      borderRadius: '50%', 
+                                      backgroundColor: deviceStates[device.client_id]?.in1_state ? '#4caf50' : '#f44336' 
+                                    }} />
+                                    <Typography variant="caption" sx={{ color: '#E0E0E0', fontSize: '0.7rem' }}>
+                                      IN1: {deviceStates[device.client_id]?.in1_state ? 'ON' : 'OFF'}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Box sx={{ 
+                                      width: 6, 
+                                      height: 6, 
+                                      borderRadius: '50%', 
+                                      backgroundColor: deviceStates[device.client_id]?.in2_state ? '#4caf50' : '#f44336' 
+                                    }} />
+                                    <Typography variant="caption" sx={{ color: '#E0E0E0', fontSize: '0.7rem' }}>
+                                      IN2: {deviceStates[device.client_id]?.in2_state ? 'ON' : 'OFF'}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </Box>
+                              
+                              {/* Outputs */}
+                              <Box>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Box sx={{ 
+                                      width: 6, 
+                                      height: 6, 
+                                      borderRadius: '50%', 
+                                      backgroundColor: deviceStates[device.client_id]?.out1_state ? '#4caf50' : '#f44336' 
+                                    }} />
+                                    <Typography variant="caption" sx={{ color: '#E0E0E0', fontSize: '0.7rem' }}>
+                                      OUT1: {deviceStates[device.client_id]?.out1_state ? 'ON' : 'OFF'}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Box sx={{ 
+                                      width: 6, 
+                                      height: 6, 
+                                      borderRadius: '50%', 
+                                      backgroundColor: deviceStates[device.client_id]?.out2_state ? '#4caf50' : '#f44336' 
+                                    }} />
+                                    <Typography variant="caption" sx={{ color: '#E0E0E0', fontSize: '0.7rem' }}>
+                                      OUT2: {deviceStates[device.client_id]?.out2_state ? 'ON' : 'OFF'}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </Box>
+                            </Box>
+                            
+                            {/* Motor Speed - Inline */}
+                            {deviceStates[device.client_id]?.motor_speed !== undefined && (
+                              <Box sx={{ mt: 0.75, pt: 0.75, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                  <Typography variant="caption" sx={{ color: 'rgba(224,224,224,0.7)', fontSize: '0.7rem' }}>
+                                    Motor:
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: '#E0E0E0', fontWeight: 600, fontSize: '0.7rem' }}>
+                                    {deviceStates[device.client_id]?.motor_speed}%
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            )}
+                          </Box>
+                        )}
 
-                            // Skip if the metric is in the excluded list
+                        {/* Metrics */}
+                        {(() => {
+                          // Filter and collect metrics
+                          const metrics = Object.entries(latestData).filter(([key, value]) => {
+                            if (value === null || value === undefined || typeof value === 'object') return false;
+                            
                             const excludedFields = [
                               'timestamp',
                               'client_id',
@@ -2061,28 +2222,70 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                               'ClientID',
                               'last_seen',
                               'created_at',
-                              'status'
+                              'status',
+                              'in1_state',
+                              'in2_state',
+                              'out1_state',
+                              'out2_state',
+                              'motor_speed',
+                              'charging',
+                              'power_saving'
                             ];
-                            if (excludedFields.includes(key)) return null;
-
-                            // Check if the metric should be visible based on preferences
+                            if (excludedFields.includes(key)) return false;
+                            
                             const metricsVisibility = currentDeviceData.metrics_visibility || {};
-                            if (metricsVisibility[key] === false) return null;
+                            if (metricsVisibility[key] === false) return false;
+                            
+                            return true;
+                          });
 
-                            // Format the value
-                            const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
-                            const unit = key === 'temperature' ? '°C' : key === 'humidity' ? '%' : '';
+                          if (metrics.length === 0) return null;
 
-                            return (
-                              <Typography key={key} variant="body2" color="textSecondary" sx={{ fontSize: '0.8rem', lineHeight: 1.2 }}>
-                                {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {formattedValue}{unit}
+                          return (
+                            <Box sx={{ 
+                              mt: 1, 
+                              mb: 1.5, 
+                              p: 1, 
+                              bgcolor: 'rgba(255,255,255,0.05)', 
+                              borderRadius: 2,
+                              border: '1px solid rgba(255,255,255,0.1)'
+                            }}>
+                              <Typography variant="caption" sx={{ 
+                                fontWeight: 600, 
+                                display: 'block', 
+                                mb: 0.75, 
+                                color: '#E0E0E0',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                fontSize: '0.7rem'
+                              }}>
+                                Metrics
                               </Typography>
-                            );
-                          })}
-                        </Box>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                {metrics.map(([key, value]) => {
+                                  // Format the value
+                                  const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
+                                  const unit = key === 'temperature' ? '°C' : key === 'humidity' ? '%' : key === 'pressure' ? ' hPa' : '';
+                                  const label = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+
+                                  return (
+                                    <Box key={key} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <Typography variant="caption" sx={{ color: 'rgba(224,224,224,0.7)', fontSize: '0.7rem' }}>
+                                        {label}:
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: '#E0E0E0', fontWeight: 600, fontSize: '0.7rem' }}>
+                                        {formattedValue}{unit}
+                                      </Typography>
+                                    </Box>
+                                  );
+                                })}
+                              </Box>
+                            </Box>
+                          );
+                        })()}
 
                         {/* Last Updated */}
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1 }}>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1, color: 'rgba(224,224,224,0.7)' }}>
                           Last Updated: {latestData.timestamp ? 
                             new Date(latestData.timestamp).toLocaleString('en-GB', { hour12: false }) : 
                             'Never'

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -116,9 +116,15 @@ export default function DashboardSubscriptionsTab({
   const [error, setError] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [success, setSuccess] = useState(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('error');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [dialogError, setDialogError] = useState(null);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const createDialogContentRef = useRef(null);
+  const editDialogContentRef = useRef(null);
   const [userLimits, setUserLimits] = useState({
     current_subscriptions: 0,
     max_subscriptions: 5,
@@ -180,6 +186,21 @@ export default function DashboardSubscriptionsTab({
       SubscriptionNotificationService.disconnect();
     };
   }, [onNotification]);
+
+  // Scroll to top of dialog when error occurs
+  useEffect(() => {
+    if (dialogError) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        if (createDialogOpen && createDialogContentRef.current) {
+          createDialogContentRef.current.scrollTop = 0;
+        }
+        if (editDialogOpen && editDialogContentRef.current) {
+          editDialogContentRef.current.scrollTop = 0;
+        }
+      }, 100);
+    }
+  }, [dialogError, createDialogOpen, editDialogOpen]);
 
   const loadSubscriptions = async () => {
     try {
@@ -353,6 +374,7 @@ export default function DashboardSubscriptionsTab({
         // If API doesn't exist yet, show setup message
         if (response.status === 404 || response.status === 500) {
           setError('Subscription API not deployed yet. Please deploy the Lambda functions first.');
+          setLoading(false);
           return;
         }
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -361,18 +383,44 @@ export default function DashboardSubscriptionsTab({
       const result = await response.json();
       if (result.success) {
         setSuccess('Subscription created successfully');
+        setSnackbarMessage('Subscription created successfully');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
         setCreateDialogOpen(false);
         resetForm();
         loadSubscriptions();
         loadUserLimits(); // Refresh limits
       } else {
-        throw new Error(result.error || 'Failed to create subscription');
+        const errorMsg = result.error || 'Failed to create subscription';
+        console.log('Subscription creation error:', errorMsg);
+        // Show error in dialog for conflict errors (check for various conflict indicators)
+        const isConflictError = errorMsg.includes('Conflicting subscription') || 
+                                errorMsg.includes('conflict') ||
+                                errorMsg.includes('already monitoring') ||
+                                errorMsg.includes('Another subscription') ||
+                                errorMsg.includes('change condition') ||
+                                errorMsg.includes('would trigger a different command');
+        
+        if (isConflictError) {
+          console.log('Setting dialog error:', errorMsg);
+          setDialogError(errorMsg);
+          setError(null); // Clear main page error
+          setLoading(false);
+          return;
+        }
+        throw new Error(errorMsg);
       }
     } catch (error) {
       console.error('Error creating subscription:', error);
+      // Only set main page error if it's not a conflict error
+      const isConflictError = error.message.includes('Conflicting subscription') || 
+                              error.message.includes('conflict') ||
+                              error.message.includes('already monitoring') ||
+                              error.message.includes('change condition') ||
+                              error.message.includes('would trigger a different command');
       if (error.message.includes('Failed to fetch')) {
         setError('Subscription API not available. Please deploy the Lambda functions first.');
-      } else {
+      } else if (!isConflictError) {
         setError(error.message || 'Failed to create subscription');
       }
     } finally {
@@ -404,15 +452,38 @@ export default function DashboardSubscriptionsTab({
       const result = await response.json();
       if (result.success) {
         setSuccess('Subscription updated successfully');
+        setSnackbarMessage('Subscription updated successfully');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
         setEditDialogOpen(false);
         resetForm();
         loadSubscriptions();
       } else {
-        throw new Error(result.error || 'Failed to update subscription');
+        const errorMsg = result.error || 'Failed to update subscription';
+        // Show error in dialog for conflict errors (check for various conflict indicators)
+        if (errorMsg.includes('Conflicting subscription') || 
+            errorMsg.includes('conflict') ||
+            errorMsg.includes('already monitoring') ||
+            errorMsg.includes('change condition') ||
+            errorMsg.includes('would trigger a different command')) {
+          setDialogError(errorMsg);
+          setError(null); // Clear main page error
+          setLoading(false);
+          return;
+        }
+        throw new Error(errorMsg);
       }
     } catch (error) {
       console.error('Error updating subscription:', error);
-      setError(error.message || 'Failed to update subscription');
+      // Only set main page error if it's not a conflict error
+      const isConflictError = error.message.includes('Conflicting subscription') || 
+                              error.message.includes('conflict') ||
+                              error.message.includes('already monitoring') ||
+                              error.message.includes('change condition') ||
+                              error.message.includes('would trigger a different command');
+      if (!isConflictError) {
+        setError(error.message || 'Failed to update subscription');
+      }
     } finally {
       setLoading(false);
     }
@@ -528,6 +599,8 @@ export default function DashboardSubscriptionsTab({
         { action: 'none', value: '', target_device: '' }
       ]
     });
+    setDialogError(null);
+    setError(null); // Clear main page error
     setEditDialogOpen(true);
   };
 
@@ -589,7 +662,7 @@ export default function DashboardSubscriptionsTab({
   };
 
   const renderSubscriptionCard = (subscription) => (
-    <Grid item xs={12} sm={6} lg={4} key={subscription.subscription_id}>
+    <Grid item xs={12} sm={6} md={4} key={subscription.subscription_id}>
       <Card 
         sx={{ 
           height: '100%',
@@ -757,7 +830,11 @@ export default function DashboardSubscriptionsTab({
   const renderCreateDialog = () => (
     <Dialog 
       open={createDialogOpen} 
-      onClose={() => setCreateDialogOpen(false)} 
+      onClose={() => {
+        setCreateDialogOpen(false);
+        setDialogError(null);
+        setError(null); // Clear main page error
+      }} 
       maxWidth="md" 
       fullWidth
       PaperProps={{
@@ -772,7 +849,7 @@ export default function DashboardSubscriptionsTab({
           Set up automated monitoring and responses for your device
         </Typography>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent ref={createDialogContentRef}>
         <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item xs={12}>
         <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
@@ -782,12 +859,32 @@ export default function DashboardSubscriptionsTab({
           Configure the conditions that will activate this subscription
         </Typography>
         
-        {/* Loop Prevention Warning */}
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          <Typography variant="body2">
-            <strong>⚠️ Loop Prevention:</strong> Avoid creating subscriptions that monitor outputs on devices that already have output subscriptions, as this can create infinite loops.
-          </Typography>
-        </Alert>
+        {/* Conflict Error or Loop Prevention Warning */}
+        {dialogError ? (
+          <Alert 
+            severity="error" 
+            variant="filled"
+            sx={{ 
+              mb: 2,
+              borderRadius: 3,
+              fontSize: '0.95rem',
+              lineHeight: 1.6,
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+              '& .MuiAlert-icon': {
+                fontSize: '1.5rem'
+              }
+            }}
+            onClose={() => setDialogError(null)}
+          >
+            {dialogError}
+          </Alert>
+        ) : (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>⚠️ Loop Prevention:</strong> Avoid creating subscriptions that monitor outputs on devices that already have output subscriptions, as this can create infinite loops.
+            </Typography>
+          </Alert>
+        )}
           </Grid>
           
           <Grid item xs={12} sm={6}>
@@ -1023,7 +1120,11 @@ export default function DashboardSubscriptionsTab({
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+        <Button onClick={() => {
+          setCreateDialogOpen(false);
+          setDialogError(null);
+          setError(null); // Clear main page error
+        }}>Cancel</Button>
         <Button 
           onClick={handleCreateSubscription} 
           variant="contained"
@@ -1038,7 +1139,11 @@ export default function DashboardSubscriptionsTab({
   const renderEditDialog = () => (
     <Dialog 
       open={editDialogOpen} 
-      onClose={() => setEditDialogOpen(false)} 
+      onClose={() => {
+        setEditDialogOpen(false);
+        setDialogError(null);
+        setError(null); // Clear main page error
+      }} 
       maxWidth="md" 
       fullWidth
       PaperProps={{
@@ -1053,7 +1158,7 @@ export default function DashboardSubscriptionsTab({
           Modify your existing subscription configuration
         </Typography>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent ref={editDialogContentRef}>
         <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item xs={12}>
             <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
@@ -1063,12 +1168,32 @@ export default function DashboardSubscriptionsTab({
               Configure the conditions that will activate this subscription
             </Typography>
             
-            {/* Loop Prevention Warning */}
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              <Typography variant="body2">
-                <strong>⚠️ Loop Prevention:</strong> Avoid creating subscriptions that monitor outputs on devices that already have output subscriptions, as this can create infinite loops.
-              </Typography>
-            </Alert>
+            {/* Conflict Error or Loop Prevention Warning */}
+            {dialogError ? (
+              <Alert 
+                severity="error" 
+                variant="filled"
+                sx={{ 
+                  mb: 2,
+                  borderRadius: 3,
+                  fontSize: '0.95rem',
+                  lineHeight: 1.6,
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                  '& .MuiAlert-icon': {
+                    fontSize: '1.5rem'
+                  }
+                }}
+                onClose={() => setDialogError(null)}
+              >
+                {dialogError}
+              </Alert>
+            ) : (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <Typography variant="body2">
+                  <strong>⚠️ Loop Prevention:</strong> Avoid creating subscriptions that monitor outputs on devices that already have output subscriptions, as this can create infinite loops.
+                </Typography>
+              </Alert>
+            )}
           </Grid>
           
           <Grid item xs={12} sm={6}>
@@ -1286,7 +1411,11 @@ export default function DashboardSubscriptionsTab({
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+        <Button onClick={() => {
+          setEditDialogOpen(false);
+          setDialogError(null);
+          setError(null); // Clear main page error
+        }}>Cancel</Button>
         <Button 
           onClick={handleUpdateSubscription} 
           variant="contained"
@@ -1310,18 +1439,64 @@ export default function DashboardSubscriptionsTab({
   }
   
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 1 }}>
       {/* Header Section */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
-            Your Subscriptions
-          </Typography>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1, 
+            px: 2,
+            py: 1.5,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+            borderRadius: 3,
+            border: '1px solid #e3f2fd',
+            position: 'relative',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: 'linear-gradient(90deg, #ff9800, #e91e63)',
+              borderRadius: '3px 3px 0 0',
+              opacity: 0.4
+            }
+          }}>
+            <Box sx={{ 
+              p: 0.5, 
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #ff9800, #e91e63)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <NotificationsIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
+            </Box>
+            <Typography variant="h6" sx={{ 
+              fontSize: '1rem', 
+              fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
+              fontWeight: 500,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              color: '#E0E0E0'
+            }}>
+              Your Subscriptions
+            </Typography>
+          </Box>
         <Button
           variant="contained"
           size="small"
           startIcon={<AddIcon />}
-          onClick={() => setCreateDialogOpen(true)}
+          onClick={() => {
+            setDialogError(null);
+            setError(null); // Clear main page error
+            setCreateDialogOpen(true);
+          }}
           disabled={!userLimits.can_create_more}
           sx={{ 
             textTransform: 'none',
@@ -1334,13 +1509,37 @@ export default function DashboardSubscriptionsTab({
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+        <Alert 
+          severity="error" 
+          sx={{ 
+            mb: 2,
+            borderRadius: 3,
+            fontSize: '0.95rem',
+            lineHeight: 1.6,
+            '& .MuiAlert-icon': {
+              fontSize: '1.5rem'
+            }
+          }} 
+          onClose={() => setError(null)}
+        >
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+        <Alert 
+          severity="success" 
+          sx={{ 
+            mb: 2,
+            borderRadius: 3,
+            fontSize: '0.95rem',
+            lineHeight: 1.6,
+            '& .MuiAlert-icon': {
+              fontSize: '1.5rem'
+            }
+          }} 
+          onClose={() => setSuccess(null)}
+        >
           {success}
         </Alert>
       )}
@@ -1379,7 +1578,11 @@ export default function DashboardSubscriptionsTab({
             variant="contained"
             size="large"
             startIcon={<AddIcon />}
-            onClick={() => setCreateDialogOpen(true)}
+            onClick={() => {
+            setDialogError(null);
+            setError(null); // Clear main page error
+            setCreateDialogOpen(true);
+          }}
             disabled={!userLimits.can_create_more}
             sx={{ 
               px: 4, 
@@ -1394,7 +1597,7 @@ export default function DashboardSubscriptionsTab({
         </Paper>
       ) : (
         <Box>
-          <Grid container spacing={3}>
+          <Grid container spacing={1}>
             {subscriptions.map(renderSubscriptionCard)}
           </Grid>
         </Box>
@@ -1403,6 +1606,43 @@ export default function DashboardSubscriptionsTab({
 
       {renderCreateDialog()}
       {renderEditDialog()}
+      
+      {/* Snackbar for conflict notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{
+          zIndex: 1500, // Higher than Dialog (1300) to appear above it
+          '& .MuiSnackbarContent-root': {
+            borderRadius: 3,
+          }
+        }}
+      >
+        <Alert 
+          onClose={() => setSnackbarOpen(false)} 
+          severity={snackbarSeverity}
+          sx={{ 
+            width: '100%',
+            maxWidth: 600,
+            borderRadius: 3,
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            fontSize: '0.95rem',
+            lineHeight: 1.6,
+            zIndex: 1500, // Ensure Alert appears above Dialog
+            '& .MuiAlert-icon': {
+              fontSize: '1.5rem'
+            },
+            '& .MuiAlert-message': {
+              padding: '8px 0'
+            }
+          }}
+          variant="filled"
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

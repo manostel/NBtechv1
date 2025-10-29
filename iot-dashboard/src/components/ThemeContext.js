@@ -56,7 +56,7 @@ export const CustomThemeProvider = ({ children }) => {
           divider: themeMode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
         },
         typography: {
-          fontFamily: "Roboto, Helvetica, Arial, sans-serif",
+          fontFamily: "'Exo 2', 'Roboto', Helvetica, Arial, sans-serif",
           h1: {
             color: themeMode === "dark" ? "#E0E0E0" : "#333",
           },

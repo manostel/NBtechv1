@@ -37,17 +37,13 @@ const SharedControls = ({
       display: 'flex', 
       flexDirection: { xs: 'column', sm: 'row' },
       alignItems: { xs: 'stretch', sm: 'center' },
-      justifyContent: { xs: 'flex-start', sm: 'space-between' },
-      gap: 2,
+      justifyContent: 'flex-end',
+      gap: { xs: 1, sm: 2 },
       '& > *': { height: '32px', width: { xs: '100%', sm: 'auto' } }
     }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: { xs: 1, sm: 0 }, minWidth: 0 }}>
-        <ShowChartIcon sx={{ color: 'success.main', fontSize: '1.25rem' }} />
-        <span style={{ fontWeight: 400, fontSize: '1rem' }}>{title}</span>
-      </Box>
-      <Box sx={{ display: 'flex', gap: 2, justifyContent: { xs: 'flex-start', sm: 'flex-end' }, flex: 1 }}>
-        <FormControl size="small" sx={{ width: 120 }}>
-          <InputLabel sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>Time Range</InputLabel>
+      <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, justifyContent: 'flex-end' }}>
+        <FormControl size="small" sx={{ width: { xs: 100, sm: 120 } }}>
+          <InputLabel sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>Time Range</InputLabel>
           <Select
             value={timeRange}
             onChange={(e) => onTimeRangeChange(e.target.value)}
@@ -55,7 +51,7 @@ const SharedControls = ({
             size="small"
             inputProps={{
               sx: {
-                fontSize: '0.8rem',
+                fontSize: { xs: '0.7rem', sm: '0.8rem' },
                 height: '32px',
                 borderRadius: 2,
                 paddingLeft: '12px',
@@ -64,14 +60,14 @@ const SharedControls = ({
               }
             }}
             sx={{
-              fontSize: '0.8rem',
+              fontSize: { xs: '0.7rem', sm: '0.8rem' },
               height: '32px',
               borderRadius: 2,
               color: 'text.primary',
               backgroundColor: 'inherit',
               '& .MuiSelect-icon': {
                 color: 'text.secondary',
-                fontSize: '1.2rem',
+                fontSize: { xs: '1rem', sm: '1.2rem' },
                 right: '8px'
               },
               '&:hover .MuiSelect-icon': {
@@ -92,7 +88,7 @@ const SharedControls = ({
             }}
           >
             {TIME_RANGES.map((range) => (
-              <MenuItem key={range.value} value={range.value} sx={{ fontSize: '0.8rem' }}>
+              <MenuItem key={range.value} value={range.value} sx={{ fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>
                 {range.label}
               </MenuItem>
             ))}
@@ -111,11 +107,11 @@ const SharedControls = ({
           disabled={selectedVariables.length === 0}
           size="small"
           sx={{ 
-            minWidth: 80,
+            minWidth: { xs: 60, sm: 80 },
             height: '32px',
             borderRadius: '20px',
-            fontSize: '0.8rem',
-            px: 2
+            fontSize: { xs: '0.7rem', sm: '0.8rem' },
+            px: { xs: 1, sm: 2 }
           }}
         >
           Apply

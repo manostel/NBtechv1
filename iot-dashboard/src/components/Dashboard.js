@@ -90,7 +90,6 @@ import DashboardSummaryTab from './dashboard2/DashboardSummaryTab';
 import DashboardChartsTab from './dashboard2/DashboardChartsTab';
 import DashboardCommandsTab from './dashboard2/DashboardCommandsTab';
 import DashboardOverviewTab from './dashboard2/DashboardOverviewTab';
-import DashboardStatisticsTab from './dashboard2/DashboardStatisticsTab';
 import DashboardAlarmsTab from './dashboard2/DashboardAlarmsTab';
 import DashboardSubscriptionsTab from './dashboard2/DashboardSubscriptionsTab';
 import DeviceNotificationService from '../utils/DeviceNotificationService';
@@ -1098,19 +1097,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         );
       case 2:
         return (
-          <DashboardStatisticsTab
-            metricsData={metricsData}
-            metricsConfig={metricsConfig}
-            timeRange={timeRange}
-            selectedVariables={selectedVariablesChartsStats}
-            availableVariables={availableVariables}
-            onVariableChange={e => handleVariableChange(e, false)}
-            onTimeRangeChange={handleTimeRangeChange}
-            onApply={handleApply}
-          />
-        );
-      case 3:
-        return (
           <DashboardCommandsTab
             device={device}
             deviceState={deviceState}
@@ -1123,7 +1109,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             fetchDeviceState={fetchDeviceState}
           />
         );
-      case 4:
+      case 3:
         return (
           <DashboardAlarmsTab
             device={device}
@@ -1131,7 +1117,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             onAlarmToggle={fetchAlarms}
           />
         );
-      case 5:
+      case 4:
         console.log('Rendering DashboardSubscriptionsTab with props:', { device, user, onNotification: setSnackbar });
         return (
           <DashboardSubscriptionsTab
@@ -1447,10 +1433,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         >
             <Tab label="Overview" {...a11yProps(0)} />
             <Tab label="Charts" {...a11yProps(1)} />
-            <Tab label="Statistics" {...a11yProps(2)} />
-            <Tab label="Commands" {...a11yProps(3)} />
-            <Tab label="Alarms" {...a11yProps(4)} />
-            <Tab label="Subscriptions" {...a11yProps(5)} />
+            <Tab label="Commands" {...a11yProps(2)} />
+            <Tab label="Alarms" {...a11yProps(3)} />
+            <Tab label="Subscriptions" {...a11yProps(4)} />
         </Tabs>
         </Box>
 
@@ -1469,9 +1454,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         </TabPanel>
         <TabPanel value={selectedTab} index={4}>
           {renderTabContent(4)}
-        </TabPanel>
-        <TabPanel value={selectedTab} index={5}>
-          {renderTabContent(5)}
         </TabPanel>
       </Container>
     </Box>

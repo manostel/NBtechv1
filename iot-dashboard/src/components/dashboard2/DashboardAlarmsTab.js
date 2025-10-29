@@ -803,9 +803,52 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
       </Tabs>
       {activeTab === 0 && (
         <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            <WarningIcon sx={{ verticalAlign: 'middle', mr: 0.5 }} /> Triggered Alarms
-          </Typography>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1, 
+            mb: 2,
+            px: 2,
+            py: 1.5,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+            borderRadius: 3,
+            border: '1px solid #e3f2fd',
+            position: 'relative',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: 'linear-gradient(90deg, #f44336, #ff9800)',
+              borderRadius: '3px 3px 0 0',
+              opacity: 0.4
+            }
+          }}>
+            <Box sx={{ 
+              p: 0.5, 
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #f44336, #ff9800)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <WarningIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
+            </Box>
+            <Typography variant="h6" sx={{ 
+              fontSize: '1rem', 
+              fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
+              fontWeight: 500,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              color: '#E0E0E0'
+            }}>
+              Triggered Alarms
+            </Typography>
+          </Box>
           
           {/* Filter Controls for Triggered Alarms */}
           {triggeredAlarms.length > 0 && (
@@ -1049,9 +1092,51 @@ const DashboardAlarmsTab = ({ device, metricsConfig = defaultMetricsConfig, onAl
       {activeTab === 1 && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              <NotificationsIcon sx={{ verticalAlign: 'middle', mr: 0.5 }} /> Manage Alarms
-            </Typography>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1, 
+              px: 2,
+              py: 1.5,
+              background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+              borderRadius: 3,
+              border: '1px solid #e3f2fd',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                background: 'linear-gradient(90deg, #9c27b0, #673ab7)',
+                borderRadius: '3px 3px 0 0',
+                opacity: 0.4
+              }
+            }}>
+              <Box sx={{ 
+                p: 0.5, 
+                borderRadius: 2,
+                background: 'linear-gradient(135deg, #9c27b0, #673ab7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <NotificationsIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
+              </Box>
+              <Typography variant="h6" sx={{ 
+                fontSize: '1rem', 
+                fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 500,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                color: '#E0E0E0'
+              }}>
+                Manage Alarms
+              </Typography>
+            </Box>
             <Button
               variant="contained"
               startIcon={<AddIcon />}

@@ -110,7 +110,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
       }}>
         <Box display="flex" alignItems="center" gap={1}>
           <Info sx={{ fontSize: '1.5rem' }} />
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
             Device Information
           </Typography>
         </Box>
@@ -125,7 +125,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Box sx={{ mb: 2 }}>
-              <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 300, mb: 1, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                 {deviceName}
               </Typography>
               <Typography variant="body1" color="grey.300" sx={{ mb: 2 }}>
@@ -140,7 +140,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
                     backgroundColor: getStatusColor(status),
                   }}
                 />
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                <Typography variant="body1" sx={{ fontWeight: 400, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                   Status: {status}
                 </Typography>
               </Box>
@@ -149,7 +149,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
           </Grid>
           <Grid item xs={12} sm={6}>
             <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'grey.300' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 300, color: 'grey.300', fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                 Device ID
               </Typography>
               <IconButton
@@ -175,7 +175,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
             </Typography>
           </Grid>
           <Grid item xs={12} sm={6}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'grey.300' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 300, mb: 1, color: 'grey.300', fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
               Battery & Signal
             </Typography>
             <Box display="flex" alignItems="center" gap={2}>
@@ -184,19 +184,19 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
             </Box>
           </Grid>
           <Grid item xs={12}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: 'grey.300' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 300, mb: 2, color: 'grey.300', fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
               Timing Information
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                   <PlayArrow sx={{ fontSize: '1.2rem' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                     Startup Time
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
-                  fontFamily: '"Roboto Mono", "Courier New", monospace',
+                  fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   backgroundColor: 'rgba(255,255,255,0.1)',
                   p: 1,
                   borderRadius: 1
@@ -217,12 +217,12 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
               <Grid item xs={12} sm={4}>
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                   <Sync sx={{ fontSize: '1.2rem' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                     Last Sync
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
-                  fontFamily: '"Roboto Mono", "Courier New", monospace',
+                  fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   backgroundColor: 'rgba(255,255,255,0.1)',
                   p: 1,
                   borderRadius: 1
@@ -236,12 +236,12 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
               <Grid item xs={12} sm={4}>
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                   <AccessTime sx={{ fontSize: '1.2rem' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                     Uptime
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
-                  fontFamily: '"Roboto Mono", "Courier New", monospace',
+                  fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   backgroundColor: 'rgba(255,255,255,0.1)',
                   p: 1,
                   borderRadius: 1
@@ -253,7 +253,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
           </Grid>
           {deviceStartTimeInfo?.startup_data && (
             <Grid item xs={12}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: 'grey.300' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 300, mb: 2, color: 'grey.300', fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                 System Information
               </Typography>
               <Grid container spacing={2}>
@@ -261,12 +261,12 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
                   <Grid item xs={12} sm={6}>
                     <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                       <Build sx={{ fontSize: '1.2rem' }} />
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                         Firmware Version
                       </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ 
-                      fontFamily: '"Roboto Mono", "Courier New", monospace',
+                      fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                       backgroundColor: 'rgba(255,255,255,0.1)',
                       p: 1,
                       borderRadius: 1
@@ -279,12 +279,12 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
                   <Grid item xs={12} sm={6}>
                     <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                       <Storage sx={{ fontSize: '1.2rem' }} />
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                         Boot Reason
                       </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ 
-                      fontFamily: '"Roboto Mono", "Courier New", monospace',
+                      fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                       backgroundColor: 'rgba(255,255,255,0.1)',
                       p: 1,
                       borderRadius: 1
@@ -345,11 +345,25 @@ export function DeviceStatusTile({
     <Card 
       sx={{ 
         width: '100%',
+        height: '100%',
         p: { xs: 0.25, sm: 0.5 },
         cursor: 'pointer',
         borderRadius: 3,
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         border: '1px solid #e3f2fd',
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          backgroundColor: getStatusColor(status),
+        },
         transition: 'all 0.3s ease',
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
@@ -360,33 +374,33 @@ export function DeviceStatusTile({
     >
       <CardContent sx={{ 
         p: { xs: 0.75, sm: 1 }, 
-        '&:last-child': { pb: { xs: 0.75, sm: 1 } }
+        '&:last-child': { pb: { xs: 0.75, sm: 1 } },
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}>
-        <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" gap={{ xs: 0.5, sm: 0.75 }}>
-          {/* Status */}
-          <Box display="flex" alignItems="center" gap={0.5}>
-            <Box
-              sx={{
-                width: { xs: 5, sm: 6 },
-                height: { xs: 5, sm: 6 },
-                borderRadius: '50%',
-                backgroundColor: getStatusColor(status),
-              }}
-            />
-            <Typography
-              variant="body2"
-              sx={{
-                color: getStatusColor(status),
-                fontWeight: 'bold',
-                lineHeight: 'normal',
-                fontSize: { xs: '0.85rem', sm: '0.95rem' },
-                fontFamily: '"Roboto Mono", "Courier New", monospace',
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase'
-              }}
-            >
-              {status}
-            </Typography>
+        <Box display="flex" alignItems="center" justifyContent="center">
+          {/* Prominent status pill */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 1.25,
+              py: 0.4,
+              borderRadius: '999px',
+              border: `1px solid ${getStatusColor(status)}AA`,
+              backgroundColor: status === 'Online' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.15)',
+              color: getStatusColor(status),
+              fontWeight: 700,
+              fontSize: { xs: '0.75rem', sm: '0.8rem' },
+              letterSpacing: '0.6px',
+              textTransform: 'uppercase'
+            }}
+          >
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: getStatusColor(status) }} />
+            {status}
           </Box>
         </Box>
       </CardContent>
@@ -430,6 +444,17 @@ export function DeviceIdentityTile({
         borderRadius: 3,
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         border: '1px solid #e3f2fd',
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          backgroundColor: getStatusColor(status),
+        },
         transition: 'all 0.3s ease',
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
@@ -449,8 +474,8 @@ export function DeviceIdentityTile({
               variant="body2" 
               sx={{ 
                 fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                fontFamily: '"Roboto Mono", "Courier New", monospace',
-                fontWeight: 500,
+                fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
+                fontWeight: 300,
                 letterSpacing: '0.02em',
                 color: 'white'
               }}
@@ -462,30 +487,26 @@ export function DeviceIdentityTile({
             </IconButton>
           </Box>
 
-          {/* Status */}
-          <Box display="flex" alignItems="center" gap={0.5}>
-            <Box
-              sx={{
-                width: { xs: 5, sm: 6 },
-                height: { xs: 5, sm: 6 },
-                borderRadius: '50%',
-                backgroundColor: getStatusColor(status),
-              }}
-            />
-            <Typography
-              variant="body2"
-              sx={{
-                color: getStatusColor(status),
-                fontWeight: 'bold',
-                lineHeight: 'normal',
-                fontSize: { xs: '0.85rem', sm: '0.95rem' },
-                fontFamily: '"Roboto Mono", "Courier New", monospace',
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase'
-              }}
-            >
-              {status}
-            </Typography>
+          {/* Prominent Status Pill */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 1.25,
+              py: 0.35,
+              borderRadius: '999px',
+              border: `1px solid ${getStatusColor(status)}AA`,
+              backgroundColor: status === 'Online' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.15)',
+              color: getStatusColor(status),
+              fontWeight: 700,
+              fontSize: { xs: '0.75rem', sm: '0.8rem' },
+              letterSpacing: '0.6px',
+              textTransform: 'uppercase'
+            }}
+          >
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: getStatusColor(status) }} />
+            {status}
           </Box>
         </Box>
       </CardContent>
@@ -589,8 +610,8 @@ export function DeviceTimingTile({
               variant="body2" 
               sx={{ 
                 fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                fontFamily: '"Roboto Mono", "Courier New", monospace',
-                fontWeight: 500,
+                fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
+                fontWeight: 300,
                 letterSpacing: '0.02em',
                 color: 'white',
                 whiteSpace: 'pre'
@@ -612,8 +633,8 @@ export function DeviceTimingTile({
               variant="body2" 
               sx={{ 
                 fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                fontFamily: '"Roboto Mono", "Courier New", monospace',
-                fontWeight: 500,
+                fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
+                fontWeight: 300,
                 letterSpacing: '0.02em',
                 color: 'white',
                 whiteSpace: 'pre'
@@ -635,8 +656,8 @@ export function DeviceTimingTile({
               variant="body2" 
               sx={{ 
                 fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                fontFamily: '"Roboto Mono", "Courier New", monospace',
-                fontWeight: 500,
+                fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
+                fontWeight: 300,
                 letterSpacing: '0.02em',
                 color: 'white',
                 whiteSpace: 'pre'
@@ -659,8 +680,8 @@ export function DeviceTimingTile({
                 variant="body2" 
                 sx={{ 
                   fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                  fontFamily: '"Roboto Mono", "Courier New", monospace',
-                  fontWeight: 500,
+                  fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
+                  fontWeight: 300,
                   letterSpacing: '0.02em',
                   color: 'white',
                   whiteSpace: 'pre'
@@ -684,8 +705,8 @@ export function DeviceTimingTile({
                 variant="body2" 
                 sx={{ 
                   fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                  fontFamily: '"Roboto Mono", "Courier New", monospace',
-                  fontWeight: 500,
+                  fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
+                  fontWeight: 300,
                   letterSpacing: '0.02em',
                   color: 'white',
                   whiteSpace: 'pre'
@@ -721,11 +742,14 @@ export function DeviceIndicatorsTile({
     <Card 
       sx={{ 
         width: '100%',
+        height: '100%',
         p: { xs: 0.25, sm: 0.5 },
         cursor: 'pointer',
         borderRadius: 3,
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         border: '1px solid #e3f2fd',
+        display: 'flex',
+        flexDirection: 'column',
         transition: 'all 0.3s ease',
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
@@ -736,12 +760,26 @@ export function DeviceIndicatorsTile({
     >
       <CardContent sx={{ 
         p: { xs: 0.75, sm: 1 }, 
-        '&:last-child': { pb: { xs: 0.75, sm: 1 } }
+        '&:last-child': { pb: { xs: 0.75, sm: 1 } },
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}>
-        <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" gap={{ xs: 0.5, sm: 0.75 }}>
-          {/* Indicators */}
-          <Box display="flex" alignItems="center" gap={{ xs: 0.75, sm: 1 }}>
+        {/* Indicators - aligned and evenly spaced */}
+        <Box
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            gap: { xs: 0.75, sm: 1 },
+            width: '100%'
+          }}
+        >
+          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <BatteryIndicator value={batteryLevel} batteryState={batteryState} charging={charging} size="small" />
+          </Box>
+          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <SignalIndicator value={signalStrength} size="small" />
           </Box>
         </Box>
@@ -793,16 +831,16 @@ export default function DeviceInfoCard({
 
         {/* Right Side: Status & Indicators (1x size each, stacked) */}
         <Grid item xs={5} sx={{ maxWidth: '41.666667%', display: 'flex', flexDirection: 'column' }}>
-          <Grid container spacing={1} sx={{ flex: 1 }}>
+          <Grid container spacing={1} sx={{ flex: 1, alignItems: 'stretch' }}>
             {/* Status Tile - ONLINE/OFFLINE */}
-            <Grid item xs={12}>
+            <Grid item xs={12} sx={{ display: 'flex' }}>
               <DeviceStatusTile
                 status={status}
                 onOpenDialog={() => setDialogOpen(true)}
               />
             </Grid>
             {/* Indicators Tile */}
-            <Grid item xs={12}>
+            <Grid item xs={12} sx={{ display: 'flex' }}>
               <DeviceIndicatorsTile
                 batteryLevel={batteryLevel}
                 signalStrength={signalStrength}

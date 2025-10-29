@@ -46,8 +46,8 @@ const VariableSelector = ({
           </Typography>
         </Box>
       )}
-      <FormControl sx={{ width: 120 }} size="small">
-        <InputLabel sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>{label}</InputLabel>
+      <FormControl sx={{ width: { xs: 100, sm: 120 } }} size="small">
+        <InputLabel sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>{label}</InputLabel>
         <Select
           multiple={!singleSelect}
           value={tempSelected}
@@ -56,7 +56,7 @@ const VariableSelector = ({
             label={label}
             sx={{
               color: 'text.primary',
-              fontSize: '0.8rem',
+              fontSize: { xs: '0.7rem', sm: '0.8rem' },
               height: '32px',
               borderRadius: 2,
               paddingLeft: '12px',
@@ -83,14 +83,14 @@ const VariableSelector = ({
             },
           }}
           sx={{
-            fontSize: '0.8rem',
+            fontSize: { xs: '0.7rem', sm: '0.8rem' },
             height: '32px',
             borderRadius: 2,
             color: 'text.primary',
             backgroundColor: 'inherit',
             '& .MuiSelect-icon': {
               color: 'text.secondary',
-              fontSize: '1.2rem',
+              fontSize: { xs: '1rem', sm: '1.2rem' },
               right: '8px'
             },
             '&:hover .MuiSelect-icon': {
@@ -104,7 +104,7 @@ const VariableSelector = ({
               value={variable}
               sx={{ 
                 py: 0.5,
-                fontSize: '0.8rem',
+                fontSize: { xs: '0.7rem', sm: '0.8rem' },
                 '&:hover': {
                   backgroundColor: 'rgba(255, 255, 255, 0.08)',
                 },
@@ -137,7 +137,7 @@ const VariableSelector = ({
                 sx={{ 
                   ml: singleSelect ? 0 : 1,
                   '& .MuiTypography-root': {
-                    fontSize: '0.8rem',
+                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
                     color: 'text.primary',
                   }
                 }}

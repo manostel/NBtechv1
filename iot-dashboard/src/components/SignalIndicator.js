@@ -14,7 +14,9 @@ export default function SignalIndicator({ value }) {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
-      <FaSignal size={16} style={{ color: getSignalColor(value) }} />
+      <Box sx={{ height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <FaSignal size={16} style={{ color: getSignalColor(value) }} />
+      </Box>
       <Box sx={{ width: 70, height: 6, backgroundColor: "#555", borderRadius: 1, overflow: "hidden" }}>
         <Box 
           sx={{ 

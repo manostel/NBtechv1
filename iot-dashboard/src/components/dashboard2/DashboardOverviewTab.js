@@ -129,44 +129,122 @@ const DashboardOverviewTab = ({
 
   return (
     <Box sx={{ p: 0, width: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Metrics Title and Variable Selector */}
+      {/* Section 1: Metrics Tiles */}
       <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        mt: 0, // No top margin
-        pt: 0, // No top padding
-        mb: 1, // Keep reasonable bottom margin
-        minWidth: 0,
-        px: 0.5, // Minimal horizontal padding
-        height: '32px' // Match height with other tabs
+        position: 'relative',
+        mb: 3,
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '32px' }}>
-          <ShowChartIcon sx={{ color: 'success.main', fontSize: '1.25rem' }} />
-          <Typography variant="h6" sx={{ fontSize: '1rem' }}>Metrics</Typography>
+        {/* Section Header - Matching Tile Style */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 2,
+          px: 2,
+          py: 1.5,
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+          borderRadius: 3,
+          border: '1px solid #e3f2fd',
+          position: 'relative',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+            borderRadius: '3px 3px 0 0',
+            opacity: 0.4
+          }
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ 
+              p: 0.5, 
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #4caf50, #2196f3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <ShowChartIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
+            </Box>
+            <Typography variant="h6" sx={{ 
+              fontSize: '1rem', 
+              fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
+              fontWeight: 500,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              color: '#E0E0E0'
+            }}>
+              Live Metrics
+            </Typography>
+          </Box>
+          <VariableSelector
+            variables={availableVariables}
+            selectedVariables={selectedVariables}
+            onVariableChange={onVariableChange}
+            showTitle={false}
+          />
         </Box>
-        <VariableSelector
-          variables={availableVariables}
-          selectedVariables={selectedVariables}
-          onVariableChange={onVariableChange}
-          showTitle={false}
-        />
+
+        {/* Metrics Tiles */}
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <OverviewTiles
+            metricsData={metricsData}
+            metricsConfig={metricsConfig}
+            selectedVariables={selectedVariables}
+            isLoading={isLoading}
+            triggeredAlarms={triggeredAlarms}
+            deviceState={deviceState}
+          />
+        </Box>
       </Box>
 
-      {/* Overview Tiles */}
-      <Box sx={{ mt: 0, flexGrow: 1, minWidth: 0 }}>
-        <OverviewTiles
-          metricsData={metricsData}
-          metricsConfig={metricsConfig}
-          selectedVariables={selectedVariables}
-          isLoading={isLoading}
-          triggeredAlarms={triggeredAlarms}
-          deviceState={deviceState}
-        />
-      </Box>
+      {/* Section 2: Data Visualization */}
+      <Box sx={{ 
+        position: 'relative',
+      }}>
+        {/* Section Header - Matching Tile Style */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          mb: 2,
+          px: 2,
+          py: 1.5,
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+          borderRadius: 3,
+          border: '1px solid #e3f2fd',
+          position: 'relative',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        }}>
+          <Box sx={{ 
+            p: 0.5, 
+            borderRadius: 2,
+            background: 'linear-gradient(135deg, #ff9800, #e91e63)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            mr: 1,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}>
+            <ShowChartIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
+          </Box>
+          <Typography variant="h6" sx={{ 
+            fontSize: '1rem', 
+            fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
+            fontWeight: 500,
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase',
+            color: '#E0E0E0'
+          }}>
+            Data Visualization
+          </Typography>
+        </Box>
 
-      {/* Overview Chart */}
-      <Box sx={{ mt: 2 }}>
+        {/* Chart Section */}
         <OverviewChart
           metricsConfig={metricsConfig}
           selectedVariables={selectedVariables}
