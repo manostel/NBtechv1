@@ -153,8 +153,8 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
                 fill: true,
                 tension: 0.4,
                 borderWidth: 3,
-                pointRadius: 4,
-                pointHoverRadius: 6,
+                pointRadius: 1,
+                pointHoverRadius: 2,
                 pointBackgroundColor: config.color,
                 pointBorderColor: '#fff',
                 pointBorderWidth: 2,
@@ -210,8 +210,8 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
               fill: false,
               tension: 0.1,
               borderWidth: 3,
-              pointRadius: 3,
-              pointHoverRadius: 5,
+              pointRadius: 1,
+              pointHoverRadius: 2,
               pointBackgroundColor: outputConfig.color,
               pointBorderColor: '#fff',
               pointBorderWidth: 1,
@@ -241,8 +241,8 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
                 fill: false,
                 tension: 0.1,
                 borderWidth: 3,
-                pointRadius: 3,
-                pointHoverRadius: 5,
+                pointRadius: 1,
+                pointHoverRadius: 2,
                 pointBackgroundColor: inputConfig.color,
                 pointBorderColor: '#fff',
                 pointBorderWidth: 1,
@@ -380,6 +380,7 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
         display: true,
         position: 'left',
         beginAtZero: true,
+        min: 0,
         max: chartView === 'state' ? 1.2 : undefined,
         grid: {
           color: 'rgba(255, 255, 255, 0.2)',
@@ -431,6 +432,7 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
         display: chartView === 'state' && selectedOutputs.includes('motor_speed'), // Only show when motor speed is selected
         position: 'right',
         beginAtZero: true,
+        min: 0,
         max: chartView === 'state' && selectedOutputs.includes('motor_speed') ? 110 : undefined,
         grid: {
           drawOnChartArea: false,
@@ -477,17 +479,41 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
           mode: 'xy',
           limits: {
             x: {min: 'original', max: 'original'},
-            y: {min: 'original', max: 'original'},
-            y1: {min: 'original', max: 'original'}
+            y: {min: 0, max: 'original'},
+            y1: {min: 0, max: 'original'}
+          },
+          // Keep boolean/state Y-axis bottom anchored at 0
+          onZoom: ({ chart }) => {
+            try {
+              if (chart.options?.scales?.y) {
+                chart.options.scales.y.min = 0;
+              }
+              if (chart.options?.scales?.y1) {
+                chart.options.scales.y1.min = 0;
+              }
+              chart.update('none');
+            } catch (_) { /* no-op */ }
           }
         },
         pan: {
           enabled: true,
-          mode: 'xy',
+          // Prevent vertical pan to keep min anchored at 0 for all views
+          mode: 'x',
           limits: {
             x: {min: 'original', max: 'original'},
-            y: {min: 'original', max: 'original'},
-            y1: {min: 'original', max: 'original'}
+            y: {min: 0, max: 'original'},
+            y1: {min: 0, max: 'original'}
+          },
+          onPan: ({ chart }) => {
+            try {
+              if (chart.options?.scales?.y) {
+                chart.options.scales.y.min = 0;
+              }
+              if (chart.options?.scales?.y1) {
+                chart.options.scales.y1.min = 0;
+              }
+              chart.update('none');
+            } catch (_) { /* no-op */ }
           }
         }
       }

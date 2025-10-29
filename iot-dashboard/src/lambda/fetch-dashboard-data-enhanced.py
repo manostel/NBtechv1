@@ -50,6 +50,8 @@ def get_step_size(time_range):
         return timedelta(minutes=2)  # 2-minute step
     elif time_range == '4h':
         return timedelta(minutes=3)  # 3-minute step
+    elif time_range == '6h':
+        return timedelta(minutes=3)  # 3-minute step
     elif time_range == '8h':
         return timedelta(minutes=4)  # 4-minute step
     elif time_range == '16h':
@@ -228,6 +230,28 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
         # Debug: Log the actual query parameters
         logger.info(f"Query parameters: client_id={client_id}, start_time={current_start.isoformat()}, end_time={final_end.isoformat()}")
         
+        # Debug: Check if there's any data for this client_id at all
+        try:
+            debug_response = table.query(
+                KeyConditionExpression='client_id = :client_id',
+                ExpressionAttributeValues={
+                    ':client_id': client_id
+                },
+                ExpressionAttributeNames={
+                    '#ts': 'timestamp'
+                },
+                ScanIndexForward=False,  # Get most recent first
+                Limit=5  # Just get a few recent items
+            )
+            if debug_response.get('Items'):
+                logger.info(f"Found {len(debug_response['Items'])} recent items for client_id {client_id}")
+                for i, item in enumerate(debug_response['Items'][:3]):  # Log first 3 items
+                    logger.info(f"Recent item {i+1}: timestamp={item.get('timestamp', 'N/A')}, out1_state={item.get('out1_state', 'N/A')}, out2_state={item.get('out2_state', 'N/A')}")
+            else:
+                logger.warning(f"No items found for client_id {client_id} in {table_type} table")
+        except Exception as e:
+            logger.error(f"Error in debug query: {str(e)}")
+        
         while current_start < final_end:
             chunk_end = min(current_start + timedelta(hours=chunk_hours), final_end)
             logger.info(f"Fetching chunk from {current_start.isoformat()} to {chunk_end.isoformat()}")
@@ -276,6 +300,12 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                     items_count = len(response.get('Items', []))
                     logger.info(f"Query {query_count} returned {items_count} items in {query_time:.2f}s")
                     
+                    # Debug: Log first few items if any found
+                    if items_count > 0:
+                        logger.info(f"Sample items from query {query_count}:")
+                        for i, item in enumerate(response['Items'][:2]):  # Log first 2 items
+                            logger.info(f"  Item {i+1}: timestamp={item.get('timestamp', 'N/A')}, out1_state={item.get('out1_state', 'N/A')}, out2_state={item.get('out2_state', 'N/A')}")
+                    
                     if 'Items' in response:
                         # Filter items based on selected variables if provided
                         if selected_variables:
@@ -287,7 +317,12 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                                 }
                                 for var in selected_variables:
                                     if var in item:
-                                        filtered_item[var] = item[var]
+                                        # Convert Decimal to float for JSON serialization
+                                        value = item[var]
+                                        if isinstance(value, Decimal):
+                                            filtered_item[var] = float(value)
+                                        else:
+                                            filtered_item[var] = value
                                 filtered_items.append(filtered_item)
                             chunk_items.extend(filtered_items)
                         else:
@@ -337,21 +372,36 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                 
                 if fallback_response.get('Items'):
                     logger.info(f"Fallback query found {len(fallback_response['Items'])} items")
+                    
+                    # Filter fallback items to only include those within the original time range
+                    filtered_fallback_items = []
+                    for item in fallback_response['Items']:
+                        item_time = datetime.fromisoformat(item['timestamp'].replace('Z', '+00:00'))
+                        if start_time <= item_time <= end_time:
+                            filtered_fallback_items.append(item)
+                    
+                    logger.info(f"Filtered fallback items to {len(filtered_fallback_items)} items within original time range")
+                    
                     # Filter items based on selected variables if provided
                     if selected_variables:
                         filtered_items = []
-                        for item in fallback_response['Items']:
+                        for item in filtered_fallback_items:
                             filtered_item = {
                                 'timestamp': item['timestamp'],
                                 'client_id': item['client_id']
                             }
                             for var in selected_variables:
                                 if var in item:
-                                    filtered_item[var] = item[var]
+                                    # Convert Decimal to float for JSON serialization
+                                    value = item[var]
+                                    if isinstance(value, Decimal):
+                                        filtered_item[var] = float(value)
+                                    else:
+                                        filtered_item[var] = value
                             filtered_items.append(filtered_item)
                         all_items.extend(filtered_items)
                     else:
-                        all_items.extend(fallback_response['Items'])
+                        all_items.extend(filtered_fallback_items)
                 else:
                     logger.warning(f"Fallback query also returned no data")
                     
@@ -364,7 +414,7 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
         logger.error(f"Error in fetch_data_in_chunks from {table_type} table: {str(e)}")
         raise
 
-def aggregate_data(items, target_points, selected_variables=None, table_type='data'):
+def aggregate_data(items, target_points, selected_variables=None, table_type='data', requested_time_range='1h'):
     """Aggregate data points to match target number of points"""
     if not items:
         return []
@@ -372,35 +422,12 @@ def aggregate_data(items, target_points, selected_variables=None, table_type='da
     # Sort items by timestamp
     sorted_items = sorted(items, key=lambda x: x['timestamp'])
     
-    # Calculate time step based on time range
+    # Calculate time step based on requested time range, not actual data range
     start_time = datetime.fromisoformat(sorted_items[0]['timestamp'].replace('Z', '+00:00'))
     end_time = datetime.fromisoformat(sorted_items[-1]['timestamp'].replace('Z', '+00:00'))
-    time_diff = end_time - start_time
     
-    # Calculate total hours in the time range
-    total_hours = time_diff.total_seconds() / 3600
-    
-    # Get step size based on total hours
-    if total_hours <= 0.25:  # 15 minutes
-        step = get_step_size('15m')
-    elif total_hours <= 1:  # 1 hour
-        step = get_step_size('1h')
-    elif total_hours <= 2:  # 2 hours
-        step = get_step_size('2h')
-    elif total_hours <= 4:  # 4 hours
-        step = get_step_size('4h')
-    elif total_hours <= 8:  # 8 hours
-        step = get_step_size('8h')
-    elif total_hours <= 16:  # 16 hours
-        step = get_step_size('16h')
-    elif total_hours <= 24:  # 24 hours
-        step = get_step_size('24h')
-    elif total_hours <= 72:  # 3 days
-        step = get_step_size('3d')
-    elif total_hours <= 168:  # 7 days
-        step = get_step_size('7d')
-    else:  # 30 days
-        step = get_step_size('30d')
+    # Use the requested time range step size instead of calculating from data
+    step = get_step_size(requested_time_range)
     
     # Calculate number of intervals
     num_intervals = int((end_time - start_time) / step) + 1
@@ -580,6 +607,8 @@ def lambda_handler(event, context):
             
         # Get the time range and points
         now = datetime.utcnow()
+        end_time = now  # Set end_time immediately
+        
         if time_range == 'live':
             start_time = now - timedelta(minutes=2)
             target_points = 20
@@ -595,6 +624,9 @@ def lambda_handler(event, context):
         elif time_range == '4h':
             start_time = now - timedelta(hours=4)
             target_points = 240
+        elif time_range == '6h':
+            start_time = now - timedelta(hours=6)
+            target_points = 360
         elif time_range == '8h':
             start_time = now - timedelta(hours=8)
             target_points = 480
@@ -629,6 +661,8 @@ def lambda_handler(event, context):
                 start_time = end_time - timedelta(hours=2)
             elif time_range == '4h':
                 start_time = end_time - timedelta(hours=4)
+            elif time_range == '6h':
+                start_time = end_time - timedelta(hours=6)
             elif time_range == '8h':
                 start_time = end_time - timedelta(hours=8)
             elif time_range == '16h':
@@ -641,10 +675,7 @@ def lambda_handler(event, context):
                 start_time = end_time - timedelta(days=7)
             elif time_range == '30d':
                 start_time = end_time - timedelta(days=30)
-            else:
-                start_time = end_time - timedelta(hours=1)
-        else:
-            end_time = now
+        # If latest_timestamp is not provided, we already have the correct start_time and end_time
             
         # Fetch data from DynamoDB with selected variables
         items = fetch_data_in_chunks(client_id, start_time, end_time, selected_variables, table_type)
@@ -667,8 +698,25 @@ def lambda_handler(event, context):
                 })
             }
             
-        # Aggregate data to achieve consistent number of points
-        aggregated_data = aggregate_data(items, target_points, selected_variables, table_type)
+        # For state history (status table), return raw data without aggregation
+        # For metrics (data table), aggregate to achieve consistent number of points
+        if table_type == 'status':
+            # Return raw data for state history - no aggregation
+            aggregated_data = []
+            for item in items:
+                data_point = {'timestamp': item['timestamp']}
+                for var in selected_variables:
+                    if var in item:
+                        # Convert Decimal to float for JSON serialization
+                        value = item[var]
+                        if isinstance(value, Decimal):
+                            data_point[var] = float(value)
+                        else:
+                            data_point[var] = value
+                aggregated_data.append(data_point)
+        else:
+            # Aggregate data for metrics to achieve consistent number of points
+            aggregated_data = aggregate_data(items, target_points, selected_variables, table_type, time_range)
         
         # Calculate summary statistics
         metrics_to_summarize = selected_variables if selected_variables else [key for key in aggregated_data[0].keys() if key != 'timestamp']

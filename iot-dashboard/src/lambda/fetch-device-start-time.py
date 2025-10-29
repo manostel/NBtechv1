@@ -14,6 +14,16 @@ def decimal_default(obj):
         return int(obj) if obj % 1 == 0 else float(obj)
     raise TypeError
 
+def decimal_to_float(obj):
+    """Recursively convert Decimal to float"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: decimal_to_float(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [decimal_to_float(x) for x in obj]
+    return obj
+
 def get_cors_headers():
     """Return CORS headers for the response"""
     return {
@@ -25,7 +35,7 @@ def get_cors_headers():
     }
 
 def get_latest_start_time(client_id):
-    """Get the latest start time for a specific device"""
+    """Get the latest start time and all startup data for a specific device"""
     try:
         # Query the table for the latest record for this client_id
         response = device_start_table.query(
@@ -39,15 +49,21 @@ def get_latest_start_time(client_id):
 
         latest_start = response['Items'][0]
         
-        # We only need the timestamp for the frontend to calculate uptime live
+        # Convert all Decimal values to float
+        latest_start = decimal_to_float(latest_start)
+        
+        # Return all fields for backward compatibility and new startup_data
         return {
-            'client_id': latest_start['client_id'],
-            'device': latest_start['device'],
-            'timestamp': latest_start['timestamp'],
+            'client_id': latest_start.get('client_id'),
+            'device': latest_start.get('device'),
+            'timestamp': latest_start.get('timestamp'),
+            'startup_data': latest_start  # Include all fields as startup_data
         }
 
     except Exception as e:
         print(f"Error getting latest start time: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def lambda_handler(event, context):
@@ -84,7 +100,7 @@ def lambda_handler(event, context):
                 'body': json.dumps({"error": "Missing client_id parameter"})
             }
 
-        # Get the latest start time
+        # Get the latest start time (which now includes all startup data)
         start_time_info = get_latest_start_time(client_id)
         
         if not start_time_info:
@@ -94,12 +110,12 @@ def lambda_handler(event, context):
                 'body': json.dumps({"error": f"No start time found for device {client_id}"})
             }
 
-        # Return the start time data
+        # Return the start time data (startup_data is already included)
         # Use the decimal_default function for serialization
         return {
             'statusCode': 200,
             'headers': get_cors_headers(),
-            'body': json.dumps(start_time_info)
+            'body': json.dumps(start_time_info, default=decimal_default)
         }
 
     except Exception as e:

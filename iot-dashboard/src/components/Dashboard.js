@@ -1362,22 +1362,22 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
         <Grid container spacing={1}>
           <Grid item xs={12}>
-        <DeviceInfoCard
-          clientID={device?.client_id || "Unknown"}
-          deviceName={device?.device_name || "Unknown"}
-          deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
-          status={deviceStatus || "Offline"}
-          lastOnline={lastSeen ? lastSeen.toLocaleString('en-GB', { hour12: false }) : 
-            device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString('en-GB', { hour12: false }) : "N/A"}
-          batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
-          signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
-          showClientId={showClientId}
-          onToggleClientId={() => setShowClientId(!showClientId)}
-          batteryState={batteryState}
-          charging={deviceState?.charging}
-          lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
-          deviceStartTimeInfo={deviceStartTimeInfo}
-        />
+            <DeviceInfoCard
+              clientID={device?.client_id || "Unknown"}
+              deviceName={device?.device_name || "Unknown"}
+              deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
+              status={deviceStatus || "Offline"}
+              lastOnline={lastSeen ? lastSeen.toLocaleString('en-GB', { hour12: false }) : 
+                device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString('en-GB', { hour12: false }) : "N/A"}
+              batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
+              signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
+              showClientId={showClientId}
+              onToggleClientId={() => setShowClientId(!showClientId)}
+              batteryState={batteryState}
+              charging={deviceState?.charging}
+              lastTimestamp={device?.latest_data?.timestamp || lastSeen?.toISOString()}
+              deviceStartTimeInfo={deviceStartTimeInfo}
+            />
           </Grid>
         </Grid>
 
@@ -1386,6 +1386,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           borderRadius: 3,
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
           border: '1px solid #e3f2fd',
+          mt: 2,
           mb: 2,
           overflowX: 'auto',
           width: 'fit-content',
