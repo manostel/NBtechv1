@@ -1592,7 +1592,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           }}
         >
             <Tab label="Overview" {...a11yProps(0)} />
-            <Tab label="Charts" {...a11yProps(1)} />
+            <Tab label="Graphs" {...a11yProps(1)} />
             <Tab label="Commands" {...a11yProps(2)} />
             <Tab label="Alarms" {...a11yProps(3)} />
             <Tab label="Subscriptions" {...a11yProps(4)} />

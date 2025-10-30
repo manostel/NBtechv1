@@ -477,7 +477,7 @@ const DashboardChartsTab = ({
             textTransform: 'uppercase',
             color: '#E0E0E0'
           }}>
-            Charts
+            Graphs
           </Typography>
         </Box>
 
@@ -509,19 +509,37 @@ const DashboardChartsTab = ({
             <Paper 
               elevation={0}
               sx={{ 
-                p: 0,
+                pl: 0.25,
+                pr: 0.25,
+                pt: 1,
+                pb: 1,
                 m: 0,
                 mt: 0,
                 mb: 0,
                 borderRadius: 3,
+                position: 'relative',
+                overflow: 'hidden',
+                background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
                 border: '1px solid #e3f2fd',
-                backgroundColor: 'white',
+                color: '#E0E0E0',
                 transition: 'all 0.3s ease',
                 width: '100%',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  background: 'linear-gradient(90deg, #4caf50, #2196f3)'
+                },
                 '&:hover': {
                   boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-                  transform: 'translateY(-2px)'
+                  transform: 'translateY(-2px)',
+                  '&::before': {
+                    background: 'linear-gradient(90deg, #5cbf60, #3399f3)'
+                  }
                 }
               }}
             >

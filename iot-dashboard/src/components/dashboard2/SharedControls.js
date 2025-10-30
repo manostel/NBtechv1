@@ -25,7 +25,7 @@ const SharedControls = ({
   onTimeRangeChange,
   onApply,
   isOverview = false,
-  title = 'Charts'
+  title = 'Graphs'
 }) => {
   // Don't render anything for the overview tab as it uses the latest data API
   if (isOverview) {
