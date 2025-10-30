@@ -728,12 +728,29 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
           pt: 1,
           pb: 1,
           borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          border: '1px solid #f0f0f0',
+          border: '1px solid #e3f2fd',
+          color: '#E0E0E0',
+          position: 'relative',
+          overflow: 'hidden',
           transition: 'all 0.3s ease',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+            transition: 'background 0.3s ease',
+          },
           '&:hover': {
             boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-            transform: 'translateY(-2px)'
+            transform: 'translateY(-2px)',
+            '&::before': {
+              background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+            }
           }
         }}
       >
@@ -777,7 +794,7 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
               justifyContent: 'center'
             }}
           >
-            <Typography color="text.secondary" variant="body2">
+            <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
               {chartView === 'metrics' ? 'Select metrics to view chart' : 'Select outputs to view state history'}
             </Typography>
           </Box>
@@ -794,7 +811,7 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
               justifyContent: 'center'
             }}
           >
-            <Typography color="text.secondary" variant="body2">
+            <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
               Loading chart data...
             </Typography>
           </Box>

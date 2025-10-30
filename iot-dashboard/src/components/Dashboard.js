@@ -1131,6 +1131,16 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     }
   };
 
+  // Refresh function
+  const handleRefresh = async () => {
+    try {
+      // Trigger a refresh of all dashboard data
+      window.location.reload();
+    } catch (error) {
+      console.error('Error refreshing dashboard:', error);
+    }
+  };
+
   // Logout confirmation dialog handlers
   const handleLogoutClick = () => {
     setLogoutConfirmOpen(true);
@@ -1244,6 +1254,13 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       <Helmet>
         <title>IoT Dashboard</title>
         <meta name="description" content="IoT Dashboard with Dark Mode" />
+        <style>{`
+          @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+        `}</style>
       </Helmet>
 
       {/* Settings Drawer */}
@@ -1261,42 +1278,136 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
       />
 
       {/* AppBar */}
-      <AppBar position="static" color="default" elevation={1}>
-        <Toolbar>
-          <IconButton
-            edge="start"
-            color="inherit"
-            aria-label="back"
-            onClick={onBack}
-            sx={{ mr: 2 }}
-          >
-          <ArrowBackIcon />
-        </IconButton>
-          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Typography variant="h6" component="div">
-              {device?.device_name || "Unknown"}
-        </Typography>
-            <Typography variant="subtitle2" color="text.secondary">
+      <AppBar 
+        position="static" 
+        color="default" 
+        elevation={2}
+        sx={{
+          background: theme.palette.mode === 'dark' 
+            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.98) 50%, rgba(255, 255, 255, 0.95) 100%)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: theme.palette.mode === 'dark' 
+            ? '1px solid rgba(255, 255, 255, 0.1)' 
+            : '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 4px 20px rgba(0, 0, 0, 0.3)'
+            : '0 4px 20px rgba(0, 0, 0, 0.1)'
+        }}
+      >
+        <Toolbar sx={{ 
+          px: { xs: 1.5, sm: 3 }, 
+          display: 'flex', 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          minHeight: '64px'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton
+              edge="start"
+              color="inherit"
+              aria-label="back"
+              onClick={onBack}
+              sx={{ 
+                mr: 1,
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  transform: 'scale(1.05)'
+                }
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography 
+                variant="h6" 
+                component="div"
+                sx={{ 
+                  fontWeight: 700,
+                  fontStyle: 'italic',
+                  letterSpacing: '0.5px',
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(45deg, #4caf50, #2196f3)'
+                    : 'linear-gradient(45deg, #1976d2, #388e3c)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                {device?.device_name || "Unknown"}
+              </Typography>
+            </Box>
+            <Typography 
+              variant="subtitle2" 
+              sx={{ 
+                display: { xs: 'none', sm: 'block' },
+                color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                fontWeight: 500,
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(255,255,255,0.05)' 
+                  : 'rgba(0,0,0,0.05)',
+                border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
+              }}
+            >
               {device?.device || "N/A"}
             </Typography>
           </Box>
-          <IconButton
-            edge="end"
-            color="inherit"
-            aria-label="settings"
-            onClick={handleSettingsOpen}
-          >
-          <SettingsIcon />
-        </IconButton>
-          <IconButton
-            edge="end"
-            color="inherit"
-            aria-label="logout"
-            onClick={handleLogoutClick}
-            sx={{ ml: 1 }}
-          >
-            <LogoutIcon />
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton
+              edge="end"
+              color="inherit"
+              aria-label="refresh"
+              onClick={handleRefresh}
+              sx={{ 
+                mr: 1,
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  transform: 'scale(1.05)'
+                }
+              }}
+            >
+              <RefreshIcon />
+            </IconButton>
+            <IconButton
+              edge="end"
+              color="inherit"
+              aria-label="settings"
+              onClick={handleSettingsOpen}
+              sx={{ 
+                mr: 1,
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  transform: 'scale(1.05)'
+                }
+              }}
+            >
+              <SettingsIcon />
+            </IconButton>
+            <IconButton
+              edge="end"
+              color="inherit"
+              aria-label="logout"
+              onClick={handleLogoutClick}
+              sx={{ 
+                mr: 0.5,
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  transform: 'scale(1.05)'
+                }
+              }}
+            >
+              <LogoutIcon />
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -1306,10 +1417,29 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         onClose={handleLogoutCancel}
         aria-labelledby="logout-dialog-title"
         aria-describedby="logout-dialog-description"
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #f44336, #ff9800)',
+              borderRadius: '3px 3px 0 0'
+            }
+          }
+        }}
       >
-        <DialogTitle id="logout-dialog-title">{"Confirm Logout"}</DialogTitle>
+        <DialogTitle id="logout-dialog-title" sx={{ color: '#E0E0E0' }}>{"Confirm Logout"}</DialogTitle>
         <DialogContent>
-          <DialogContentText id="logout-dialog-description">
+          <DialogContentText id="logout-dialog-description" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
             Are you sure you want to log out?
           </DialogContentText>
         </DialogContent>
@@ -1353,8 +1483,6 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
               deviceName={device?.device_name || "Unknown"}
               deviceType={device?.device_type || device?.latest_data?.device || 'Unknown'}
               status={deviceStatus || "Offline"}
-              lastOnline={lastSeen ? lastSeen.toLocaleString('en-GB', { hour12: false }) : 
-                device?.latest_data?.timestamp ? new Date(device.latest_data.timestamp).toLocaleString('en-GB', { hour12: false }) : "N/A"}
               batteryLevel={metricsData?.data_latest?.[0]?.battery || 0}
               signalStrength={metricsData?.data_latest?.[0]?.signal_quality || 0}
               showClientId={showClientId}
@@ -1369,9 +1497,17 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
 
         {/* Tabs */}
         <Box sx={{ 
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.9) 50%, rgba(255, 255, 255, 0.8) 100%)',
+          backdropFilter: 'blur(10px)',
           borderRadius: 3,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          border: '1px solid #e3f2fd',
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 4px 20px rgba(0, 0, 0, 0.2)'
+            : '0 4px 20px rgba(0, 0, 0, 0.1)',
+          border: theme.palette.mode === 'dark' 
+            ? '1px solid rgba(255, 255, 255, 0.1)' 
+            : '1px solid rgba(0, 0, 0, 0.1)',
           mt: 2,
           mb: 2,
           overflowX: 'auto',
@@ -1401,33 +1537,40 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             scrollButtons="auto"
             allowScrollButtonsMobile
           sx={{
-              minHeight: '40px',
+              minHeight: '48px',
               ml: 0,
               pl: 0,
             '& .MuiTab-root': {
-                minHeight: '40px',
+                minHeight: '48px',
                 fontSize: '0.875rem',
                 textTransform: 'none',
-                fontWeight: 500,
+                fontWeight: 600,
                 px: 2,
                 color: theme.palette.text.secondary,
                 borderRadius: 2,
                 margin: '4px',
                 transition: 'all 0.3s ease',
                 '&.Mui-selected': {
-                  color: theme.palette.primary.main,
-                  fontWeight: 600,
-                  backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                  color: theme.palette.mode === 'dark' ? '#4caf50' : '#1976d2',
+                  fontWeight: 700,
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(76, 175, 80, 0.15)' 
+                    : 'rgba(25, 118, 210, 0.08)',
                 },
                 '&:hover': {
-                  color: theme.palette.primary.light,
-                  backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                  color: theme.palette.mode === 'dark' ? '#4caf50' : '#1976d2',
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(255, 255, 255, 0.05)' 
+                    : 'rgba(25, 118, 210, 0.04)',
+                  transform: 'translateY(-1px)'
                 }
             },
             '& .MuiTabs-indicator': {
-              backgroundColor: theme.palette.primary.main,
               height: '3px',
-              borderRadius: '2px'
+              borderRadius: '3px 3px 0 0',
+              background: theme.palette.mode === 'dark'
+                ? 'linear-gradient(90deg, #4caf50, #2196f3)'
+                : 'linear-gradient(90deg, #1976d2, #388e3c)'
             }
           }}
         >
@@ -1438,6 +1581,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
             <Tab label="Subscriptions" {...a11yProps(4)} />
         </Tabs>
         </Box>
+
 
         {/* Tab Content */}
         <TabPanel value={selectedTab} index={0}>

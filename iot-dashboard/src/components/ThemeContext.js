@@ -21,7 +21,7 @@ export const CustomThemeProvider = ({ children }) => {
   useEffect(() => {
     // Apply theme-specific attributes to document elements
     document.documentElement.setAttribute('data-theme', themeMode);
-    document.body.style.backgroundColor = themeMode === "dark" ? "#141829" : "#f9f9f9";
+    document.body.style.backgroundColor = themeMode === "dark" ? "#141829" : "#f5f5f5";
     document.body.style.color = themeMode === "dark" ? "#E0E0E0" : "#333";
     
     // Apply transition only after initial load
@@ -36,8 +36,8 @@ export const CustomThemeProvider = ({ children }) => {
         palette: {
           mode: themeMode,
           background: {
-            default: themeMode === "dark" ? "#141829" : "#f9f9f9",
-            paper: themeMode === "dark" ? "#1a1f3c" : "#fff",
+            default: themeMode === "dark" ? "#141829" : "#f5f5f5",
+            paper: themeMode === "dark" ? "#1a1f3c" : "#fafafa",
           },
           text: {
             primary: themeMode === "dark" ? "#E0E0E0" : "#333",
@@ -81,14 +81,14 @@ export const CustomThemeProvider = ({ children }) => {
             styleOverrides: `
               body {
                 transition: background-color 0.3s ease;
-                background-color: ${themeMode === "dark" ? "#141829" : "#f9f9f9"};
+                background-color: ${themeMode === "dark" ? "#141829" : "#f5f5f5"};
                 color: ${themeMode === "dark" ? "#E0E0E0" : "#333"};
                 min-height: 100vh;
               }
               
               #root {
                 min-height: 100vh;
-                background-color: ${themeMode === "dark" ? "#141829" : "#f9f9f9"};
+                background-color: ${themeMode === "dark" ? "#141829" : "#f5f5f5"};
                 transition: background-color 0.3s ease;
               }
             `,
@@ -97,7 +97,7 @@ export const CustomThemeProvider = ({ children }) => {
             styleOverrides: {
               root: {
                 transition: 'all 0.3s ease',
-                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fff",
+                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fafafa",
                 '&:hover': {
                   backgroundColor: themeMode === "dark" ? "#1f2547" : "#f5f5f5",
                   boxShadow: themeMode === "dark" ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.1)',
@@ -131,7 +131,7 @@ export const CustomThemeProvider = ({ children }) => {
           MuiCard: {
             styleOverrides: {
               root: {
-                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fff",
+                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fafafa",
                 transition: 'all 0.3s ease',
                 '&:hover': {
                   backgroundColor: themeMode === "dark" ? "#1f2547" : "#f5f5f5",
@@ -143,7 +143,7 @@ export const CustomThemeProvider = ({ children }) => {
           MuiAppBar: {
             styleOverrides: {
               root: {
-                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fff",
+                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fafafa",
                 boxShadow: themeMode === "dark" ? '0 2px 10px rgba(0, 0, 0, 0.3)' : '0 2px 10px rgba(0, 0, 0, 0.1)',
               },
             },
@@ -151,7 +151,7 @@ export const CustomThemeProvider = ({ children }) => {
           MuiDrawer: {
             styleOverrides: {
               paper: {
-                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fff",
+                backgroundColor: themeMode === "dark" ? "#1a1f3c" : "#fafafa",
               },
             },
           },

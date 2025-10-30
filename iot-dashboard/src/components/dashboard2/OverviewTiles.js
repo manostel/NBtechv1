@@ -63,13 +63,30 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 3,
+        background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         border: '1px solid #e3f2fd',
+        color: '#E0E0E0',
+        position: 'relative',
+        overflow: 'hidden',
         transition: 'all 0.3s ease',
         cursor: alarmActive ? 'pointer' : 'default',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+          transition: 'background 0.3s ease',
+        },
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-          transform: 'translateY(-2px)'
+          transform: 'translateY(-2px)',
+          '&::before': {
+            background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+          }
         }
       }}
     >
@@ -85,7 +102,12 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
             }} 
           />
         )}
-        <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 400, fontSize: '0.95rem', textAlign: 'left' }}>
+        <Typography variant="subtitle2" sx={{ 
+          fontWeight: 400, 
+          fontSize: '0.95rem', 
+          textAlign: 'left',
+          color: 'rgba(224, 224, 224, 0.8)'
+        }}>
           {title}
         </Typography>
         {alarmActive && (
@@ -113,15 +135,43 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
             {value}
           </Typography>
           {unit && (
-            <Typography component="span" variant="body2" color="textSecondary" sx={{ fontSize: '0.9rem', ml: 0 }}>
+            <Typography component="span" variant="body2" sx={{ 
+              fontSize: '0.9rem', 
+              ml: 0,
+              color: 'rgba(224, 224, 224, 0.7)'
+            }}>
               {unit}
             </Typography>
           )}
         </Box>
       )}
-      <Dialog open={alarmDialogOpen} onClose={() => setAlarmDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{`Alarms - ${title}`}</DialogTitle>
-        <DialogContent dividers>
+      <Dialog 
+        open={alarmDialogOpen} 
+        onClose={() => setAlarmDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+              borderRadius: '3px 3px 0 0'
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: '#E0E0E0' }}>{`Alarms - ${title}`}</DialogTitle>
+        <DialogContent dividers sx={{ color: '#E0E0E0' }}>
           {alarmActive ? (
             <List dense>
               {triggeredAlarmsList.map((alarm, index) => (
@@ -132,12 +182,14 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
                   <ListItemText
                     primary={alarm.description || 'Alarm triggered'}
                     secondary={`Severity: ${alarm.severity || 'info'}${alarm.threshold !== undefined ? ` • Threshold: ${alarm.threshold}` : ''}${alarm.current_value !== undefined ? ` • Current: ${alarm.current_value}` : ''}`}
+                    primaryTypographyProps={{ sx: { color: '#E0E0E0' } }}
+                    secondaryTypographyProps={{ sx: { color: 'rgba(224, 224, 224, 0.7)' } }}
                   />
                 </ListItem>
               ))}
             </List>
           ) : (
-            <Typography variant="body2">No alarms triggered.</Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>No alarms triggered.</Typography>
           )}
         </DialogContent>
         <DialogActions>
@@ -148,6 +200,7 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
               setAlarmDialogOpen(false);
             }} 
             variant="contained"
+            sx={{ color: '#E0E0E0' }}
           >
             Close
           </Button>
@@ -234,19 +287,19 @@ const OverviewTiles = ({
                   left: 0,
                   right: 0,
                   height: '2px',
-                  background: 'linear-gradient(90deg, #9c27b0, #673ab7)',
+                  background: 'linear-gradient(90deg, #4caf50, #2196f3)',
                   borderRadius: '3px 3px 0 0',
-                  opacity: 0.4
+                  opacity: 0.6
                 }
               }}>
                 <Box sx={{ 
                   p: 0.5, 
                   borderRadius: 2,
-                  background: 'linear-gradient(135deg, #9c27b0, #673ab7)',
+                  background: 'linear-gradient(135deg, #4caf50, #2196f3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  boxShadow: '0 2px 8px rgba(76, 175, 80, 0.3)'
                 }}>
                   <SettingsIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
                 </Box>

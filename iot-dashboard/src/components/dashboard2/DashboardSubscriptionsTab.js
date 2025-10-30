@@ -669,12 +669,29 @@ export default function DashboardSubscriptionsTab({
           display: 'flex',
           flexDirection: 'column',
           borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
           border: '1px solid #e3f2fd',
+          color: '#E0E0E0',
+          position: 'relative',
+          overflow: 'hidden',
           transition: 'all 0.3s ease',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+            transition: 'background 0.3s ease',
+          },
           '&:hover': {
             boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-            transform: 'translateY(-2px)'
+            transform: 'translateY(-2px)',
+            '&::before': {
+              background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+            }
           }
         }}
       >
@@ -693,10 +710,10 @@ export default function DashboardSubscriptionsTab({
                 </Box>
               </Box>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, color: '#E0E0E0' }}>
                   {getDeviceName(subscription.device_id)}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
                   {PARAMETER_TYPES[subscription.parameter_type]?.label} • {subscription.parameter_name}
                 </Typography>
               </Box>
@@ -838,14 +855,30 @@ export default function DashboardSubscriptionsTab({
       maxWidth="md" 
       fullWidth
       PaperProps={{
-        sx: { borderRadius: 3 }
+        sx: { 
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+          color: '#E0E0E0',
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+            borderRadius: '3px 3px 0 0'
+          }
+        }
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
           Configure Device Subscription
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
           Set up automated monitoring and responses for your device
         </Typography>
       </DialogTitle>
@@ -1147,14 +1180,30 @@ export default function DashboardSubscriptionsTab({
       maxWidth="md" 
       fullWidth
       PaperProps={{
-        sx: { borderRadius: 3 }
+        sx: { 
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+          color: '#E0E0E0',
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+            borderRadius: '3px 3px 0 0'
+          }
+        }
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
           Edit Subscription
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
           Modify your existing subscription configuration
         </Typography>
       </DialogTitle>
@@ -1485,7 +1534,7 @@ export default function DashboardSubscriptionsTab({
               textTransform: 'uppercase',
               color: '#E0E0E0'
             }}>
-              Your Subscriptions
+              Subscriptions
             </Typography>
           </Box>
         <Button

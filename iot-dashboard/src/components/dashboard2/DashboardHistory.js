@@ -39,7 +39,7 @@ export default function DashboardHistory({ metricsData, metricsConfig }) {
             {metricsData.map((row, index) => (
               <TableRow key={index}>
                 <TableCell>
-                  {new Date(row.timestamp).toLocaleTimeString()}
+                  {new Date(row.timestamp).toLocaleTimeString('en-GB', { hour12: false })}
                 </TableCell>
                 {metricKeys.map(key => (
                   <TableCell key={key} align="right">

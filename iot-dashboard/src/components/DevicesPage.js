@@ -43,6 +43,8 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   ShowChart as ShowChartIcon,
+  Map as MapIcon,
+  Refresh as RefreshIcon,
   Bluetooth as BluetoothIcon,
 } from '@mui/icons-material';
 import BatteryIndicator from "./BatteryIndicator";
@@ -283,10 +285,29 @@ const ConfigureDeviceDialog = React.memo(({
             fullWidth
             disableEscapeKeyDown
             disableBackdropClick
+            PaperProps={{
+              sx: {
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+                color: '#E0E0E0',
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+                  borderRadius: '3px 3px 0 0'
+                }
+              }
+            }}
         >
-            <DialogTitle>Configure Device Metrics</DialogTitle>
+            <DialogTitle sx={{ color: '#E0E0E0' }}>Configure Device Metrics</DialogTitle>
             <DialogContent>
-                <DialogContentText sx={{ mb: 2 }}>
+                <DialogContentText sx={{ mb: 2, color: 'rgba(224, 224, 224, 0.7)' }}>
                     Select which metrics you want to display on the device tile.
                 </DialogContentText>
                 
@@ -922,6 +943,11 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   };
 
   const fetchDeviceData = async (device) => {
+    if (!device || !device.client_id) {
+      console.error('fetchDeviceData called with invalid device:', device);
+      return null;
+    }
+    
     try {
       const dataResponse = await fetch(DEVICE_DATA_API_URL, {
         method: 'POST',
@@ -1832,52 +1858,199 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
     <Box sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Helmet>
         <title>Devices - IoT Dashboard</title>
+        <style>{`
+          @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+        `}</style>
       </Helmet>
       
-      <AppBar position="static" color="default" elevation={1}>
-        <Toolbar sx={{ px: { xs: 1.5, sm: 3 }, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      <AppBar 
+        position="static" 
+        color="default" 
+        elevation={2}
+        sx={{
+          background: currentTheme === 'dark' 
+            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.98) 50%, rgba(255, 255, 255, 0.95) 100%)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: currentTheme === 'dark' 
+            ? '1px solid rgba(255, 255, 255, 0.1)' 
+            : '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: currentTheme === 'dark'
+            ? '0 4px 20px rgba(0, 0, 0, 0.3)'
+            : '0 4px 20px rgba(0, 0, 0, 0.1)'
+        }}
+      >
+        <Toolbar sx={{ 
+          px: { xs: 1.5, sm: 3 }, 
+          display: 'flex', 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          minHeight: '64px'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography 
+                variant="h6" 
+                component="div"
+                sx={{ 
+                  fontWeight: 700,
+                  fontStyle: 'italic',
+                  letterSpacing: '0.5px',
+                  background: currentTheme === 'dark'
+                    ? 'linear-gradient(45deg, #4caf50, #2196f3)'
+                    : 'linear-gradient(45deg, #1976d2, #388e3c)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                NB-Tech v1
+              </Typography>
+              <Box sx={{
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                backgroundColor: currentTheme === 'dark' 
+                  ? 'rgba(76, 175, 80, 0.2)' 
+                  : 'rgba(76, 175, 80, 0.1)',
+                border: `1px solid ${currentTheme === 'dark' ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.2)'}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5
+              }}>
+                <Box sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: '#4caf50',
+                  animation: 'pulse 2s infinite'
+                }} />
+              </Box>
+            </Box>
             <Typography 
-              variant="h6" 
-              component="div"
+              variant="subtitle2" 
               sx={{ 
-                fontWeight: 700,
-                fontStyle: 'italic',
-                letterSpacing: '0.5px',
-                ml: 0.5,
-                mr: 2
+                display: { xs: 'none', sm: 'block' },
+                color: currentTheme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                fontWeight: 500,
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                backgroundColor: currentTheme === 'dark' 
+                  ? 'rgba(255,255,255,0.05)' 
+                  : 'rgba(0,0,0,0.05)',
+                border: `1px solid ${currentTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
               }}
             >
-              NB-Tech v1
-            </Typography>
-            <Typography variant="subtitle2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               {user.email}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton
-              edge="end"
-              color="inherit"
-              aria-label="settings"
-              onClick={() => setSettingsOpen(true)}
-              sx={{ mr: 1 }}
-            >
-              <SettingsIcon />
-            </IconButton>
-            <IconButton
-              edge="end"
-              color="inherit"
-              aria-label="logout"
-              onClick={handleLogout}
-              sx={{ mr: 0.5 }}
-            >
-              <LogoutIcon />
-            </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+
+            {/* Refresh Button */}
+            <Tooltip title="Refresh devices">
+              <IconButton
+                edge="end"
+                color="inherit"
+                aria-label="refresh"
+                onClick={async () => {
+                  try {
+                    setIsLoading(true);
+                    await Promise.all([
+                      fetchDevices(),
+                      fetchGPSData(),
+                      fetchDeviceStates()
+                    ]);
+                    // Fetch device data for all devices
+                    if (devices && devices.length > 0) {
+                      const deviceDataPromises = devices.map(device => fetchDeviceData(device));
+                      await Promise.all(deviceDataPromises);
+                    }
+                  } catch (error) {
+                    console.error('Error refreshing data:', error);
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                sx={{ 
+                  mr: 1,
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    transform: 'scale(1.05)'
+                  }
+                }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+
+            {/* Settings */}
+            <Tooltip title="Settings">
+              <IconButton
+                edge="end"
+                color="inherit"
+                aria-label="settings"
+                onClick={() => setSettingsOpen(true)}
+                sx={{ 
+                  mr: 1,
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    transform: 'scale(1.05)'
+                  }
+                }}
+              >
+                <SettingsIcon />
+              </IconButton>
+            </Tooltip>
+
+            {/* Logout */}
+            <Tooltip title="Logout">
+              <IconButton
+                edge="end"
+                color="inherit"
+                aria-label="logout"
+                onClick={handleLogout}
+                sx={{ 
+                  mr: 0.5,
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    transform: 'scale(1.05)'
+                  }
+                }}
+              >
+                <LogoutIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Toolbar>
       </AppBar>
 
-      <Box sx={{ width: '100%', mb: 2 }}>
+      <Box sx={{ 
+        width: '100%', 
+        mb: 2,
+        background: currentTheme === 'dark'
+          ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)'
+          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.9) 50%, rgba(255, 255, 255, 0.8) 100%)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: 3,
+        mx: 2,
+        mt: 1,
+        border: currentTheme === 'dark' 
+          ? '1px solid rgba(255, 255, 255, 0.1)' 
+          : '1px solid rgba(0, 0, 0, 0.1)',
+        boxShadow: currentTheme === 'dark'
+          ? '0 4px 20px rgba(0, 0, 0, 0.2)'
+          : '0 4px 20px rgba(0, 0, 0, 0.1)'
+      }}>
         <Tabs 
           value={activeTab} 
           onChange={handleTabChange} 
@@ -1886,19 +2059,119 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           centered
           variant="fullWidth"
           sx={{ 
-            mb: 1,
+            mb: 0,
             '& .MuiTab-root': {
-              minHeight: '36px',
+              minHeight: '48px',
               fontSize: '0.875rem',
               textTransform: 'none',
-              fontWeight: 500,
-              py: 0.5
+              fontWeight: 600,
+              py: 1,
+              px: 2,
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                backgroundColor: currentTheme === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.05)' 
+                  : 'rgba(0, 0, 0, 0.05)',
+                transform: 'translateY(-1px)'
+              },
+              '&.Mui-selected': {
+                color: currentTheme === 'dark' ? '#4caf50' : '#1976d2',
+                fontWeight: 700
+              }
+            },
+            '& .MuiTabs-indicator': {
+              height: '3px',
+              borderRadius: '3px 3px 0 0',
+              background: currentTheme === 'dark'
+                ? 'linear-gradient(90deg, #4caf50, #2196f3)'
+                : 'linear-gradient(90deg, #1976d2, #388e3c)'
             }
           }}
         >
-          <Tab label="All Devices" />
-          <Tab label="Map View" />
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ShowChartIcon sx={{ fontSize: '1.1rem' }} />
+                All Devices
+              </Box>
+            } 
+          />
+              <Tab 
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <MapIcon sx={{ fontSize: '1.1rem', color: 'inherit' }} key="map-icon" />
+                    Map View
+                  </Box>
+                } 
+              />
         </Tabs>
+      </Box>
+
+      {/* Status Information Bar */}
+      <Box sx={{ 
+        mx: 2, 
+        mb: 2,
+        p: 2,
+        background: currentTheme === 'dark'
+          ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.6) 0%, rgba(31, 37, 71, 0.7) 50%, rgba(26, 31, 60, 0.6) 100%)'
+          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(248, 250, 252, 0.7) 50%, rgba(255, 255, 255, 0.6) 100%)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: 3,
+        border: currentTheme === 'dark' 
+          ? '1px solid rgba(255, 255, 255, 0.1)' 
+          : '1px solid rgba(0, 0, 0, 0.1)',
+        boxShadow: currentTheme === 'dark'
+          ? '0 4px 20px rgba(0, 0, 0, 0.15)'
+          : '0 4px 20px rgba(0, 0, 0, 0.08)'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          {/* Online/Offline Summary */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                backgroundColor: '#4caf50',
+                animation: 'pulse 2s infinite'
+              }} />
+              <Typography variant="body2" sx={{ 
+                fontWeight: 600,
+                color: currentTheme === 'dark' ? '#4caf50' : '#2e7d32'
+              }}>
+                {devices.filter(device => {
+                  const deviceStatus = getDeviceStatus(deviceData[device.client_id], device.client_id);
+                  return deviceStatus.status === 'Online';
+                }).length} Online
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                backgroundColor: '#f44336'
+              }} />
+              <Typography variant="body2" sx={{ 
+                fontWeight: 600,
+                color: currentTheme === 'dark' ? '#f44336' : '#d32f2f'
+              }}>
+                {devices.filter(device => {
+                  const deviceStatus = getDeviceStatus(deviceData[device.client_id], device.client_id);
+                  return deviceStatus.status === 'Offline';
+                }).length} Offline
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Last Update Info */}
+          <Typography variant="caption" sx={{ 
+            color: currentTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+            fontStyle: 'italic'
+          }}>
+            Last updated: {new Date().toLocaleTimeString('en-GB', { hour12: false })}
+          </Typography>
+        </Box>
       </Box>
 
       {activeTab === 0 && (
@@ -2404,12 +2677,25 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         onClose={() => setAddDeviceOpen(false)}
         PaperProps={{
           sx: {
-            bgcolor: 'background.paper',
-            color: 'text.primary'
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+              borderRadius: '3px 3px 0 0'
+            }
           }
         }}
       >
-        <DialogTitle>Add New Device</DialogTitle>
+        <DialogTitle sx={{ color: '#E0E0E0' }}>Add New Device</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -2442,14 +2728,27 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         onClose={() => setDeleteDialogOpen(false)}
         PaperProps={{
           sx: {
-            bgcolor: 'background.paper',
-            color: 'text.primary'
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #f44336, #ff9800)',
+              borderRadius: '3px 3px 0 0'
+            }
           }
         }}
       >
-        <DialogTitle>Delete Device</DialogTitle>
+        <DialogTitle sx={{ color: '#E0E0E0' }}>Delete Device</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
             Are you sure you want to delete this device? This action cannot be undone.
           </DialogContentText>
         </DialogContent>

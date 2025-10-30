@@ -339,18 +339,35 @@ const DashboardCommands = ({
           <Card sx={{ 
             height: '100%',
             borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            border: '1px solid #f0f0f0',
+            border: '1px solid #e3f2fd',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
             transition: 'all 0.3s ease',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+              transition: 'background 0.3s ease',
+            },
             '&:hover': {
               boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-              transform: 'translateY(-2px)'
+              transform: 'translateY(-2px)',
+              '&::before': {
+                background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+              }
             }
           }}>
             <CardContent sx={{ p: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-                <PowerIcon sx={{ color: 'text.secondary', fontSize: '1.1rem', mr: 1 }} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                <PowerIcon sx={{ color: 'rgba(224, 224, 224, 0.7)', fontSize: '1.1rem', mr: 1 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#E0E0E0' }}>
                   Output Controls
                 </Typography>
               </Box>
@@ -449,18 +466,35 @@ const DashboardCommands = ({
           <Card sx={{ 
             height: '100%',
             borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            border: '1px solid #f0f0f0',
+            border: '1px solid #e3f2fd',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
             transition: 'all 0.3s ease',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+              transition: 'background 0.3s ease',
+            },
             '&:hover': {
               boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-              transform: 'translateY(-2px)'
+              transform: 'translateY(-2px)',
+              '&::before': {
+                background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+              }
             }
           }}>
             <CardContent sx={{ p: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-                <SpeedIcon sx={{ color: 'text.secondary', fontSize: '1.1rem', mr: 1 }} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                <SpeedIcon sx={{ color: 'rgba(224, 224, 224, 0.7)', fontSize: '1.1rem', mr: 1 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#E0E0E0' }}>
                   Motor Speed
                 </Typography>
               </Box>
@@ -533,8 +567,8 @@ const DashboardCommands = ({
         }}>
           <CardContent sx={{ p: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-              <BatterySaverIcon sx={{ fontSize: '1.1rem', color: 'text.secondary', mr: 1 }} />
-              <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+              <BatterySaverIcon sx={{ fontSize: '1.1rem', color: 'rgba(224, 224, 224, 0.7)', mr: 1 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#E0E0E0' }}>
                 Power Saving Mode
               </Typography>
             </Box>
@@ -590,8 +624,8 @@ const DashboardCommands = ({
         }}>
           <CardContent sx={{ p: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-              <RestartAltIcon sx={{ fontSize: '1.1rem', color: 'text.secondary', mr: 1 }} />
-              <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+              <RestartAltIcon sx={{ fontSize: '1.1rem', color: 'rgba(224, 224, 224, 0.7)', mr: 1 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#E0E0E0' }}>
                 Restart Device
               </Typography>
             </Box>

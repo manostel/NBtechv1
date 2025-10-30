@@ -97,8 +97,20 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
       PaperProps={{
         sx: {
           borderRadius: 2,
-          background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
-          color: 'white'
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+          color: '#E0E0E0',
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+            borderRadius: '2px 2px 0 0'
+          }
         }
       }}
     >
@@ -116,7 +128,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
         </Box>
         <IconButton 
           onClick={onClose}
-          sx={{ color: 'white' }}
+          sx={{ color: 'rgba(224, 224, 224, 0.7)' }}
         >
           <Close />
         </IconButton>
@@ -156,7 +168,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
                 size="small"
                 onClick={() => setShowClientId(!showClientId)}
                 sx={{ 
-                  color: 'white',
+                  color: '#E0E0E0',
                   '&:hover': {
                     backgroundColor: 'rgba(255,255,255,0.1)'
                   }
@@ -299,7 +311,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} sx={{ color: 'white' }}>
+        <Button onClick={onClose} sx={{ color: '#E0E0E0' }}>
           Close
         </Button>
       </DialogActions>
@@ -349,8 +361,10 @@ export function DeviceStatusTile({
         p: { xs: 0.25, sm: 0.5 },
         cursor: 'pointer',
         borderRadius: 3,
+        background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         border: '1px solid #e3f2fd',
+        color: '#E0E0E0',
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
@@ -367,7 +381,11 @@ export function DeviceStatusTile({
         transition: 'all 0.3s ease',
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-          transform: 'translateY(-2px)'
+          transform: 'translateY(-2px)',
+          '&::before': {
+            backgroundColor: getStatusColor(status),
+            opacity: 0.8
+          }
         }
       }}
       onClick={onOpenDialog}
@@ -458,7 +476,11 @@ export function DeviceIdentityTile({
         transition: 'all 0.3s ease',
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-          transform: 'translateY(-2px)'
+          transform: 'translateY(-2px)',
+          '&::before': {
+            backgroundColor: getStatusColor(status),
+            opacity: 0.8
+          }
         }
       }}
       onClick={onOpenDialog}
@@ -477,7 +499,7 @@ export function DeviceIdentityTile({
                 fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                 fontWeight: 300,
                 letterSpacing: '0.02em',
-                color: 'white'
+                color: '#E0E0E0'
               }}
             >
               ID: {showClientId ? clientID : '••••••••••••'}
@@ -529,7 +551,19 @@ export function DeviceTimingTile({
   status = 'Offline',
   onOpenDialog = () => {}
 }) {
+  const theme = useTheme();
   const currentUptimeDisplay = useUptime(status, deviceStartTimeInfo);
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Online":
+        return theme.palette.success.main;
+      case "Offline":
+        return theme.palette.error.main;
+      default:
+        return theme.palette.grey[500];
+    }
+  };
 
   // Format timestamp to fixed length: "29/10/2025, 14:53:20"
   const formatTimestamp = (timestamp) => {
@@ -577,14 +611,31 @@ export function DeviceTimingTile({
         p: { xs: 0.25, sm: 0.5 },
         cursor: 'pointer',
         borderRadius: 3,
+        background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         border: '1px solid #e3f2fd',
+        color: '#E0E0E0',
+        position: 'relative',
+        overflow: 'hidden',
         transition: 'all 0.3s ease',
         display: 'flex',
         flexDirection: 'column',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          backgroundColor: getStatusColor(status),
+        },
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-          transform: 'translateY(-2px)'
+          transform: 'translateY(-2px)',
+          '&::before': {
+            backgroundColor: getStatusColor(status),
+            opacity: 0.8
+          }
         }
       }}
       onClick={onOpenDialog}
@@ -603,7 +654,7 @@ export function DeviceTimingTile({
             <PlayArrow 
               sx={{ 
                 fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                color: 'white'
+                color: '#E0E0E0'
               }} 
             />
             <Typography 
@@ -613,7 +664,7 @@ export function DeviceTimingTile({
                 fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                 fontWeight: 300,
                 letterSpacing: '0.02em',
-                color: 'white',
+                color: '#E0E0E0',
                 whiteSpace: 'pre'
               }}
             >
@@ -626,7 +677,7 @@ export function DeviceTimingTile({
             <Sync 
               sx={{ 
                 fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                color: 'white'
+                color: '#E0E0E0'
               }} 
             />
             <Typography 
@@ -636,7 +687,7 @@ export function DeviceTimingTile({
                 fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                 fontWeight: 300,
                 letterSpacing: '0.02em',
-                color: 'white',
+                color: '#E0E0E0',
                 whiteSpace: 'pre'
               }}
             >
@@ -649,7 +700,7 @@ export function DeviceTimingTile({
             <AccessTime 
               sx={{ 
                 fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                color: 'white'
+                color: '#E0E0E0'
               }} 
             />
             <Typography 
@@ -659,7 +710,7 @@ export function DeviceTimingTile({
                 fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                 fontWeight: 300,
                 letterSpacing: '0.02em',
-                color: 'white',
+                color: '#E0E0E0',
                 whiteSpace: 'pre'
               }}
             >
@@ -673,7 +724,7 @@ export function DeviceTimingTile({
               <Build 
                 sx={{ 
                   fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                  color: 'white'
+                  color: '#E0E0E0'
                 }} 
               />
               <Typography 
@@ -683,7 +734,7 @@ export function DeviceTimingTile({
                   fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   fontWeight: 300,
                   letterSpacing: '0.02em',
-                  color: 'white',
+                  color: '#E0E0E0',
                   whiteSpace: 'pre'
                 }}
               >
@@ -698,7 +749,7 @@ export function DeviceTimingTile({
               <Storage 
                 sx={{ 
                   fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                  color: 'white'
+                  color: '#E0E0E0'
                 }} 
               />
               <Typography 
@@ -708,7 +759,7 @@ export function DeviceTimingTile({
                   fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   fontWeight: 300,
                   letterSpacing: '0.02em',
-                  color: 'white',
+                  color: '#E0E0E0',
                   whiteSpace: 'pre'
                 }}
               >
@@ -746,14 +797,31 @@ export function DeviceIndicatorsTile({
         p: { xs: 0.25, sm: 0.5 },
         cursor: 'pointer',
         borderRadius: 3,
+        background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         border: '1px solid #e3f2fd',
+        color: '#E0E0E0',
+        position: 'relative',
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         transition: 'all 0.3s ease',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+          transition: 'background 0.3s ease',
+        },
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-          transform: 'translateY(-2px)'
+          transform: 'translateY(-2px)',
+          '&::before': {
+            background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+          }
         }
       }}
       onClick={onOpenDialog}
@@ -802,7 +870,6 @@ export default function DeviceInfoCard({
   deviceName = '',
   deviceType = '',
   status = 'Offline',
-  lastOnline = 'Never',
   isLoading = false,
   batteryLevel = 0,
   signalStrength = 0,
@@ -877,7 +944,6 @@ DeviceInfoCard.propTypes = {
   deviceName: PropTypes.string,
   deviceType: PropTypes.string,
   status: PropTypes.string,
-  lastOnline: PropTypes.string,
   isLoading: PropTypes.bool,
   batteryLevel: PropTypes.number,
   signalStrength: PropTypes.number,

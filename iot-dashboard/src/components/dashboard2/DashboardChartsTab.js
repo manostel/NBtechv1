@@ -433,8 +433,9 @@ const DashboardChartsTab = ({
       {/* Section Header and Controls in One Row */}
       <Box sx={{ 
         display: 'flex', 
-        alignItems: 'center', 
-        gap: 2, 
+        alignItems: { xs: 'flex-start', sm: 'center' },
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: { xs: 1, sm: 2 }, 
         mb: 2,
         px: 2,
         py: 1.5,
@@ -480,12 +481,13 @@ const DashboardChartsTab = ({
           </Typography>
         </Box>
 
-        {/* Controls - Anchored to Right */}
+        {/* Controls - Responsive Layout */}
         <Box sx={{ 
           display: 'flex', 
-          justifyContent: 'flex-end',
+          justifyContent: { xs: 'flex-start', sm: 'flex-end' },
           alignItems: 'center',
-          flex: 1,
+          flex: { xs: 'none', sm: 1 },
+          width: { xs: '100%', sm: 'auto' },
           minWidth: 0
         }}>
           <SharedControls

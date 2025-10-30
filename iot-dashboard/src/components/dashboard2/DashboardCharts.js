@@ -29,7 +29,7 @@ export default function DashboardCharts({ metricsData, metricsConfig, isLoading 
     labels: Array.from({ length: metricsData[Object.keys(metricsData)[0]]?.length || 0 }, (_, i) => {
       const now = new Date();
       const timeAgo = now.getTime() - (i * 60000); // Assuming 1-minute intervals
-      return new Date(timeAgo).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return new Date(timeAgo).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
     }),
     datasets: Object.entries(metricsConfig)
       .filter(([key]) => !['client_id', 'ClientID'].includes(key))
