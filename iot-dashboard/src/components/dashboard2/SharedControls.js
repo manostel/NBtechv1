@@ -35,14 +35,16 @@ const SharedControls = ({
   return (
     <Box sx={{ 
       display: 'flex', 
-      flexDirection: { xs: 'column', sm: 'row' },
-      alignItems: { xs: 'stretch', sm: 'center' },
+      flexDirection: 'row',
+      flexWrap: 'nowrap',
+      alignItems: 'center',
       justifyContent: 'flex-end',
       gap: { xs: 0.5, sm: 2 },
-      '& > *': { height: '32px', width: { xs: '100%', sm: 'auto' } }
+      minWidth: 0,
+      '& > *': { height: '32px', width: 'auto', minWidth: 0 }
     }}>
       <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 2 }, justifyContent: 'flex-end' }}>
-        <FormControl size="small" sx={{ width: { xs: 100, sm: 120 } }}>
+        <FormControl size="small" sx={{ width: { xs: 92, sm: 120 } }}>
           <InputLabel sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>Time Range</InputLabel>
           <Select
             value={timeRange}

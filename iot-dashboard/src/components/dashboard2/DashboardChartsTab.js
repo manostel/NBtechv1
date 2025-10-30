@@ -433,9 +433,10 @@ const DashboardChartsTab = ({
       {/* Section Header and Controls in One Row */}
       <Box sx={{ 
         display: 'flex', 
-        alignItems: { xs: 'flex-start', sm: 'center' },
-        flexDirection: { xs: 'column', sm: 'row' },
-        gap: { xs: 1, sm: 2 }, 
+        alignItems: 'center',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        gap: { xs: 0.5, sm: 2 }, 
         mb: 2,
         px: 2,
         py: 1.5,
@@ -458,7 +459,7 @@ const DashboardChartsTab = ({
       }}>
         {/* Section Title */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-          <Box sx={{ 
+        <Box sx={{ 
             p: 0.5, 
             borderRadius: 2,
             background: 'linear-gradient(135deg, #2196f3, #4caf50)',
@@ -470,11 +471,11 @@ const DashboardChartsTab = ({
             <TrendingUpIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
           </Box>
           <Typography variant="h6" sx={{ 
-            fontSize: '1rem', 
+            fontSize: { xs: '0.95rem', sm: '1rem' }, 
             fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-            fontWeight: 500,
-            letterSpacing: '0.5px',
-            textTransform: 'uppercase',
+            fontWeight: 400,
+            letterSpacing: '0.2px',
+            textTransform: 'none',
             color: '#E0E0E0'
           }}>
             Graphs
@@ -484,11 +485,11 @@ const DashboardChartsTab = ({
         {/* Controls - Responsive Layout */}
         <Box sx={{ 
           display: 'flex', 
-          justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+          justifyContent: 'flex-end',
           alignItems: 'center',
-          flex: { xs: 'none', sm: 1 },
-          width: { xs: '100%', sm: 'auto' },
-          minWidth: 0
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden'
         }}>
           <SharedControls
             selectedVariables={selectedVariables}

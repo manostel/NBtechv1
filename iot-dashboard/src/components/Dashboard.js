@@ -1550,37 +1550,38 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         <Tabs
           value={selectedTab}
           onChange={handleTabChange}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
-              minHeight: '48px',
-              ml: 0,
-              pl: 0,
+            minHeight: { xs: 38, sm: 44 },
+            ml: 0,
+            pl: 0,
             '& .MuiTab-root': {
-                minHeight: '48px',
-                fontSize: '0.875rem',
-                textTransform: 'none',
+              minHeight: { xs: 38, sm: 46 },
+              fontSize: { xs: '0.9rem', sm: '1rem' },
+              textTransform: 'none',
+              fontWeight: 500,
+              letterSpacing: '0.2px',
+              px: { xs: 1, sm: 2 },
+              color: theme.palette.text.secondary,
+              borderRadius: 2,
+              margin: { xs: '2px', sm: '4px' },
+              transition: 'all 0.3s ease',
+              '&.Mui-selected': {
+                color: theme.palette.mode === 'dark' ? '#4caf50' : '#1976d2',
                 fontWeight: 600,
-                px: 2,
-                color: theme.palette.text.secondary,
-                borderRadius: 2,
-                margin: '4px',
-                transition: 'all 0.3s ease',
-                '&.Mui-selected': {
-                  color: theme.palette.mode === 'dark' ? '#4caf50' : '#1976d2',
-                  fontWeight: 700,
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(76, 175, 80, 0.15)' 
-                    : 'rgba(25, 118, 210, 0.08)',
-                },
-                '&:hover': {
-                  color: theme.palette.mode === 'dark' ? '#4caf50' : '#1976d2',
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(255, 255, 255, 0.05)' 
-                    : 'rgba(25, 118, 210, 0.04)',
-                  transform: 'translateY(-1px)'
-                }
+                backgroundColor: theme.palette.mode === 'dark'
+                  ? 'rgba(76, 175, 80, 0.15)'
+                  : 'rgba(25, 118, 210, 0.08)',
+              },
+              '&:hover': {
+                color: theme.palette.mode === 'dark' ? '#4caf50' : '#1976d2',
+                backgroundColor: theme.palette.mode === 'dark'
+                  ? 'rgba(255, 255, 255, 0.05)'
+                  : 'rgba(25, 118, 210, 0.04)',
+                transform: 'translateY(-1px)'
+              }
             },
             '& .MuiTabs-indicator': {
               height: '3px',

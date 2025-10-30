@@ -13,24 +13,19 @@ export default function BatteryIndicator({ value, isCharging, batteryState, char
     return theme.palette.error.main;
   };
 
-  // Get state icon based on charging status (1 = charging, 0 = not charging)
+  // Only show a state icon when charging; otherwise no icon
   const getStateIcon = () => {
-    // Only use charging field from API (1 or 0)
     if (charging === 1) {
       return <FaBolt size={12} style={{ color: theme.palette.success.main }} />;
-    } else if (charging === 0) {
-      return <FaArrowDown size={12} style={{ color: theme.palette.error.main }} />;
-    } else {
-      // Any other value (undefined, null, etc.) - show question mark
-      return <HelpOutline sx={{ fontSize: 12, color: theme.palette.text.secondary }} />;
     }
+    return null;
   };
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
       <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, height: 20 }}>
         <FaBatteryFull size={16} style={{ color: getBatteryColor(value) }} />
-        {batteryState && (
+        {charging === 1 && (
           <Box sx={{ 
             display: 'flex',
             alignItems: 'center',

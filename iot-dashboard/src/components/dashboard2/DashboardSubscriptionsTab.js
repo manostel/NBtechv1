@@ -1568,11 +1568,11 @@ export default function DashboardSubscriptionsTab({
               <NotificationsIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
             </Box>
             <Typography variant="h6" sx={{ 
-              fontSize: '1rem', 
+              fontSize: { xs: '0.95rem', sm: '1rem' }, 
               fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-              fontWeight: 500,
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
+              fontWeight: 400,
+              letterSpacing: '0.2px',
+              textTransform: 'none',
               color: '#E0E0E0'
             }}>
               Subscriptions

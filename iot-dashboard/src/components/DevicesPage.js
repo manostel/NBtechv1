@@ -2363,11 +2363,31 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                           </IconButton>
                         </Box>
 
-                        {/* Device Type - Updated */}
+                        {/* Device Type - Styled chip */}
                         {latestData.device && (
-                          <Typography variant="body2" color="textSecondary" gutterBottom sx={{ color: 'rgba(224,224,224,0.8)' }}>
-                            Device Type: {latestData.device}
-                          </Typography>
+                          <Box sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 0.75,
+                            px: 1,
+                            py: 0.5,
+                            borderRadius: 2,
+                            border: '1px solid #e3f2fd',
+                            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.6) 0%, rgba(31, 37, 71, 0.8) 50%, rgba(26, 31, 60, 0.6) 100%)',
+                            color: 'rgba(224,224,224,0.85)',
+                            width: 'fit-content',
+                            mb: 1
+                          }}>
+                            <Box sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: 'linear-gradient(90deg, #4caf50, #2196f3)'
+                            }} />
+                            <Typography variant="caption" sx={{ fontWeight: 500, letterSpacing: '0.2px' }}>
+                              {latestData.device}
+                            </Typography>
+                          </Box>
                         )}
 
                         {/* Indicators */}
@@ -2557,13 +2577,13 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                           );
                         })()}
 
-                        {/* Last Updated */}
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 'auto', pt: 1, color: 'rgba(224,224,224,0.7)' }}>
-                          Last Updated: {latestData.timestamp ? 
-                            new Date(latestData.timestamp).toLocaleString('en-GB', { hour12: false }) : 
-                            'Never'
-                          }
-                        </Typography>
+                        {/* Last Updated - compact with icon */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 'auto', pt: 1, color: 'rgba(224,224,224,0.7)' }}>
+                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', background: 'linear-gradient(90deg, #2196f3, #4caf50)' }} />
+                          <Typography variant="caption" sx={{ color: 'rgba(224,224,224,0.75)' }}>
+                            {latestData.timestamp ? new Date(latestData.timestamp).toLocaleString('en-GB', { hour12: false }) : 'Never'}
+                          </Typography>
+                        </Box>
 
                         {/* Actions */}
                         <Box sx={{ 

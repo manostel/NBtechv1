@@ -92,7 +92,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
     <Dialog 
       open={open} 
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
       PaperProps={{
         sx: {
@@ -140,7 +140,7 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
               <Typography variant="h5" sx={{ fontWeight: 300, mb: 1, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                 {deviceName}
               </Typography>
-              <Typography variant="body1" color="grey.300" sx={{ mb: 2 }}>
+              <Typography variant="body1" color="grey.300" sx={{ mb: 2, fontSize: { xs: '0.95rem', sm: '1rem' } }}>
                 {deviceType}
               </Typography>
               <Box display="flex" alignItems="center" gap={1}>
@@ -203,14 +203,14 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
               <Grid item xs={12} sm={4}>
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                   <PlayArrow sx={{ fontSize: '1.2rem' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 400, fontSize: { xs: '0.9rem', sm: '0.95rem' }, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                     Startup Time
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
                   fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   backgroundColor: 'rgba(255,255,255,0.1)',
-                  p: 1,
+                  p: 1.25,
                   borderRadius: 1
                 }}>
                   {deviceStartTimeInfo?.timestamp ? 
@@ -228,15 +228,15 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
               </Grid>
               <Grid item xs={12} sm={4}>
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
-                  <Sync sx={{ fontSize: '1.2rem' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                  <Sync sx={{ fontSize: '1.2rem', animation: 'spin 2s linear infinite', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 400, fontSize: { xs: '0.9rem', sm: '0.95rem' }, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                     Last Sync
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
                   fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   backgroundColor: 'rgba(255,255,255,0.1)',
-                  p: 1,
+                  p: 1.25,
                   borderRadius: 1
                 }}>
                   {lastTimestamp ? 
@@ -248,14 +248,14 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
               <Grid item xs={12} sm={4}>
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                   <AccessTime sx={{ fontSize: '1.2rem' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 400, fontSize: { xs: '0.9rem', sm: '0.95rem' }, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                     Uptime
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
                   fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   backgroundColor: 'rgba(255,255,255,0.1)',
-                  p: 1,
+                  p: 1.25,
                   borderRadius: 1
                 }}>
                   {currentUptimeDisplay}
@@ -273,14 +273,14 @@ const DeviceInfoDialog = ({ open, onClose, deviceName, deviceType, clientID, sta
                   <Grid item xs={12} sm={6}>
                     <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                       <Build sx={{ fontSize: '1.2rem' }} />
-                      <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 400, fontSize: { xs: '0.9rem', sm: '0.95rem' }, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
                         Firmware Version
                       </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ 
                       fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                       backgroundColor: 'rgba(255,255,255,0.1)',
-                      p: 1,
+                      p: 1.25,
                       borderRadius: 1
                     }}>
                       {deviceStartTimeInfo.startup_data.firmware_version}
@@ -650,7 +650,7 @@ export function DeviceTimingTile({
       }}>
         <Box display="flex" flexDirection="column" gap={0}>
           {/* Start Time */}
-          <Box display="flex" alignItems="center" gap={0.5}>
+          <Box display="flex" alignItems="center" gap={0.75}>
             <PlayArrow 
               sx={{ 
                 fontSize: { xs: '0.8rem', sm: '0.9rem' },
@@ -660,7 +660,7 @@ export function DeviceTimingTile({
             <Typography 
               variant="body2" 
               sx={{ 
-                fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                fontSize: { xs: '0.85rem', sm: '0.9rem' },
                 fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                 fontWeight: 300,
                 letterSpacing: '0.02em',
@@ -673,17 +673,19 @@ export function DeviceTimingTile({
           </Box>
 
           {/* Last Sync */}
-          <Box display="flex" alignItems="center" gap={0.5}>
+          <Box display="flex" alignItems="center" gap={0.75}>
             <Sync 
               sx={{ 
-                fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                color: '#E0E0E0'
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                color: '#E0E0E0',
+                animation: 'spin 2s linear infinite',
+                '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }
               }} 
             />
             <Typography 
               variant="body2" 
               sx={{ 
-                fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                fontSize: { xs: '0.85rem', sm: '0.9rem' },
                 fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                 fontWeight: 300,
                 letterSpacing: '0.02em',
@@ -696,7 +698,7 @@ export function DeviceTimingTile({
           </Box>
 
           {/* Uptime */}
-          <Box display="flex" alignItems="center" gap={0.5}>
+          <Box display="flex" alignItems="center" gap={0.75}>
             <AccessTime 
               sx={{ 
                 fontSize: { xs: '0.8rem', sm: '0.9rem' },
@@ -706,7 +708,7 @@ export function DeviceTimingTile({
             <Typography 
               variant="body2" 
               sx={{ 
-                fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                fontSize: { xs: '0.85rem', sm: '0.9rem' },
                 fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                 fontWeight: 300,
                 letterSpacing: '0.02em',
@@ -720,17 +722,17 @@ export function DeviceTimingTile({
 
           {/* Firmware Version */}
           {deviceStartTimeInfo?.startup_data?.firmware_version && (
-            <Box display="flex" alignItems="center" gap={0.5}>
+            <Box display="flex" alignItems="center" gap={0.75}>
               <Build 
                 sx={{ 
-                  fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                  fontSize: { xs: '0.9rem', sm: '1rem' },
                   color: '#E0E0E0'
                 }} 
               />
               <Typography 
                 variant="body2" 
                 sx={{ 
-                  fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                  fontSize: { xs: '0.85rem', sm: '0.9rem' },
                   fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   fontWeight: 300,
                   letterSpacing: '0.02em',
@@ -745,17 +747,17 @@ export function DeviceTimingTile({
 
           {/* Boot Reason */}
           {deviceStartTimeInfo?.startup_data?.boot_reason && (
-            <Box display="flex" alignItems="center" gap={0.5}>
+            <Box display="flex" alignItems="center" gap={0.75}>
               <Storage 
                 sx={{ 
-                  fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                  fontSize: { xs: '0.9rem', sm: '1rem' },
                   color: '#E0E0E0'
                 }} 
               />
               <Typography 
                 variant="body2" 
                 sx={{ 
-                  fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                  fontSize: { xs: '0.85rem', sm: '0.9rem' },
                   fontFamily: '"Exo 2", "Roboto Mono", "Courier New", monospace',
                   fontWeight: 300,
                   letterSpacing: '0.02em',
