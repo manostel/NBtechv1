@@ -580,7 +580,19 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           client_id: device.client_id,
           user_email: user.email,
           time_range: timeRange,
-          points: 60,
+          points: timeRange === 'live' ? 60 :
+                 timeRange === '15m' ? 15 :
+                 timeRange === '1h' ? 60 :
+                 timeRange === '2h' ? 120 :
+                 timeRange === '4h' ? 240 :
+                 timeRange === '6h' ? 360 :
+                 timeRange === '8h' ? 480 :
+                 timeRange === '16h' ? 960 :
+                 timeRange === '24h' ? 288 :
+                 timeRange === '3d' ? 432 :
+                 timeRange === '7d' ? 336 :
+                 timeRange === '30d' ? 720 :
+                 60,
           include_state: true,
           selected_variables: variables
         })
@@ -1030,10 +1042,15 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
           points: timeRange === 'live' ? 60 : 
                  timeRange === '15m' ? 15 :
                  timeRange === '1h' ? 60 :
-                 timeRange === '24h' ? 96 : // 15-minute intervals for 24h
-                 timeRange === '3d' ? 144 : // 30-minute intervals for 3d
-                 timeRange === '7d' ? 168 : // 1-hour intervals for 7d
-                 timeRange === '30d' ? 360 : // 2-hour intervals for 30d
+                 timeRange === '2h' ? 120 :
+                 timeRange === '4h' ? 240 :
+                 timeRange === '6h' ? 360 :
+                 timeRange === '8h' ? 480 :
+                 timeRange === '16h' ? 960 :
+                 timeRange === '24h' ? 288 :
+                 timeRange === '3d' ? 432 :
+                 timeRange === '7d' ? 336 :
+                 timeRange === '30d' ? 720 :
                  60,
           include_state: true,
           selected_variables: selectedVariablesChartsStats

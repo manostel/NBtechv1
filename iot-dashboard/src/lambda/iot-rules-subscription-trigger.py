@@ -1009,13 +1009,26 @@ def check_subscription_cooldown_sync(subscription):
         # Parse last trigger time
         last_trigger_time = datetime.fromisoformat(last_triggered.replace('Z', '+00:00'))
         current_time = datetime.now(timezone.utc)
-        
-        # Cooldown period: 30 seconds minimum between triggers
-        cooldown_seconds = 30
-        time_diff = (current_time - last_trigger_time).total_seconds()
-        
-        if time_diff < cooldown_seconds:
-            logger.info(f"Subscription {subscription_id} cooldown: {cooldown_seconds - time_diff:.1f}s remaining")
+
+        # Cooldown: prefer per-subscription value in milliseconds, fallback to 30s
+        cooldown_ms = subscription.get('cooldown_ms')
+        if cooldown_ms is None:
+            # Try to read from stored item in case UI/backend saved it there
+            cooldown_ms = item.get('cooldown_ms') if isinstance(item, dict) else None
+        if cooldown_ms is None:
+            cooldown_ms = 30000  # default 30s
+        try:
+            cooldown_ms = int(cooldown_ms)
+        except Exception:
+            cooldown_ms = 30000
+
+        if cooldown_ms <= 0:
+            return True  # no cooldown
+
+        time_diff_ms = int((current_time - last_trigger_time).total_seconds() * 1000)
+        if time_diff_ms < cooldown_ms:
+            remaining_ms = cooldown_ms - time_diff_ms
+            logger.info(f"Subscription {subscription_id} cooldown: {remaining_ms/1000:.1f}s remaining")
             return False
         
         return True

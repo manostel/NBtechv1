@@ -139,6 +139,7 @@ export default function DashboardSubscriptionsTab({
     parameter_name: '',
     condition_type: 'change',
     threshold_value: '',
+    cooldown_ms: 30000,
     notification_method: 'in_app',
     enabled: true,
     description: '',
@@ -349,6 +350,7 @@ export default function DashboardSubscriptionsTab({
         parameter_name: formData.parameter_name,
         condition_type: formData.condition_type,
         threshold_value: formData.threshold_value || null,
+        cooldown_ms: typeof formData.cooldown_ms === 'number' ? formData.cooldown_ms : 30000,
         notification_method: formData.notification_method,
         enabled: formData.enabled,
         description: formData.description,
@@ -571,6 +573,7 @@ export default function DashboardSubscriptionsTab({
       parameter_name: '',
       condition_type: 'change',
       threshold_value: '',
+      cooldown_ms: 30000,
       notification_method: 'in_app',
       enabled: true,
       description: '',
@@ -590,6 +593,7 @@ export default function DashboardSubscriptionsTab({
       parameter_name: subscription.parameter_name,
       condition_type: subscription.condition_type,
       threshold_value: subscription.threshold_value || '',
+      cooldown_ms: typeof subscription.cooldown_ms === 'number' ? subscription.cooldown_ms : 30000,
       notification_method: subscription.notification_method,
       enabled: subscription.enabled,
       description: subscription.description || '',
@@ -792,6 +796,13 @@ export default function DashboardSubscriptionsTab({
                 size="small"
                 variant="outlined"
               />
+            {!!(subscription.cooldown_ms > 0) && (
+              <Chip
+                label={`${Math.floor(subscription.cooldown_ms / 1000)}s cooldown`}
+                size="small"
+                variant="outlined"
+              />
+            )}
               {subscription.commands && subscription.commands.some(cmd => cmd.action !== 'none') && (
                 subscription.commands
                   .filter(cmd => cmd.action !== 'none')
@@ -1010,6 +1021,21 @@ export default function DashboardSubscriptionsTab({
               />
             </Grid>
           )}
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Cooldown (seconds)"
+              value={Math.max(0, Math.floor((Number(formData.cooldown_ms || 0)) / 1000))}
+              onChange={(e) => {
+                const secs = Math.max(0, parseInt(e.target.value || '0', 10));
+                setFormData({ ...formData, cooldown_ms: secs * 1000 });
+              }}
+              type="number"
+              inputProps={{ min: 0 }}
+              helperText="Minimum time between triggers. Set 0 to disable cooldown."
+            />
+          </Grid>
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
@@ -1324,6 +1350,21 @@ export default function DashboardSubscriptionsTab({
               />
             </Grid>
           )}
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Cooldown (seconds)"
+              value={Math.max(0, Math.floor((Number(formData.cooldown_ms || 0)) / 1000))}
+              onChange={(e) => {
+                const secs = Math.max(0, parseInt(e.target.value || '0', 10));
+                setFormData({ ...formData, cooldown_ms: secs * 1000 });
+              }}
+              type="number"
+              inputProps={{ min: 0 }}
+              helperText="Minimum time between triggers. Set 0 to disable cooldown."
+            />
+          </Grid>
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>

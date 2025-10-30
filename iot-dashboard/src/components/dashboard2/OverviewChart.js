@@ -35,7 +35,8 @@ ChartJS.defaults.plugins.legend.labels.fontColor = '#ffffff';
 
 const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, user }) => {
   const [selectedMetric, setSelectedMetric] = useState('');
-  const [timeRange, setTimeRange] = useState('1h');
+  const [metricsTimeRange, setMetricsTimeRange] = useState('1h');
+  const [stateTimeRange, setStateTimeRange] = useState('1h');
   const [chartView, setChartView] = useState('metrics'); // 'metrics' or 'state'
   const [selectedMetrics, setSelectedMetrics] = useState([]); // For metrics view checkboxes
   const [selectedOutputs, setSelectedOutputs] = useState([]); // Will be auto-populated
@@ -96,7 +97,7 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
         (chartView === 'state' && (selectedOutputs.length > 0 || selectedInputs.length > 0))) {
       fetchChartData();
     }
-  }, [chartView, selectedMetrics, selectedOutputs, selectedInputs, timeRange]);
+  }, [chartView, selectedMetrics, selectedOutputs, selectedInputs, metricsTimeRange, stateTimeRange]);
 
   const fetchChartData = async () => {
     if (!device || !user) return;
@@ -109,6 +110,9 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
         ? selectedMetrics
         : [...selectedOutputs, ...selectedInputs];
       
+      // Use per-view time range
+      const effectiveTimeRange = chartView === 'metrics' ? metricsTimeRange : stateTimeRange;
+
       const response = await fetch(DASHBOARD_DATA_URL, {
         method: 'POST',
         headers: {
@@ -119,11 +123,19 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
           action: 'get_dashboard_data',
           client_id: device.client_id,
           user_email: user.email,
-          time_range: timeRange,
-          points: timeRange === '1h' ? 60 :
-                 timeRange === '6h' ? 72 :
-                 timeRange === '24h' ? 96 :
-                 timeRange === '7d' ? 168 :
+          time_range: effectiveTimeRange,
+          points: effectiveTimeRange === 'live' ? 60 :
+                 effectiveTimeRange === '15m' ? 15 :
+                 effectiveTimeRange === '1h' ? 60 :
+                 effectiveTimeRange === '2h' ? 120 :
+                 effectiveTimeRange === '4h' ? 240 :
+                 effectiveTimeRange === '6h' ? 360 :
+                 effectiveTimeRange === '8h' ? 480 :
+                 effectiveTimeRange === '16h' ? 960 :
+                 effectiveTimeRange === '24h' ? 288 :
+                 effectiveTimeRange === '3d' ? 432 :
+                 effectiveTimeRange === '7d' ? 336 :
+                 effectiveTimeRange === '30d' ? 360 :
                  60,
           include_state: true,
           selected_variables: selectedVars,
@@ -579,15 +591,22 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
           <FormControl size="small" sx={{ minWidth: { xs: 60, sm: 70 }, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
             <InputLabel>Time</InputLabel>
             <Select
-              value={timeRange}
+              value={chartView === 'metrics' ? metricsTimeRange : stateTimeRange}
               label="Time"
-              onChange={(e) => setTimeRange(e.target.value)}
+              onChange={(e) => chartView === 'metrics' ? setMetricsTimeRange(e.target.value) : setStateTimeRange(e.target.value)}
               sx={{ fontSize: '0.8rem' }}
             >
+              <MenuItem value="15m" sx={{ fontSize: '0.8rem' }}>15m</MenuItem>
               <MenuItem value="1h" sx={{ fontSize: '0.8rem' }}>1h</MenuItem>
+              <MenuItem value="2h" sx={{ fontSize: '0.8rem' }}>2h</MenuItem>
+              <MenuItem value="4h" sx={{ fontSize: '0.8rem' }}>4h</MenuItem>
               <MenuItem value="6h" sx={{ fontSize: '0.8rem' }}>6h</MenuItem>
+              <MenuItem value="8h" sx={{ fontSize: '0.8rem' }}>8h</MenuItem>
+              <MenuItem value="16h" sx={{ fontSize: '0.8rem' }}>16h</MenuItem>
               <MenuItem value="24h" sx={{ fontSize: '0.8rem' }}>24h</MenuItem>
+              <MenuItem value="3d" sx={{ fontSize: '0.8rem' }}>3d</MenuItem>
               <MenuItem value="7d" sx={{ fontSize: '0.8rem' }}>7d</MenuItem>
+              <MenuItem value="30d" sx={{ fontSize: '0.8rem' }}>30d</MenuItem>
             </Select>
           </FormControl>
           {chartView === 'metrics' && (

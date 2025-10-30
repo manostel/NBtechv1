@@ -67,6 +67,15 @@ def validate_subscription_data(subscription_data):
         if 'threshold_value' not in subscription_data or not subscription_data['threshold_value']:
             return False, f"threshold_value is required for condition_type: {subscription_data['condition_type']}"
     
+    # Optional: cooldown_ms must be integer >= 0 if provided
+    if 'cooldown_ms' in subscription_data:
+        try:
+            cooldown_ms = int(subscription_data.get('cooldown_ms'))
+            if cooldown_ms < 0:
+                return False, "cooldown_ms must be >= 0"
+        except Exception:
+            return False, "cooldown_ms must be an integer"
+    
     return True, "Valid"
 
 def check_conflicting_subscriptions(user_email, device_id, parameter_name, condition_type, subscription_id=None):
@@ -245,6 +254,7 @@ def create_subscription(user_email, subscription_data):
             'parameter_name': subscription_data['parameter_name'],
             'condition_type': subscription_data['condition_type'],
             'threshold_value': subscription_data.get('threshold_value', None),
+            'cooldown_ms': int(subscription_data.get('cooldown_ms', 30000)) if str(subscription_data.get('cooldown_ms', '')).strip() != '' else 30000,
             'notification_method': subscription_data['notification_method'],
             'enabled': subscription_data.get('enabled', True),
             'description': subscription_data.get('description', ''),
@@ -330,8 +340,8 @@ def update_subscription(user_email, subscription_id, subscription_data):
                         new_value != conflict_value):
                         return False, f"Another active subscription monitoring '{subscription_data['parameter_name']}' would trigger a different command for {conflict_action} ({conflict_value} vs {new_value}). This would cause conflicting actions. Please disable the existing subscription or adjust your command settings."
         
-        # Update subscription - include commands in the update
-        update_expression = "SET device_id = :device_id, parameter_type = :parameter_type, parameter_name = :parameter_name, condition_type = :condition_type, threshold_value = :threshold_value, notification_method = :notification_method, enabled = :enabled, description = :description, commands = :commands, updated_at = :updated_at"
+        # Update subscription - include commands and cooldown in the update
+        update_expression = "SET device_id = :device_id, parameter_type = :parameter_type, parameter_name = :parameter_name, condition_type = :condition_type, threshold_value = :threshold_value, cooldown_ms = :cooldown_ms, notification_method = :notification_method, enabled = :enabled, description = :description, commands = :commands, updated_at = :updated_at"
         
         expression_values = {
             ':device_id': subscription_data['device_id'],
@@ -340,6 +350,7 @@ def update_subscription(user_email, subscription_id, subscription_data):
             ':condition_type': subscription_data['condition_type'],
             ':threshold_value': subscription_data.get('threshold_value', None),
             ':notification_method': subscription_data['notification_method'],
+            ':cooldown_ms': int(subscription_data.get('cooldown_ms', 30000)) if str(subscription_data.get('cooldown_ms', '')).strip() != '' else 30000,
             ':enabled': subscription_data.get('enabled', True),
             ':description': subscription_data.get('description', ''),
             ':commands': subscription_data.get('commands', []),

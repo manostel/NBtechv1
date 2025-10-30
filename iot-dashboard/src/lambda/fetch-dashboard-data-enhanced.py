@@ -1,6 +1,6 @@
 import json
 import boto3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from decimal import Decimal
 from statistics import mean
@@ -57,19 +57,19 @@ def get_step_size(time_range):
     elif time_range == '16h':
         return timedelta(minutes=5)  # 5-minute step
     elif time_range == '24h':
-        return timedelta(minutes=30)  # 30-minute step (was 15)
+        return timedelta(minutes=5)  # finer granularity for small changes
     elif time_range == '3d':
-        return timedelta(hours=2)  # 2-hour step (was 130 minutes)
+        return timedelta(minutes=10)  # 10-minute step
     elif time_range == '7d':
-        return timedelta(hours=6)  # 6-hour step (was 3 hours)
+        return timedelta(minutes=30)  # 30-minute step
     elif time_range == '30d':
-        return timedelta(hours=12)  # 12-hour step (was 5 hours)
+        return timedelta(hours=2)  # 2-hour step to reduce load
     else:
         return timedelta(minutes=1)  # Default to 1-minute step
 
 def get_time_range_and_points(time_range, target_points=100):
     """Get start time and calculate interval for consistent points"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     step = get_step_size(time_range)
     
     if time_range == 'live':
@@ -414,77 +414,71 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
         logger.error(f"Error in fetch_data_in_chunks from {table_type} table: {str(e)}")
         raise
 
-def aggregate_data(items, target_points, selected_variables=None, table_type='data', requested_time_range='1h'):
-    """Aggregate data points to match target number of points"""
+def aggregate_data(items, target_points, selected_variables=None, table_type='data', requested_time_range='1h',
+                   requested_start_time: datetime = None, requested_end_time: datetime = None):
+    """Aggregate data points to match target number of points across the full requested window.
+    For status data, fill empty intervals using the last known value (forward-fill)."""
     if not items:
         return []
     
     # Sort items by timestamp
     sorted_items = sorted(items, key=lambda x: x['timestamp'])
     
-    # Calculate time step based on requested time range, not actual data range
-    start_time = datetime.fromisoformat(sorted_items[0]['timestamp'].replace('Z', '+00:00'))
-    end_time = datetime.fromisoformat(sorted_items[-1]['timestamp'].replace('Z', '+00:00'))
+    # Calculate time step based on requested time range
+    # Use the requested start/end window when provided, so we cover the full period
+    if requested_start_time is not None and requested_end_time is not None:
+        start_time = requested_start_time
+        end_time = requested_end_time
+    else:
+        start_time = datetime.fromisoformat(sorted_items[0]['timestamp'].replace('Z', '+00:00'))
+        end_time = datetime.fromisoformat(sorted_items[-1]['timestamp'].replace('Z', '+00:00'))
     
     # Use the requested time range step size instead of calculating from data
     step = get_step_size(requested_time_range)
     
-    # Calculate number of intervals
-    num_intervals = int((end_time - start_time) / step) + 1
-    
     # Initialize aggregated data
     aggregated_data = []
     current_interval_start = start_time
-    current_interval_items = []
+    last_values = {}
+    item_index = 0
+    total_items = len(sorted_items)
     
-    # Process items in chronological order
-    for item in sorted_items:
-        item_time = datetime.fromisoformat(item['timestamp'].replace('Z', '+00:00'))
+    # Walk the full window, interval by interval
+    while current_interval_start < end_time:
+        interval_end = current_interval_start + step
+        interval_items = []
         
-        # If item is within current interval, add it to current interval items
-        if item_time < current_interval_start + step:
-            current_interval_items.append(item)
-        else:
-            # Process current interval if it has items
-            if current_interval_items:
-                # Calculate average values for the interval
-                interval_data = {'timestamp': current_interval_start.isoformat() + 'Z'}
-                for var in selected_variables:
-                    values = [float(item[var]) for item in current_interval_items if var in item]
-                    if values:
-                        # For state history (status table), use mode instead of mean for boolean values
-                        if table_type == 'status' and (var.endswith('_state') or var in ['charging', 'power_saving']):
-                            # Count occurrences and use most frequent value
-                            from collections import Counter
-                            value_counts = Counter(values)
-                            most_common_value = value_counts.most_common(1)[0][0]
-                            interval_data[var] = int(most_common_value)
-                        else:
-                            # Round to 2 decimal places for metrics
-                            interval_data[var] = round(mean(values), 2)
-                aggregated_data.append(interval_data)
-            
-            # Move to next interval
-            current_interval_start = current_interval_start + step
-            current_interval_items = [item]
-    
-    # Process the last interval
-    if current_interval_items:
+        # Collect items that fall into this interval
+        while item_index < total_items:
+            item_time = datetime.fromisoformat(sorted_items[item_index]['timestamp'].replace('Z', '+00:00'))
+            if item_time < interval_end:
+                interval_items.append(sorted_items[item_index])
+                item_index += 1
+            else:
+                break
+        
         interval_data = {'timestamp': current_interval_start.isoformat() + 'Z'}
-        for var in selected_variables:
-            values = [float(item[var]) for item in current_interval_items if var in item]
-            if values:
-                # For state history (status table), use mode instead of mean for boolean values
-                if table_type == 'status' and (var.endswith('_state') or var in ['charging', 'power_saving']):
-                    # Count occurrences and use most frequent value
-                    from collections import Counter
-                    value_counts = Counter(values)
-                    most_common_value = value_counts.most_common(1)[0][0]
-                    interval_data[var] = int(most_common_value)
+        if selected_variables:
+            for var in selected_variables:
+                values = [float(it[var]) for it in interval_items if var in it]
+                if values:
+                    if table_type == 'status' and (var.endswith('_state') or var in ['charging', 'power_saving']):
+                        from collections import Counter
+                        value_counts = Counter(values)
+                        most_common_value = value_counts.most_common(1)[0][0]
+                        interval_data[var] = int(most_common_value)
+                    else:
+                        interval_data[var] = round(mean(values), 2)
+                    last_values[var] = interval_data[var]
                 else:
-                    # Round to 2 decimal places for metrics
-                    interval_data[var] = round(mean(values), 2)
+                    # No data this interval: forward-fill for status; leave missing for metrics
+                    if table_type == 'status':
+                        if var in last_values:
+                            interval_data[var] = last_values[var]
+                        else:
+                            interval_data[var] = 0
         aggregated_data.append(interval_data)
+        current_interval_start = interval_end
     
     # If we have more points than target, resample to match target
     if len(aggregated_data) > target_points:
@@ -606,7 +600,7 @@ def lambda_handler(event, context):
             }
             
         # Get the time range and points
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         end_time = now  # Set end_time immediately
         
         if time_range == 'live':
@@ -635,16 +629,16 @@ def lambda_handler(event, context):
             target_points = 960
         elif time_range == '24h':
             start_time = now - timedelta(hours=24)
-            target_points = 96  # 4 points per hour
+            target_points = 288  # 12 points per hour (5-min)
         elif time_range == '3d':
             start_time = now - timedelta(days=3)
-            target_points = 144  # 2 points per hour
+            target_points = 432  # 6 points per hour (10-min)
         elif time_range == '7d':
             start_time = now - timedelta(days=7)
-            target_points = 168  # 1 point per hour
+            target_points = 336  # 2 points per hour (30-min)
         elif time_range == '30d':
             start_time = now - timedelta(days=30)
-            target_points = 360  # 1 point every 2 hours
+            target_points = 360  # 1 point per 2 hours
         else:
             start_time = now - timedelta(hours=1)
             target_points = 60
@@ -698,25 +692,20 @@ def lambda_handler(event, context):
                 })
             }
             
-        # For state history (status table), return raw data without aggregation
-        # For metrics (data table), aggregate to achieve consistent number of points
-        if table_type == 'status':
-            # Return raw data for state history - no aggregation
-            aggregated_data = []
-            for item in items:
-                data_point = {'timestamp': item['timestamp']}
-                for var in selected_variables:
-                    if var in item:
-                        # Convert Decimal to float for JSON serialization
-                        value = item[var]
-                        if isinstance(value, Decimal):
-                            data_point[var] = float(value)
-                        else:
-                            data_point[var] = value
-                aggregated_data.append(data_point)
-        else:
-            # Aggregate data for metrics to achieve consistent number of points
-            aggregated_data = aggregate_data(items, target_points, selected_variables, table_type, time_range)
+        # Aggregate both metrics and state history to reduce payload and client work
+        # Cap target points to avoid over-fetching/processing on very long ranges
+        if target_points > 480:
+            target_points = 480
+        # For status (state history), aggregation uses mode for boolean-like fields
+        aggregated_data = aggregate_data(
+            items,
+            target_points,
+            selected_variables,
+            table_type,
+            time_range,
+            requested_start_time=start_time,
+            requested_end_time=end_time
+        )
         
         # Calculate summary statistics
         metrics_to_summarize = selected_variables if selected_variables else [key for key in aggregated_data[0].keys() if key != 'timestamp']
