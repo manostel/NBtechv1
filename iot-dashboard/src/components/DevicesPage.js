@@ -2936,10 +2936,29 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         onClose={handleLogoutCancel}
         aria-labelledby="logout-dialog-title"
         aria-describedby="logout-dialog-description"
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #f44336, #ff9800)',
+              borderRadius: '3px 3px 0 0'
+            }
+          }
+        }}
       >
-        <DialogTitle id="logout-dialog-title">{"Confirm Logout"}</DialogTitle>
+        <DialogTitle id="logout-dialog-title" sx={{ color: '#E0E0E0' }}>{"Confirm Logout"}</DialogTitle>
         <DialogContent>
-          <DialogContentText id="logout-dialog-description">
+          <DialogContentText id="logout-dialog-description" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
             Are you sure you want to log out?
           </DialogContentText>
         </DialogContent>
