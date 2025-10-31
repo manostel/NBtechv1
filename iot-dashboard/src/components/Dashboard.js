@@ -1253,7 +1253,8 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
     DeviceNotificationService.notifyThresholdExceeded(device, metric, value, threshold);
   }, []);
 
-  if (isInitialLoad && isLoading) {
+  // Block rendering until core data is ready
+  if (isLoading || !variablesLoaded || !metricsData) {
     return <DashboardSkeleton />;
   }
 

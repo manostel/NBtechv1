@@ -405,15 +405,17 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
     const style = document.createElement('style');
     style.textContent = `
       .leaflet-popup-content-wrapper {
-        background-color: ${theme.palette.background.paper} !important;
-        color: ${theme.palette.text.primary} !important;
-        border: 1px solid #e3f2fd !important;
-        border-radius: 12px !important;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+      }
+      .leaflet-popup-content {
+        margin: 0 !important; /* remove default 13px/19px margin to let our card fill */
       }
       .leaflet-popup-tip {
-        background-color: ${theme.palette.background.paper} !important;
-        border: 1px solid #e3f2fd !important;
+        background: ${theme.palette.mode === 'dark' ? 'rgba(31, 37, 71, 0.95)' : 'rgba(255,255,255,0.95)'} !important;
+        border: ${theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'} !important;
       }
       .leaflet-popup-close-button {
         color: ${theme.palette.text.primary} !important;
@@ -610,11 +612,39 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
               <Popup>
                 <Box sx={{ 
                   p: 2, 
-                  minWidth: 200,
-                  bgcolor: theme.palette.background.paper,
-                  color: theme.palette.text.primary
+                  minWidth: 220,
+                  borderRadius: 3,
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+                  border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+                  color: theme.palette.text.primary,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)'
+                  }
                 }}>
-                  <Typography variant="h6" gutterBottom>
+                  <Typography 
+                    variant="h6" 
+                    gutterBottom
+                    sx={{
+                      fontWeight: 600,
+                      letterSpacing: '0.2px',
+                      background: 'linear-gradient(45deg, #4caf50, #2196f3)',
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent'
+                    }}
+                  >
                     {device.device_name}
                   </Typography>
                   
@@ -635,9 +665,9 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                     <Box sx={{ 
                       mt: 1, 
                       p: 1, 
-                      bgcolor: 'rgba(255,255,255,0.05)', 
+                      bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', 
                       borderRadius: 2,
-                      border: '1px solid rgba(255,255,255,0.1)'
+                      border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'
                     }}>
                       <Typography variant="caption" sx={{ 
                         fontWeight: 600, 
@@ -743,9 +773,9 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                       <Box sx={{ 
                         mt: 1, 
                         p: 1, 
-                        bgcolor: 'rgba(255,255,255,0.05)', 
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', 
                         borderRadius: 2,
-                        border: '1px solid rgba(255,255,255,0.1)'
+                        border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'
                       }}>
                         <Typography variant="caption" sx={{ 
                           fontWeight: 600, 
@@ -775,10 +805,17 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                   })()}
 
                   <Button 
-                    variant="contained" 
+                    variant="outlined" 
                     size="small" 
                     fullWidth 
-                    sx={{ mt: 1 }}
+                    sx={{ 
+                      mt: 1,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderColor: 'text.secondary',
+                      color: 'text.primary',
+                      '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' }
+                    }}
                     onClick={() => {
                       onDeviceClick(device);
                       setSelectedDevice(null);
@@ -818,8 +855,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   const getDeviceStatus = (deviceData, deviceId) => {
     try {
       if (!deviceData?.latest_data?.timestamp) {
-        console.log(`DevicesPage: Device ${deviceId} - No timestamp data, returning Offline`);
-        return { status: 'Offline', lastSeen: null };
+        // No data yet; avoid flashing Offline – show a neutral state
+        return { status: 'Checking', lastSeen: null };
       }
       
       console.log(`DevicesPage: Processing device ${deviceId} with data:`, deviceData);
@@ -828,16 +865,20 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       // Just get the current status from global timer
       const status = getGlobalDeviceStatus(deviceId);
       const lastUpdateTime = new Date(deviceData.latest_data.timestamp);
+      const ageMs = Date.now() - lastUpdateTime.getTime();
+      // Fallback heuristic if global timer hasn't populated yet
+      const fallbackStatus = ageMs <= 3 * 60 * 1000 ? 'Online' : 'Offline';
       
-      console.log(`DevicesPage: Device ${deviceId} - Status calculated as ${status}, last seen: ${lastUpdateTime}`);
+      const resolvedStatus = typeof status === 'string' && status.length > 0 ? status : fallbackStatus;
+      console.log(`DevicesPage: Device ${deviceId} - Status calculated as ${resolvedStatus}, last seen: ${lastUpdateTime}`);
       
       return {
-        status: status,
+        status: resolvedStatus,
         lastSeen: lastUpdateTime
       };
     } catch (error) {
       console.error('Error calculating device status:', error);
-      return { status: 'Offline', lastSeen: null };
+      return { status: 'Checking', lastSeen: null };
     }
   };
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1291,7 +1332,9 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   };
 
   const getStatusColor = (status) => {
-    return status === 'Online' ? '#4caf50' : '#f44336';
+    if (status === 'Online') return '#4caf50';
+    if (status === 'Offline') return '#f44336';
+    return '#9e9e9e'; // Checking/Unknown
   };
 
   const handleDragStart = (e, device) => {
@@ -2265,7 +2308,7 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           </Box>
 
           <Grid container spacing={3} sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
-            {isLoading ? (
+            {(isLoading || gpsLoading || Object.keys(deviceData || {}).length === 0) ? (
               // Show 6 skeleton cards while loading
               Array.from(new Array(6)).map((_, index) => (
                 <DeviceCardSkeleton key={index} />
@@ -2846,10 +2889,28 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
       <Dialog 
         open={openEditDialog} 
         onClose={handleCloseEditDialog}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #4caf50, #2196f3)'
+            }
+          }
+        }}
       >
-        <DialogTitle>Edit Device</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #4caf50, #2196f3)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Edit Device</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ color: 'rgba(224, 224, 224, 0.7)', mb: 1 }}>
             Update device name or client ID.
           </DialogContentText>
           <TextField
@@ -2877,8 +2938,8 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseEditDialog}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained" color="primary">
+          <Button onClick={handleCloseEditDialog} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>Cancel</Button>
+          <Button onClick={handleSave} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600, borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>
             Save
           </Button>
         </DialogActions>
@@ -2890,14 +2951,26 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         onClose={() => setClientIdWarningOpen(false)}
         PaperProps={{
           sx: {
-            bgcolor: 'background.paper',
-            color: 'text.primary'
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #ff9800, #e91e63)'
+            }
           }
         }}
       >
-        <DialogTitle>Warning: Changing Client ID</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #ff9800, #e91e63)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Warning: Changing Client ID</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ color: 'rgba(224, 224, 224, 0.85)' }}>
             You are about to change the device's Client ID from "{editingDevice?.client_id}" to "{newClientId}". 
             This action will:
           </DialogContentText>
@@ -2918,13 +2991,13 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
               </DialogContentText>
             </Box>
           </Box>
-          <DialogContentText>
+          <DialogContentText sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
             Are you sure you want to proceed with this change?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setClientIdWarningOpen(false)}>Cancel</Button>
-          <Button onClick={handleClientIdChangeConfirm} color="warning" variant="contained">
+          <Button onClick={() => setClientIdWarningOpen(false)} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>Cancel</Button>
+          <Button onClick={handleClientIdChangeConfirm} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600, borderColor: 'warning.main', color: 'warning.main', '&:hover': { borderColor: 'warning.dark', backgroundColor: 'rgba(255,152,0,0.06)' } }}>
             Proceed with Change
           </Button>
         </DialogActions>
@@ -2938,22 +3011,34 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
         onClose={() => setConfigureDialogOpen(false)}
         PaperProps={{
           sx: {
-            bgcolor: 'background.paper',
-            color: 'text.primary'
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #4caf50, #2196f3)'
+            }
           }
         }}
       >
-        <DialogTitle>Configure Device</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #4caf50, #2196f3)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Configure Device</DialogTitle>
         <DialogContent>
           {/* Implement the logic to configure the device */}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfigureDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setConfigureDialogOpen(false)} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>Cancel</Button>
           <Button onClick={() => {
             // Handle save configuration
             setConfigureDialogOpen(false);
             showSnackbar('Device configuration updated successfully', 'success');
-          }} variant="contained" color="primary">
+          }} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600, borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>
             Save
           </Button>
         </DialogActions>
