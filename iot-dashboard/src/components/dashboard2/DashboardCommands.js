@@ -339,13 +339,22 @@ const DashboardCommands = ({
           <Card sx={{ 
             height: '100%',
             borderRadius: 3,
-            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            border: '1px solid #e3f2fd',
-            color: '#E0E0E0',
+            background: (theme) => theme.palette.mode === 'dark'
+              ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+              : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+            backdropFilter: 'blur(12px)',
+            boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+            border: 'none',
+            outline: 'none',
+            color: (theme) => theme.palette.text.primary,
             position: 'relative',
             overflow: 'hidden',
             transition: 'all 0.3s ease',
+            '&:focus, &:focus-visible, &:focus-within': {
+              outline: 'none !important',
+              boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+              border: 'none !important'
+            },
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -353,14 +362,14 @@ const DashboardCommands = ({
               left: 0,
               right: 0,
               height: '4px',
-              background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+              background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)',
               transition: 'background 0.3s ease',
             },
             '&:hover': {
               boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
               transform: 'translateY(-2px)',
               '&::before': {
-                background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+                background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #5cbf60, #3399f3)' : 'linear-gradient(90deg, #1e88e5, #43a047)',
               }
             }
           }}>
@@ -468,7 +477,7 @@ const DashboardCommands = ({
             borderRadius: 3,
             background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            border: '1px solid #e3f2fd',
+            border: 'none',
             color: '#E0E0E0',
             position: 'relative',
             overflow: 'hidden',
@@ -514,6 +523,15 @@ const DashboardCommands = ({
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2,
                     },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      border: 'none',
+                    },
+                    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+                      border: 'none',
+                    },
+                    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      border: 'none',
+                    },
                   }}
                 />
                 <Button
@@ -556,14 +574,27 @@ const DashboardCommands = ({
       {/* Power Saving Tile */}
       <Grid item xs={12} sm={6} md={4}>
         <Card sx={{ 
+          height: '100%',
           borderRadius: 3,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          border: '1px solid #f0f0f0',
+          background: (theme) => theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+          border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+          color: (theme) => theme.palette.text.primary,
+          position: 'relative',
+          overflow: 'hidden',
           transition: 'all 0.3s ease',
-          '&:hover': {
-            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-            transform: 'translateY(-2px)'
-          }
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)'
+          },
         }}>
           <CardContent sx={{ p: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
@@ -613,14 +644,27 @@ const DashboardCommands = ({
       {/* Restart Device Tile */}
       <Grid item xs={12} sm={6} md={4}>
         <Card sx={{ 
+          height: '100%',
           borderRadius: 3,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          border: '1px solid #f0f0f0',
+          background: (theme) => theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+          border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+          color: (theme) => theme.palette.text.primary,
+          position: 'relative',
+          overflow: 'hidden',
           transition: 'all 0.3s ease',
-          '&:hover': {
-            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-            transform: 'translateY(-2px)'
-          }
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #f44336, #ff9800)' : 'linear-gradient(90deg, #e53935, #fb8c00)'
+          },
         }}>
           <CardContent sx={{ p: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>

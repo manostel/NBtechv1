@@ -1263,9 +1263,25 @@ export default function Dashboard2({ user, device, onLogout, onBack }) {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        bgcolor: 'background.default',
         width: '100%',
-        pt: 0
+        pt: 0,
+        background: theme.palette.mode === 'dark'
+          ? 'linear-gradient(135deg, #141829 0%, #1a1f3c 50%, #141829 100%)'
+          : 'linear-gradient(135deg, #f5f5f5 0%, #e8f4fd 50%, #f5f5f5 100%)',
+        color: theme.palette.text.primary,
+        position: 'relative',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: theme.palette.mode === 'dark'
+            ? 'radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(33, 150, 243, 0.1) 0%, transparent 50%)'
+            : 'radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.05) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(33, 150, 243, 0.05) 0%, transparent 50%)',
+          pointerEvents: 'none'
+        }
       }}
     >
       <Helmet>

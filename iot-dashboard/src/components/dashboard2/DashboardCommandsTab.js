@@ -25,7 +25,7 @@ const DashboardCommandsTab = ({
         py: 1.5,
         background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
         borderRadius: 3,
-        border: '1px solid #e3f2fd',
+        border: 'none',
         position: 'relative',
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         '&::before': {
@@ -54,10 +54,13 @@ const DashboardCommandsTab = ({
         <Typography variant="h6" sx={{ 
           fontSize: { xs: '0.95rem', sm: '1rem' }, 
           fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-          fontWeight: 400,
+          fontWeight: 600,
           letterSpacing: '0.2px',
           textTransform: 'none',
-          color: '#E0E0E0'
+          background: 'linear-gradient(45deg, #4caf50, #2196f3)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent'
         }}>
           Commands
         </Typography>

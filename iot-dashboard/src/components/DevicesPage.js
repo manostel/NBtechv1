@@ -70,32 +70,43 @@ const DEVICE_DATA_UPDATE_INTERVAL = 2 * 60 * 1000; // 2 minutes in milliseconds
 const DEVICE_STATUS_UPDATE_INTERVAL = 70 * 1000; // 70 seconds in milliseconds
 const BATTERY_STATE_UPDATE_INTERVAL = 15 * 1000; // 15 seconds in milliseconds
 
-const DeviceSkeleton = () => (
-  <Paper sx={{ 
-  p: 2, 
-  height: '100%',
-  borderRadius: 3,
-  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-  border: '1px solid #e3f2fd',
-  background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
-  color: '#E0E0E0'
-  }}>
-    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-      <Skeleton variant="circular" width={24} height={24} sx={{ mr: 1 }} />
-      <Skeleton variant="text" width="60%" height={24} />
-    </Box>
-    <Skeleton variant="text" width="40%" height={20} sx={{ mb: 2 }} />
-    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-      <Skeleton variant="rectangular" width={60} height={20} />
-      <Skeleton variant="rectangular" width={60} height={20} />
-    </Box>
-    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-      <Skeleton variant="text" width="30%" height={20} />
-      <Skeleton variant="text" width="30%" height={20} />
-    </Box>
-    <Skeleton variant="text" width="70%" height={20} />
-  </Paper>
-);
+const DeviceSkeleton = () => {
+  const theme = useMuiTheme();
+  const paperSx = {
+    p: 2,
+    height: '100%',
+    borderRadius: 3,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+    backdropFilter: 'blur(12px)',
+    border: theme.palette.mode === 'dark'
+      ? '1px solid rgba(255, 255, 255, 0.1)'
+      : '1px solid rgba(0, 0, 0, 0.08)',
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 6px 24px rgba(0, 0, 0, 0.35)'
+      : '0 6px 24px rgba(0, 0, 0, 0.08)'
+  };
+  const skeletonBase = { bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' };
+  return (
+    <Paper sx={paperSx}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <Skeleton variant="circular" width={24} height={24} sx={{ mr: 1, ...skeletonBase }} />
+        <Skeleton variant="text" width="60%" height={24} sx={skeletonBase} />
+      </Box>
+      <Skeleton variant="text" width="40%" height={20} sx={{ mb: 2, ...skeletonBase }} />
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <Skeleton variant="rectangular" width={60} height={20} sx={skeletonBase} />
+        <Skeleton variant="rectangular" width={60} height={20} sx={skeletonBase} />
+      </Box>
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <Skeleton variant="text" width="30%" height={20} sx={skeletonBase} />
+        <Skeleton variant="text" width="30%" height={20} sx={skeletonBase} />
+      </Box>
+      <Skeleton variant="text" width="70%" height={20} sx={skeletonBase} />
+    </Paper>
+  );
+};
 
 const EditDeviceDialog = ({ device, onClose }) => {
     const [editedDevice, setEditedDevice] = useState({
@@ -127,15 +138,23 @@ const DeviceCardSkeleton = () => {
                 sx={{
                     p: 2,
                     borderRadius: 3,
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                    border: '1px solid #e3f2fd',
+                    background: theme.palette.mode === 'dark'
+                      ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+                    backdropFilter: 'blur(12px)',
+                    border: theme.palette.mode === 'dark'
+                      ? '1px solid rgba(255, 255, 255, 0.1)'
+                      : '1px solid rgba(0, 0, 0, 0.08)',
+                    boxShadow: theme.palette.mode === 'dark'
+                      ? '0 6px 24px rgba(0, 0, 0, 0.35)'
+                      : '0 6px 24px rgba(0, 0, 0, 0.08)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 1,
                     height: '100%',
                     transition: 'all 0.3s ease',
                     '& .MuiSkeleton-root': {
-                        bgcolor: 'rgba(0, 0, 0, 0.1)',
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                         transition: 'background-color 0.3s ease'
                     }
                 }}
@@ -1855,7 +1874,29 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ 
+      flexGrow: 1, 
+      height: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column',
+      background: theme.palette.mode === 'dark'
+        ? 'linear-gradient(135deg, #141829 0%, #1a1f3c 50%, #141829 100%)'
+        : 'linear-gradient(135deg, #f5f5f5 0%, #e8f4fd 50%, #f5f5f5 100%)',
+      color: theme.palette.text.primary,
+      position: 'relative',
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: theme.palette.mode === 'dark'
+          ? 'radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(33, 150, 243, 0.1) 0%, transparent 50%)'
+          : 'radial-gradient(circle at 20% 50%, rgba(76, 175, 80, 0.05) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(33, 150, 243, 0.05) 0%, transparent 50%)',
+        pointerEvents: 'none'
+      }
+    }}>
       <Helmet>
         <title>Devices - IoT Dashboard</title>
         <style>{`
@@ -2272,10 +2313,13 @@ export default function DevicesPage({ user, onSelectDevice, onLogout }) {
                         sx={{
                           p: 2,
                           borderRadius: 3,
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                          border: '1px solid #e3f2fd',
-                          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
-                          color: '#E0E0E0',
+                          background: theme.palette.mode === 'dark'
+                            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+                            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+                          backdropFilter: 'blur(12px)',
+                          boxShadow: theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+                          border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+                          color: theme.palette.text.primary,
                           cursor: 'pointer',
                           transition: 'all 0.3s ease',
                           '&:hover': {

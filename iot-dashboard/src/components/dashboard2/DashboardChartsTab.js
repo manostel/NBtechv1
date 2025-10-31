@@ -439,10 +439,10 @@ const DashboardChartsTab = ({
         gap: { xs: 0.5, sm: 2 }, 
         mb: 2,
         px: 2,
-        py: 1.5,
+        py: 2,
         background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
         borderRadius: 3,
-        border: '1px solid #e3f2fd',
+        border: 'none',
         position: 'relative',
         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         '&::before': {
@@ -454,11 +454,12 @@ const DashboardChartsTab = ({
           height: '2px',
           background: 'linear-gradient(90deg, #2196f3, #4caf50)',
           borderRadius: '3px 3px 0 0',
-          opacity: 0.4
+          opacity: 0.4,
+          zIndex: 0
         }
       }}>
         {/* Section Title */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, position: 'relative', zIndex: 1 }}>
         <Box sx={{ 
             p: 0.5, 
             borderRadius: 2,
@@ -473,10 +474,13 @@ const DashboardChartsTab = ({
           <Typography variant="h6" sx={{ 
             fontSize: { xs: '0.95rem', sm: '1rem' }, 
             fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-            fontWeight: 400,
+            fontWeight: 600,
             letterSpacing: '0.2px',
             textTransform: 'none',
-            color: '#E0E0E0'
+            background: 'linear-gradient(45deg, #2196f3, #4caf50)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
           }}>
             Graphs
           </Typography>
@@ -489,7 +493,9 @@ const DashboardChartsTab = ({
           alignItems: 'center',
           flex: 1,
           minWidth: 0,
-          overflow: 'hidden'
+          overflow: 'visible',
+          position: 'relative',
+          zIndex: 1
         }}>
           <SharedControls
             selectedVariables={selectedVariables}
@@ -520,10 +526,13 @@ const DashboardChartsTab = ({
                 borderRadius: 3,
                 position: 'relative',
                 overflow: 'hidden',
-                background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                border: '1px solid #e3f2fd',
-                color: '#E0E0E0',
+                background: theme.palette.mode === 'dark'
+                  ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+                  : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+                backdropFilter: 'blur(12px)',
+                boxShadow: theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+                border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+                color: theme.palette.text.primary,
                 transition: 'all 0.3s ease',
                 width: '100%',
                 '&::before': {
@@ -533,13 +542,13 @@ const DashboardChartsTab = ({
                   left: 0,
                   right: 0,
                   height: '4px',
-                  background: 'linear-gradient(90deg, #4caf50, #2196f3)'
+                  background: theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)'
                 },
                 '&:hover': {
                   boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
                   transform: 'translateY(-2px)',
                   '&::before': {
-                    background: 'linear-gradient(90deg, #5cbf60, #3399f3)'
+                    background: theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #5cbf60, #3399f3)' : 'linear-gradient(90deg, #1e88e5, #43a047)'
                   }
                 }
               }}

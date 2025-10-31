@@ -142,9 +142,9 @@ const DashboardOverviewTab = ({
           mb: 2,
           px: 2,
           py: 1.5,
-          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.92) 50%, rgba(26, 31, 60, 0.85) 100%)',
           borderRadius: 3,
-          border: '1px solid #e3f2fd',
+        border: 'none',
           position: 'relative',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
           '&::before': {
@@ -174,10 +174,13 @@ const DashboardOverviewTab = ({
             <Typography variant="h6" sx={{ 
               fontSize: { xs: '0.95rem', sm: '1rem' }, 
               fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-              fontWeight: 400,
+              fontWeight: 600,
               letterSpacing: '0.2px',
               textTransform: 'none',
-              color: '#E0E0E0'
+              background: 'linear-gradient(45deg, #4caf50, #2196f3)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
             }}>
               Live Metrics
             </Typography>
@@ -214,11 +217,22 @@ const DashboardOverviewTab = ({
           mb: 2,
           px: 2,
           py: 1.5,
-          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.92) 50%, rgba(26, 31, 60, 0.85) 100%)',
           borderRadius: 3,
-          border: '1px solid #e3f2fd',
+        border: 'none',
           position: 'relative',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+            borderRadius: '3px 3px 0 0',
+            opacity: 0.4
+          },
         }}>
           <Box sx={{ 
             p: 0.5, 
@@ -235,10 +249,13 @@ const DashboardOverviewTab = ({
           <Typography variant="h6" sx={{ 
             fontSize: { xs: '0.95rem', sm: '1rem' }, 
             fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-            fontWeight: 400,
+            fontWeight: 600,
             letterSpacing: '0.2px',
             textTransform: 'none',
-            color: '#E0E0E0'
+            background: 'linear-gradient(45deg, #4caf50, #2196f3)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
           }}>
             Data Visualization
           </Typography>

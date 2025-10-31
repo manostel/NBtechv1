@@ -41,10 +41,10 @@ const SharedControls = ({
       justifyContent: 'flex-end',
       gap: { xs: 0.5, sm: 2 },
       minWidth: 0,
-      '& > *': { height: '32px', width: 'auto', minWidth: 0 }
+      '& > *': { width: 'auto', minWidth: 0 }
     }}>
       <Box sx={{ display: 'flex', gap: { xs: 0.5, sm: 2 }, justifyContent: 'flex-end' }}>
-        <FormControl size="small" sx={{ width: { xs: 92, sm: 120 } }}>
+        <FormControl size="small" sx={{ width: { xs: 92, sm: 120 }, overflow: 'visible' }}>
           <InputLabel sx={{ color: 'text.secondary', fontSize: { xs: '0.7rem', sm: '0.8rem' } }}>Time Range</InputLabel>
           <Select
             value={timeRange}
@@ -103,17 +103,25 @@ const SharedControls = ({
           label="Chart Variables"
         />
         <Button
-          variant="contained"
-          color="primary"
+          variant="outlined"
+          color="inherit"
           onClick={onApply}
           disabled={selectedVariables.length === 0}
           size="small"
           sx={{ 
             minWidth: { xs: 60, sm: 80 },
             height: '32px',
-            borderRadius: '20px',
+            borderRadius: 2,
+            fontWeight: 500,
+            textTransform: 'none',
             fontSize: { xs: '0.7rem', sm: '0.8rem' },
-            px: { xs: 1, sm: 2 }
+            px: { xs: 1.25, sm: 2 },
+            borderColor: 'text.secondary',
+            color: 'text.primary',
+            '&:hover': {
+              borderColor: 'text.primary',
+              backgroundColor: 'rgba(0,0,0,0.04)'
+            }
           }}
         >
           Apply

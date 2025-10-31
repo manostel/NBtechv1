@@ -673,10 +673,13 @@ export default function DashboardSubscriptionsTab({
           display: 'flex',
           flexDirection: 'column',
           borderRadius: 3,
-          background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          border: '1px solid #e3f2fd',
-          color: '#E0E0E0',
+          background: (theme) => theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+          border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+          color: (theme) => theme.palette.text.primary,
           position: 'relative',
           overflow: 'hidden',
           transition: 'all 0.3s ease',
@@ -687,14 +690,14 @@ export default function DashboardSubscriptionsTab({
             left: 0,
             right: 0,
             height: '4px',
-            background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+            background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)',
             transition: 'background 0.3s ease',
           },
           '&:hover': {
             boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
             transform: 'translateY(-2px)',
             '&::before': {
-              background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+              background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #5cbf60, #3399f3)' : 'linear-gradient(90deg, #1e88e5, #43a047)',
             }
           }
         }}
@@ -1537,11 +1540,12 @@ export default function DashboardSubscriptionsTab({
             display: 'flex', 
             alignItems: 'center', 
             gap: 1, 
+            width: '100%',
             px: 2,
             py: 1.5,
             background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
             borderRadius: 3,
-            border: '1px solid #e3f2fd',
+            border: 'none',
             position: 'relative',
             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
             '&::before': {
@@ -1570,31 +1574,41 @@ export default function DashboardSubscriptionsTab({
             <Typography variant="h6" sx={{ 
               fontSize: { xs: '0.95rem', sm: '1rem' }, 
               fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-              fontWeight: 400,
+              fontWeight: 600,
               letterSpacing: '0.2px',
               textTransform: 'none',
-              color: '#E0E0E0'
+              background: 'linear-gradient(45deg, #ff9800, #e91e63)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
             }}>
               Subscriptions
             </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setDialogError(null);
+                setError(null); // Clear main page error
+                setCreateDialogOpen(true);
+              }}
+              disabled={!userLimits.can_create_more}
+              sx={{ 
+                textTransform: 'none',
+                fontWeight: 600,
+                ml: 'auto',
+                borderColor: 'text.secondary',
+                color: 'text.primary',
+                '&:hover': {
+                  borderColor: 'text.primary',
+                  backgroundColor: 'rgba(0,0,0,0.04)'
+                }
+              }}
+            >
+              New Subscription
+            </Button>
           </Box>
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setDialogError(null);
-            setError(null); // Clear main page error
-            setCreateDialogOpen(true);
-          }}
-          disabled={!userLimits.can_create_more}
-          sx={{ 
-            textTransform: 'none',
-            fontWeight: 600
-          }}
-        >
-            New Subscription
-          </Button>
         </Box>
       </Box>
 
@@ -1641,8 +1655,12 @@ export default function DashboardSubscriptionsTab({
             p: 6, 
             textAlign: 'center',
             borderRadius: 3,
-            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-            border: '1px dashed #e0e0e0'
+            background: theme.palette.mode === 'dark'
+              ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+              : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+            backdropFilter: 'blur(12px)',
+            border: theme.palette.mode === 'dark' ? '1px dashed rgba(255,255,255,0.2)' : '1px dashed rgba(0,0,0,0.15)',
+            boxShadow: theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)'
           }}
         >
           <Box sx={{ 

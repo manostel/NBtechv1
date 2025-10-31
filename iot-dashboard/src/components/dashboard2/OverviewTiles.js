@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Grid, Paper, Typography, Box, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Grid, Paper, Typography, Box, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, List, ListItem, ListItemIcon, ListItemText, useTheme } from '@mui/material';
 import PropTypes from 'prop-types';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
@@ -21,6 +21,7 @@ const getSeverityIcon = (severity) => {
 };
 
 const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAlarmsList, isStatus = false }) => {
+  const theme = useTheme();
   const alarmActive = Array.isArray(triggeredAlarmsList) && triggeredAlarmsList.length > 0;
   const [alarmDialogOpen, setAlarmDialogOpen] = React.useState(false);
 
@@ -63,10 +64,13 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 3,
-        background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.85) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.85) 100%)',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-        border: '1px solid #e3f2fd',
-        color: '#E0E0E0',
+        background: theme.palette.mode === 'dark'
+          ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+        backdropFilter: 'blur(12px)',
+        boxShadow: theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+        border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+        color: theme.palette.text.primary,
         position: 'relative',
         overflow: 'hidden',
         transition: 'all 0.3s ease',
@@ -78,14 +82,14 @@ const OverviewTile = ({ title, value, unit, icon, color, isLoading, triggeredAla
           left: 0,
           right: 0,
           height: '4px',
-          background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+          background: theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)',
           transition: 'background 0.3s ease',
         },
         '&:hover': {
           boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
           transform: 'translateY(-2px)',
           '&::before': {
-            background: 'linear-gradient(90deg, #5cbf60, #3399f3)',
+            background: theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #5cbf60, #3399f3)' : 'linear-gradient(90deg, #1e88e5, #43a047)',
           }
         }
       }}
@@ -277,7 +281,7 @@ const OverviewTiles = ({
                 py: 1.5,
                 background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
                 borderRadius: 3,
-                border: '1px solid #e3f2fd',
+                border: 'none',
                 position: 'relative',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
                 '&::before': {
@@ -306,10 +310,13 @@ const OverviewTiles = ({
                 <Typography variant="h6" sx={{ 
                   fontSize: { xs: '0.95rem', sm: '1rem' }, 
                   fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontWeight: 400,
+                  fontWeight: 600,
                   letterSpacing: '0.2px',
                   textTransform: 'none',
-                  color: '#E0E0E0',
+                  background: 'linear-gradient(45deg, #4caf50, #2196f3)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
                   lineHeight: 1.2
                 }}>
                   Device Status
