@@ -140,6 +140,7 @@ export default function DashboardSubscriptionsTab({
     condition_type: 'change',
     threshold_value: '',
     cooldown_ms: 30000,
+    tolerance_percent: '',  // Optional: custom tolerance percentage (leave empty for defaults)
     notification_method: 'in_app',
     enabled: true,
     description: '',
@@ -344,6 +345,16 @@ export default function DashboardSubscriptionsTab({
 
       setLoading(true);
       
+      // Convert tolerance_percent from percentage (e.g., 2) to decimal (e.g., 0.02)
+      // User enters as percentage (2 = 2%), we store as decimal (0.02)
+      let toleranceValue = null;
+      if (formData.tolerance_percent && formData.tolerance_percent.trim() !== '') {
+        const parsed = parseFloat(formData.tolerance_percent);
+        // If value is >= 1, assume it's percentage and convert to decimal
+        // If value is < 1, assume it's already decimal
+        toleranceValue = parsed >= 1 ? parsed / 100 : parsed;
+      }
+
       const subscriptionData = {
         device_id: formData.device_id,
         parameter_type: formData.parameter_type,
@@ -351,6 +362,7 @@ export default function DashboardSubscriptionsTab({
         condition_type: formData.condition_type,
         threshold_value: formData.threshold_value || null,
         cooldown_ms: typeof formData.cooldown_ms === 'number' ? formData.cooldown_ms : 30000,
+        tolerance_percent: toleranceValue,  // Stored as decimal (0.02 = 2%)
         notification_method: formData.notification_method,
         enabled: formData.enabled,
         description: formData.description,
@@ -395,34 +407,16 @@ export default function DashboardSubscriptionsTab({
       } else {
         const errorMsg = result.error || 'Failed to create subscription';
         console.log('Subscription creation error:', errorMsg);
-        // Show error in dialog for conflict errors (check for various conflict indicators)
-        const isConflictError = errorMsg.includes('Conflicting subscription') || 
-                                errorMsg.includes('conflict') ||
-                                errorMsg.includes('already monitoring') ||
-                                errorMsg.includes('Another subscription') ||
-                                errorMsg.includes('change condition') ||
-                                errorMsg.includes('would trigger a different command');
-        
-        if (isConflictError) {
-          console.log('Setting dialog error:', errorMsg);
-          setDialogError(errorMsg);
-          setError(null); // Clear main page error
-          setLoading(false);
-          return;
-        }
-        throw new Error(errorMsg);
+        setDialogError(errorMsg);
+        setError(null); // Clear main page error
+        setLoading(false);
+        return;
       }
     } catch (error) {
       console.error('Error creating subscription:', error);
-      // Only set main page error if it's not a conflict error
-      const isConflictError = error.message.includes('Conflicting subscription') || 
-                              error.message.includes('conflict') ||
-                              error.message.includes('already monitoring') ||
-                              error.message.includes('change condition') ||
-                              error.message.includes('would trigger a different command');
       if (error.message.includes('Failed to fetch')) {
         setError('Subscription API not available. Please deploy the Lambda functions first.');
-      } else if (!isConflictError) {
+      } else {
         setError(error.message || 'Failed to create subscription');
       }
     } finally {
@@ -433,6 +427,23 @@ export default function DashboardSubscriptionsTab({
   const handleUpdateSubscription = async () => {
     try {
       setLoading(true);
+      
+      // Convert tolerance_percent from percentage (e.g., 2) to decimal (e.g., 0.02)
+      // User enters as percentage (2 = 2%), we store as decimal (0.02)
+      let toleranceValue = null;
+      if (formData.tolerance_percent && formData.tolerance_percent.trim() !== '') {
+        const parsed = parseFloat(formData.tolerance_percent);
+        // If value is >= 1, assume it's percentage and convert to decimal
+        // If value is < 1, assume it's already decimal
+        toleranceValue = parsed >= 1 ? parsed / 100 : parsed;
+      }
+      
+      // Prepare subscription data with converted tolerance
+      const subscriptionUpdateData = {
+        ...formData,
+        tolerance_percent: toleranceValue  // Use converted decimal value
+      };
+      
       const response = await fetch(SUBSCRIPTIONS_API_URL, {
         method: 'POST',
         headers: {
@@ -443,7 +454,7 @@ export default function DashboardSubscriptionsTab({
           action: 'update_subscription',
           user_email: user.email,
           subscription_id: selectedSubscription.subscription_id,
-          subscription: formData
+          subscription: subscriptionUpdateData
         })
       });
 
@@ -462,30 +473,14 @@ export default function DashboardSubscriptionsTab({
         loadSubscriptions();
       } else {
         const errorMsg = result.error || 'Failed to update subscription';
-        // Show error in dialog for conflict errors (check for various conflict indicators)
-        if (errorMsg.includes('Conflicting subscription') || 
-            errorMsg.includes('conflict') ||
-            errorMsg.includes('already monitoring') ||
-            errorMsg.includes('change condition') ||
-            errorMsg.includes('would trigger a different command')) {
-          setDialogError(errorMsg);
-          setError(null); // Clear main page error
-          setLoading(false);
-          return;
-        }
-        throw new Error(errorMsg);
+        setDialogError(errorMsg);
+        setError(null); // Clear main page error
+        setLoading(false);
+        return;
       }
     } catch (error) {
       console.error('Error updating subscription:', error);
-      // Only set main page error if it's not a conflict error
-      const isConflictError = error.message.includes('Conflicting subscription') || 
-                              error.message.includes('conflict') ||
-                              error.message.includes('already monitoring') ||
-                              error.message.includes('change condition') ||
-                              error.message.includes('would trigger a different command');
-      if (!isConflictError) {
-        setError(error.message || 'Failed to update subscription');
-      }
+      setError(error.message || 'Failed to update subscription');
     } finally {
       setLoading(false);
     }
@@ -574,6 +569,7 @@ export default function DashboardSubscriptionsTab({
       condition_type: 'change',
       threshold_value: '',
       cooldown_ms: 30000,
+      tolerance_percent: '',  // Optional: custom tolerance percentage
       notification_method: 'in_app',
       enabled: true,
       description: '',
@@ -594,6 +590,11 @@ export default function DashboardSubscriptionsTab({
       condition_type: subscription.condition_type,
       threshold_value: subscription.threshold_value || '',
       cooldown_ms: typeof subscription.cooldown_ms === 'number' ? subscription.cooldown_ms : 30000,
+      tolerance_percent: subscription.tolerance_percent 
+        ? (parseFloat(subscription.tolerance_percent) >= 1 
+            ? parseFloat(subscription.tolerance_percent).toString() 
+            : (parseFloat(subscription.tolerance_percent) * 100).toString()) 
+        : '',  // Convert decimal back to percentage for display (0.02 -> 2)
       notification_method: subscription.notification_method,
       enabled: subscription.enabled,
       description: subscription.description || '',
@@ -806,6 +807,19 @@ export default function DashboardSubscriptionsTab({
                 variant="outlined"
               />
             )}
+            {subscription.tolerance_percent && (
+              <Chip
+                label={`${(parseFloat(subscription.tolerance_percent) >= 1 
+                  ? parseFloat(subscription.tolerance_percent) 
+                  : parseFloat(subscription.tolerance_percent) * 100).toFixed(1)}% tolerance`}
+                size="small"
+                variant="outlined"
+                color="info"
+                title={`Custom tolerance: ${(parseFloat(subscription.tolerance_percent) >= 1 
+                  ? parseFloat(subscription.tolerance_percent) 
+                  : parseFloat(subscription.tolerance_percent) * 100).toFixed(1)}%`}
+              />
+            )}
               {subscription.commands && subscription.commands.some(cmd => cmd.action !== 'none') && (
                 subscription.commands
                   .filter(cmd => cmd.action !== 'none')
@@ -906,8 +920,8 @@ export default function DashboardSubscriptionsTab({
           Configure the conditions that will activate this subscription
         </Typography>
         
-        {/* Conflict Error or Loop Prevention Warning */}
-        {dialogError ? (
+        {/* Error Display */}
+        {dialogError && (
           <Alert 
             severity="error" 
             variant="filled"
@@ -924,12 +938,6 @@ export default function DashboardSubscriptionsTab({
             onClose={() => setDialogError(null)}
           >
             {dialogError}
-          </Alert>
-        ) : (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            <Typography variant="body2">
-              <strong>⚠️ Loop Prevention:</strong> Avoid creating subscriptions that monitor outputs on devices that already have output subscriptions, as this can create infinite loops.
-            </Typography>
           </Alert>
         )}
           </Grid>
@@ -1029,14 +1037,42 @@ export default function DashboardSubscriptionsTab({
             <TextField
               fullWidth
               label="Cooldown (seconds)"
-              value={Math.max(0, Math.floor((Number(formData.cooldown_ms || 0)) / 1000))}
+              value={formData.cooldown_ms ? Math.floor(formData.cooldown_ms / 1000) : ''}
               onChange={(e) => {
-                const secs = Math.max(0, parseInt(e.target.value || '0', 10));
-                setFormData({ ...formData, cooldown_ms: secs * 1000 });
+                const inputValue = e.target.value;
+                // Allow empty string while typing
+                if (inputValue === '') {
+                  setFormData({ ...formData, cooldown_ms: 0 });
+                  return;
+                }
+                // Parse as integer and convert to milliseconds
+                const secs = Math.max(0, parseInt(inputValue, 10));
+                if (!isNaN(secs)) {
+                  setFormData({ ...formData, cooldown_ms: secs * 1000 });
+                }
               }}
               type="number"
               inputProps={{ min: 0 }}
               helperText="Minimum time between triggers. Set 0 to disable cooldown."
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Custom Tolerance (%)"
+              value={formData.tolerance_percent}
+              onChange={(e) => {
+                // Only allow integers
+                const value = e.target.value;
+                if (value === '' || /^\d+$/.test(value)) {
+                  setFormData({ ...formData, tolerance_percent: value });
+                }
+              }}
+              type="number"
+              inputProps={{ min: 0, max: 100, step: 1 }}
+              helperText="Optional: Custom sensitivity as whole percentage (e.g., 1 = 1%, 2 = 2%). Leave empty for parameter-specific defaults."
+              placeholder="Auto (default)"
             />
           </Grid>
           
@@ -1246,8 +1282,8 @@ export default function DashboardSubscriptionsTab({
               Configure the conditions that will activate this subscription
             </Typography>
             
-            {/* Conflict Error or Loop Prevention Warning */}
-            {dialogError ? (
+            {/* Error Display */}
+            {dialogError && (
               <Alert 
                 severity="error" 
                 variant="filled"
@@ -1264,12 +1300,6 @@ export default function DashboardSubscriptionsTab({
                 onClose={() => setDialogError(null)}
               >
                 {dialogError}
-              </Alert>
-            ) : (
-              <Alert severity="warning" sx={{ mb: 2 }}>
-                <Typography variant="body2">
-                  <strong>⚠️ Loop Prevention:</strong> Avoid creating subscriptions that monitor outputs on devices that already have output subscriptions, as this can create infinite loops.
-                </Typography>
               </Alert>
             )}
           </Grid>
@@ -1358,14 +1388,42 @@ export default function DashboardSubscriptionsTab({
             <TextField
               fullWidth
               label="Cooldown (seconds)"
-              value={Math.max(0, Math.floor((Number(formData.cooldown_ms || 0)) / 1000))}
+              value={formData.cooldown_ms ? Math.floor(formData.cooldown_ms / 1000) : ''}
               onChange={(e) => {
-                const secs = Math.max(0, parseInt(e.target.value || '0', 10));
-                setFormData({ ...formData, cooldown_ms: secs * 1000 });
+                const inputValue = e.target.value;
+                // Allow empty string while typing
+                if (inputValue === '') {
+                  setFormData({ ...formData, cooldown_ms: 0 });
+                  return;
+                }
+                // Parse as integer and convert to milliseconds
+                const secs = Math.max(0, parseInt(inputValue, 10));
+                if (!isNaN(secs)) {
+                  setFormData({ ...formData, cooldown_ms: secs * 1000 });
+                }
               }}
               type="number"
               inputProps={{ min: 0 }}
               helperText="Minimum time between triggers. Set 0 to disable cooldown."
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Custom Tolerance (%)"
+              value={formData.tolerance_percent}
+              onChange={(e) => {
+                // Only allow integers
+                const value = e.target.value;
+                if (value === '' || /^\d+$/.test(value)) {
+                  setFormData({ ...formData, tolerance_percent: value });
+                }
+              }}
+              type="number"
+              inputProps={{ min: 0, max: 100, step: 1 }}
+              helperText="Optional: Custom sensitivity as whole percentage (e.g., 1 = 1%, 2 = 2%). Leave empty for parameter-specific defaults."
+              placeholder="Auto (default)"
             />
           </Grid>
           

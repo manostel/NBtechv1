@@ -458,10 +458,13 @@ def aggregate_data(items, target_points, selected_variables=None, table_type='da
                 break
         
         interval_data = {'timestamp': current_interval_start.isoformat() + 'Z'}
+        has_data = False  # Track if this interval has any actual data
+        
         if selected_variables:
             for var in selected_variables:
                 values = [float(it[var]) for it in interval_items if var in it]
                 if values:
+                    has_data = True  # Mark that we have at least one value
                     if table_type == 'status' and (var.endswith('_state') or var in ['charging', 'power_saving']):
                         from collections import Counter
                         value_counts = Counter(values)
@@ -475,9 +478,15 @@ def aggregate_data(items, target_points, selected_variables=None, table_type='da
                     if table_type == 'status':
                         if var in last_values:
                             interval_data[var] = last_values[var]
+                            has_data = True  # Forward-filled value counts as data
                         else:
                             interval_data[var] = 0
-        aggregated_data.append(interval_data)
+                            has_data = True  # Default 0 counts as data for status
+        
+        # Only add interval if it has actual data (not just empty timestamp)
+        if has_data or not selected_variables:
+            aggregated_data.append(interval_data)
+        
         current_interval_start = interval_end
     
     # If we have more points than target, resample to match target
@@ -495,9 +504,12 @@ def aggregate_data(items, target_points, selected_variables=None, table_type='da
             if interval_points:
                 # Calculate average values for the interval
                 interval_data = {'timestamp': current_time.isoformat() + 'Z'}
+                has_resampled_data = False  # Track if this resampled interval has any actual data
+                
                 for var in selected_variables:
                     values = [point[var] for point in interval_points if var in point]
                     if values:
+                        has_resampled_data = True  # Mark that we have at least one value
                         # For state history (status table), use mode instead of mean for boolean values
                         if table_type == 'status' and (var.endswith('_state') or var in ['charging', 'power_saving']):
                             # Count occurrences and use most frequent value
@@ -508,7 +520,10 @@ def aggregate_data(items, target_points, selected_variables=None, table_type='da
                         else:
                             # Round to 2 decimal places for metrics
                             interval_data[var] = round(mean(values), 2)
-                resampled_data.append(interval_data)
+                
+                # Only add resampled interval if it has actual data (not just empty timestamp)
+                if has_resampled_data:
+                    resampled_data.append(interval_data)
             
             current_time += new_step
         
@@ -526,13 +541,20 @@ def calculate_summary_statistics(data, metrics, table_type='data'):
     }
     
     for metric in metrics:
-        values = [float(item.get(metric, 0)) for item in data]
+        # Only include values that actually exist (don't treat missing as 0)
+        values = [float(item[metric]) for item in data if metric in item]
         if values:
             # Round all statistics to 2 decimal places
             summary[f'avg_{metric}'] = round(mean(values), 2)
             summary[f'min_{metric}'] = round(min(values), 2)
             summary[f'max_{metric}'] = round(max(values), 2)
             summary[f'latest_{metric}'] = round(values[-1], 2)
+        else:
+            # No values found for this metric
+            summary[f'avg_{metric}'] = None
+            summary[f'min_{metric}'] = None
+            summary[f'max_{metric}'] = None
+            summary[f'latest_{metric}'] = None
     
     return summary
 

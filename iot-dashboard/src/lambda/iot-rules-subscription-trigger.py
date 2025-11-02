@@ -342,27 +342,81 @@ def check_single_subscription_sync(subscription, device_data, message_type):
         current_value_normalized = normalize_value_for_comparison(current_value)
         logger.info(f"Extracted value for {parameter_name}: {current_value} (normalized: {current_value_normalized})")
         
-        # Get last known value
-        last_value = get_last_parameter_value_sync(device_id, parameter_name)
+        # Get last known value from the subscription record itself
+        last_value = get_last_parameter_value_sync(device_id, parameter_name, subscription_id, subscription['user_email'])
         last_value_normalized = normalize_value_for_comparison(last_value)
         
         logger.info(f"Last value for {parameter_name}: {last_value} (normalized: {last_value_normalized})")
         
-        # Check if value changed (using normalized values)
-        # For numeric values, use 2% tolerance to only trigger on meaningful changes
+        # CRITICAL: Check if value changed from last stored state
+        # We only trigger subscriptions when the actual device state changes
+        # This ensures trigger count only increments on real state transitions
         if last_value_normalized is None:
+            # First time seeing this parameter - consider it changed
             has_changed = True
+            logger.info(f"Parameter {parameter_name} - first time detected, considering as changed")
         elif isinstance(current_value_normalized, (int, float)) and isinstance(last_value_normalized, (int, float)):
-            # Use 2% tolerance - only trigger if change is more than 2% of the current value
+            # For numeric values, use configurable tolerance to only trigger on meaningful changes
+            # This prevents false triggers from sensor noise and small fluctuations
+            
+            # Check if subscription has custom tolerance_percent configured
+            # Users can set this when creating/editing subscriptions for fine-tuned control
+            tolerance_percent = subscription.get('tolerance_percent')
+            
+            if tolerance_percent is None:
+                # Use parameter-specific defaults if not configured
+                # Some parameters are more stable (battery), others fluctuate more (signal_quality)
+                tolerance_percentages = {
+                    'battery': 0.02,           # 2% - battery changes slowly
+                    'temperature': 0.03,       # 3% - temperature can fluctuate more
+                    'humidity': 0.03,         # 3% - humidity fluctuates
+                    'pressure': 0.02,         # 2% - pressure is relatively stable
+                    'signal_quality': 0.05,    # 5% - signal quality can jump around
+                    'motor_speed': 0.02,      # 2% - motor speed is relatively stable
+                }
+                tolerance_percent = tolerance_percentages.get(parameter_name.lower(), 0.02)
+                logger.info(f"Using default tolerance for {parameter_name}: {tolerance_percent*100:.1f}%")
+            else:
+                # Convert to float if it's stored as Decimal or string
+                if isinstance(tolerance_percent, Decimal):
+                    tolerance_percent = float(tolerance_percent)
+                elif isinstance(tolerance_percent, str):
+                    tolerance_percent = float(tolerance_percent)
+                logger.info(f"Using custom tolerance for {parameter_name}: {tolerance_percent*100:.1f}%")
+            
+            # Calculate tolerance: use percentage of current value, with minimum absolute threshold
             # For very small values (< 1), use minimum absolute change of 0.01
-            tolerance = max(abs(current_value_normalized) * 0.02, 0.01)
+            # For larger values, use the percentage
+            if abs(current_value_normalized) < 1:
+                tolerance = 0.01  # Minimum absolute change for very small values
+            else:
+                tolerance = max(abs(current_value_normalized) * tolerance_percent, 0.01)
+            
             has_changed = abs(current_value_normalized - last_value_normalized) > tolerance
+            if has_changed:
+                logger.info(f"Parameter {parameter_name} value changed: {last_value_normalized} -> {current_value_normalized} (diff: {abs(current_value_normalized - last_value_normalized):.3f}, tolerance: {tolerance:.3f})")
+            else:
+                logger.info(f"Parameter {parameter_name} value unchanged: {current_value_normalized} (within tolerance: {tolerance:.3f})")
         else:
             # For non-numeric values, use exact comparison
             has_changed = current_value_normalized != last_value_normalized
+            if has_changed:
+                logger.info(f"Parameter {parameter_name} value changed: {last_value_normalized} -> {current_value_normalized}")
+            else:
+                logger.info(f"Parameter {parameter_name} value unchanged: {current_value_normalized}")
         
+        # IMPORTANT: Only proceed if value actually changed
+        # This ensures trigger count reflects actual state changes, not repeated same values
         if not has_changed:
-            logger.info(f"Parameter {parameter_name} value unchanged ({current_value_normalized}) - skipping trigger")
+            # Value is within tolerance - not a meaningful change for triggering
+            # BUT we should still update the stored value to track the current baseline
+            # This prevents the stored value from getting "stuck" at an old value
+            # when there are small fluctuations that don't exceed the tolerance
+            logger.info(f"Parameter {parameter_name} value unchanged ({current_value_normalized}) - skipping trigger (no state change detected)")
+            # Update stored value to current value even though it's within tolerance
+            # This keeps the baseline current without triggering subscriptions
+            store_parameter_value_sync(device_id, parameter_name, current_value_normalized, subscription_id, subscription['user_email'])
+            logger.info(f"Updated stored value to {current_value_normalized} (within tolerance, no trigger)")
             return False
         
         # Evaluate subscription condition
@@ -385,41 +439,38 @@ def check_single_subscription_sync(subscription, device_data, message_type):
             # For "change" condition, store the new value FIRST to prevent retriggering on same value
             # even if we skip due to cooldown or other checks
             if condition_type == 'change':
-                store_parameter_value_sync(device_id, parameter_name, current_value_normalized)
+                store_parameter_value_sync(device_id, parameter_name, current_value_normalized, subscription_id, subscription['user_email'])
                 logger.info(f"Stored new value for 'change' condition: {current_value_normalized}")
             
-            # Enhanced loop prevention: Check cooldown period
+            # Check cooldown period
+            # IMPORTANT: Cooldown only applies AFTER a successful trigger
+            # The cooldown checks 'last_triggered' timestamp, which is ONLY updated
+            # when update_subscription_trigger_sync() is called (after successful trigger)
+            # This means: First trigger always succeeds, subsequent triggers respect cooldown
             if not check_subscription_cooldown_sync(subscription):
-                logger.info(f"Subscription {subscription_id} in cooldown period - skipping")
-                # Value already stored for "change" condition, so it won't retrigger
+                logger.info(f"Subscription {subscription_id} in cooldown period - skipping (cooldown only applies after previous successful trigger)")
+                # Value already stored for "change" condition, so it won't retrigger on same value
+                # NOTE: last_triggered is NOT updated here, so cooldown period doesn't reset
                 return False
             
-            # Enhanced loop prevention: Check for self-triggering commands
-            if check_self_triggering_loop_sync(subscription, device_data):
-                logger.warning(f"Subscription {subscription_id} would create self-triggering loop - skipping")
-                # Value already stored for "change" condition, so it won't retrigger
-                return False
+            logger.info(f"✅ Subscription {subscription_id} conditions met AND state changed - triggering!")
             
-            # Enhanced loop prevention: Validate command targets
-            if not validate_command_targets_sync(subscription):
-                logger.warning(f"Subscription {subscription_id} has invalid command targets - skipping")
-                # Value already stored for "change" condition, so it won't retrigger
-                return False
-            
-            logger.info(f"✅ Subscription {subscription_id} conditions met - triggering!")
-            
-            # Update subscription trigger info
+            # Update subscription trigger count - ONLY increments when state changed AND condition met
+            # This ensures accurate trigger counting for actual state transitions
             update_subscription_trigger_sync(subscription_id)
             
             # Store new value for future comparison (for non-"change" conditions)
+            # This is already done for "change" condition above (before cooldown checks)
             if condition_type != 'change':
-                store_parameter_value_sync(device_id, parameter_name, current_value_normalized)
+                store_parameter_value_sync(device_id, parameter_name, current_value_normalized, subscription_id, subscription['user_email'])
             
             return True
         
-        # If condition not met, still store the value to track the last value properly
-        # This prevents false "change" triggers when value goes back to previous value
-        store_parameter_value_sync(device_id, parameter_name, current_value_normalized)
+        # Condition not met, but value changed - store the new value anyway
+        # This tracks the state properly and prevents false triggers in future
+        # NOTE: Trigger count was NOT incremented because condition wasn't met
+        logger.info(f"Parameter {parameter_name} changed but condition not met - storing new value for future comparison")
+        store_parameter_value_sync(device_id, parameter_name, current_value_normalized, subscription_id, subscription['user_email'])
         
         return False
         
@@ -523,26 +574,41 @@ def evaluate_subscription_condition(condition_type, current_value, threshold_val
         logger.error(f"Error evaluating condition {condition_type}: {e}")
         return False
 
-def get_last_parameter_value_sync(device_id, parameter_name):
-    """Get the last known value for a parameter (synchronous version)"""
+def get_last_parameter_value_sync(device_id, parameter_name, subscription_id, user_email):
+    """Get the last known value for a parameter from the subscription record (synchronous version)"""
     try:
-        # Get from subscription data table
-        subscription_data_table = dynamodb.Table('IoT_SubscriptionData')
-        
-        response = subscription_data_table.get_item(
+        # Get the last processed value from the subscription record itself
+        # This avoids needing a separate table
+        response = subscriptions_table.get_item(
             Key={
-                'device_id': device_id,
-                'parameter_name': parameter_name
+                'user_email': user_email,
+                'subscription_id': subscription_id
             }
         )
         
         if 'Item' in response:
-            return response['Item'].get('last_value')
+            subscription_item = response['Item']
+            # Check if this subscription has the same parameter
+            if subscription_item.get('parameter_name') == parameter_name and subscription_item.get('device_id') == device_id:
+                last_value = subscription_item.get('last_processed_value')
+                
+                if last_value is not None:
+                    # Convert Decimal to float for comparison (DynamoDB returns Decimal)
+                    if isinstance(last_value, Decimal):
+                        return float(last_value)
+                    elif isinstance(last_value, (int, float)):
+                        return float(last_value)
+                    else:
+                        return last_value  # String or other types
         
+        # No previous value stored - this is normal for first time
+        logger.info(f"No previous value stored for {parameter_name} on subscription {subscription_id} (first time)")
         return None
         
     except Exception as e:
         logger.error(f"Error getting last parameter value: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return None
 
 async def get_last_parameter_value(device_id, parameter_name):
@@ -566,30 +632,39 @@ async def get_last_parameter_value(device_id, parameter_name):
         logger.error(f"Error getting last parameter value: {e}")
         return None
 
-def store_parameter_value_sync(device_id, parameter_name, value):
-    """Store the current parameter value for future comparison (synchronous version)"""
+def store_parameter_value_sync(device_id, parameter_name, value, subscription_id, user_email):
+    """Store the current parameter value in the subscription record for future comparison (synchronous version)"""
     try:
-        # Instead of storing in IoT_DeviceData, store in a separate table for subscription tracking
-        # This prevents flooding the main device data table
-        subscription_data_table = dynamodb.Table('IoT_SubscriptionData')
+        # Store the last processed value directly in the subscription record
+        # This avoids needing a separate table and keeps state per subscription
         
-        current_timestamp = datetime.now(timezone.utc).isoformat()
+        # Convert float to Decimal for DynamoDB compatibility
+        # DynamoDB requires Decimal types for numeric values, not float
+        if isinstance(value, float):
+            value_to_store = Decimal(str(value))
+        elif isinstance(value, int):
+            value_to_store = Decimal(value)
+        else:
+            value_to_store = value  # String or other types
         
-        # Store/update the parameter value for this device
-        subscription_data_table.put_item(
-            Item={
-                'device_id': device_id,
-                'parameter_name': parameter_name,
-                'last_value': value,
-                'last_updated': current_timestamp,
-                'ttl': int((datetime.now(timezone.utc) + timedelta(days=7)).timestamp())  # Auto-delete after 7 days
+        # Update the subscription record with the last processed value
+        subscriptions_table.update_item(
+            Key={
+                'user_email': user_email,
+                'subscription_id': subscription_id
+            },
+            UpdateExpression='SET last_processed_value = :value',
+            ExpressionAttributeValues={
+                ':value': value_to_store
             }
         )
         
-        logger.info(f"Stored parameter {parameter_name}={value} for device {device_id}")
+        logger.info(f"Stored parameter {parameter_name}={value_to_store} (original: {value}) in subscription {subscription_id}")
         
     except Exception as e:
         logger.error(f"Error storing parameter value: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
 async def store_parameter_value(device_id, parameter_name, value):
     """Store the current parameter value for future comparison"""
@@ -607,7 +682,16 @@ async def store_parameter_value(device_id, parameter_name, value):
         logger.error(f"Error storing parameter value: {e}")
 
 def update_subscription_trigger_sync(subscription_id):
-    """Update subscription trigger count and timestamp (synchronous version)"""
+    """
+    Update subscription trigger count and timestamp (synchronous version)
+    
+    IMPORTANT: This function should ONLY be called when:
+    1. Parameter value changed from last stored state
+    2. Subscription condition is met
+    3. All safety checks passed (cooldown, loop prevention, etc.)
+    
+    This ensures trigger_count accurately reflects actual state change triggers.
+    """
     try:
         # First, get the subscription to find the user_email
         response = subscriptions_table.scan(
@@ -624,6 +708,9 @@ def update_subscription_trigger_sync(subscription_id):
         subscription = response['Items'][0]
         user_email = subscription['user_email']
         
+        # Get current trigger count before update
+        current_count = subscription.get('trigger_count', 0)
+        
         subscriptions_table.update_item(
             Key={
                 'user_email': user_email,
@@ -633,8 +720,13 @@ def update_subscription_trigger_sync(subscription_id):
             ExpressionAttributeValues={
                 ':last_triggered': datetime.now(timezone.utc).isoformat(),
                 ':increment': 1
-            }
+            },
+            ReturnValues='UPDATED_NEW'
         )
+        
+        new_count = current_count + 1
+        logger.info(f"✅ Trigger count updated for subscription {subscription_id}: {current_count} -> {new_count} (state change detected)")
+        
     except Exception as e:
         logger.error(f"Error updating subscription trigger: {e}")
 
@@ -663,15 +755,33 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
         current_value_normalized = normalize_value_for_comparison(current_value)
         
         # Create notification
+        # Convert numeric values to Decimal for DynamoDB compatibility
+        current_value_for_notification = current_value_normalized
+        if isinstance(current_value_normalized, float):
+            current_value_for_notification = Decimal(str(current_value_normalized))
+        elif isinstance(current_value_normalized, int):
+            current_value_for_notification = Decimal(current_value_normalized)
+            
+        threshold_value_for_notification = subscription.get('threshold_value')
+        if threshold_value_for_notification is not None:
+            try:
+                threshold_float = float(threshold_value_for_notification) if isinstance(threshold_value_for_notification, str) else threshold_value_for_notification
+                if isinstance(threshold_float, float):
+                    threshold_value_for_notification = Decimal(str(threshold_float))
+                elif isinstance(threshold_float, int):
+                    threshold_value_for_notification = Decimal(threshold_float)
+            except (ValueError, TypeError):
+                pass  # Keep as string if can't convert
+        
         notification = {
             'user_email': subscription['user_email'],
             'notification_id': f"{subscription['subscription_id']}_{int(datetime.now().timestamp())}",
             'subscription_id': subscription['subscription_id'],
             'device_id': subscription['device_id'],
             'parameter_name': parameter_name,
-            'current_value': current_value_normalized,
+            'current_value': current_value_for_notification,
             'condition_type': subscription['condition_type'],
-            'threshold_value': subscription.get('threshold_value'),
+            'threshold_value': threshold_value_for_notification,
             'message_type': message_type,
             'message': format_notification_message(subscription, current_value_normalized, message_type),
             'timestamp': datetime.now(timezone.utc).isoformat(),
@@ -1003,7 +1113,11 @@ def check_subscription_cooldown_sync(subscription):
         subscription_item = response['Item']
         last_triggered = subscription_item.get('last_triggered')
         
+        # If last_triggered doesn't exist, it means subscription never successfully triggered
+        # In this case, allow the trigger (no cooldown period to wait for)
+        # This ensures the first trigger always succeeds
         if not last_triggered:
+            logger.info(f"Subscription {subscription_id} - no previous trigger, allowing (cooldown only applies after successful trigger)")
             return True  # Never triggered, allow
         
         # Parse last trigger time
@@ -1028,9 +1142,11 @@ def check_subscription_cooldown_sync(subscription):
         time_diff_ms = int((current_time - last_trigger_time).total_seconds() * 1000)
         if time_diff_ms < cooldown_ms:
             remaining_ms = cooldown_ms - time_diff_ms
-            logger.info(f"Subscription {subscription_id} cooldown: {remaining_ms/1000:.1f}s remaining")
+            logger.info(f"Subscription {subscription_id} cooldown: {remaining_ms/1000:.1f}s remaining (since last successful trigger at {last_triggered})")
             return False
         
+        # Cooldown period has passed since last successful trigger
+        logger.info(f"Subscription {subscription_id} cooldown period passed ({time_diff_ms/1000:.1f}s since last trigger)")
         return True
         
     except Exception as e:
@@ -1038,102 +1154,6 @@ def check_subscription_cooldown_sync(subscription):
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return True  # Allow on error to avoid blocking
-
-def check_self_triggering_loop_sync(subscription, device_data):
-    """Check if subscription would create a self-triggering loop"""
-    try:
-        subscription_id = subscription['subscription_id']
-        device_id = subscription['device_id']
-        parameter_name = subscription['parameter_name']
-        commands = subscription.get('commands', [])
-        
-        # Check each command for potential loops
-        for command in commands:
-            if command.get('action') == 'none':
-                continue
-                
-            target_device = command.get('target_device', device_id)
-            command_action = command.get('action', '')
-            
-            # Loop prevention: Don't send commands to the same device being monitored
-            if target_device == device_id:
-                # Check if the command would affect the monitored parameter
-                if would_command_affect_parameter(command_action, parameter_name):
-                    logger.warning(f"Loop detected: {command_action} would affect {parameter_name}")
-                    return True
-                    
-            # Additional loop prevention: Check for parameter coupling
-            if is_parameter_coupled(parameter_name, command_action):
-                logger.warning(f"Parameter coupling detected: {parameter_name} <-> {command_action}")
-                return True
-        
-        return False
-        
-    except Exception as e:
-        logger.error(f"Error checking self-triggering loop: {e}")
-        return False  # Allow on error
-
-def validate_command_targets_sync(subscription):
-    """Validate that command targets are safe and won't cause loops"""
-    try:
-        device_id = subscription['device_id']
-        commands = subscription.get('commands', [])
-        
-        for command in commands:
-            if command.get('action') == 'none':
-                continue
-                
-            target_device = command.get('target_device', device_id)
-            command_action = command.get('action', '')
-            command_value = command.get('value', '')
-            
-            # Validate command format - skip invalid commands but don't block subscription
-            if not is_valid_command_format(command_action, command_value):
-                logger.warning(f"Invalid command format: {command_action}={command_value} - skipping this command but allowing subscription")
-                continue  # Skip this command but continue validation
-                
-            # Check for dangerous command combinations
-            if is_dangerous_command_combination(device_id, target_device, command_action):
-                logger.warning(f"Dangerous command combination detected: {command_action} to {target_device} - blocking subscription")
-                return False
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error validating command targets: {e}")
-        return False
-
-def would_command_affect_parameter(command_action, parameter_name):
-    """Check if a command would affect the monitored parameter"""
-    # Map command actions to parameters they affect
-    command_parameter_map = {
-        'out1': ['outputs.OUT1', 'outputs.out1'],
-        'out2': ['outputs.OUT2', 'outputs.out2'],
-        'in1': ['inputs.IN1', 'inputs.in1'],
-        'in2': ['inputs.IN2', 'inputs.in2'],
-        'speed': ['outputs.speed', 'motor_speed'],
-        'power_saving': ['outputs.power_saving', 'power_saving']
-    }
-    
-    affected_parameters = command_parameter_map.get(command_action.lower(), [])
-    return parameter_name.lower() in [p.lower() for p in affected_parameters]
-
-def is_parameter_coupled(parameter_name, command_action):
-    """Check if parameters are coupled (changing one affects the other)"""
-    # Known parameter couplings
-    coupled_groups = [
-        ['outputs.OUT1', 'outputs.OUT2'],  # OUT1 and OUT2 might be coupled
-        ['inputs.IN1', 'inputs.IN2'],     # IN1 and IN2 might be coupled
-        ['outputs.speed', 'motor_speed'],  # Speed parameters
-        ['battery', 'power_saving']        # Battery and power saving
-    ]
-    
-    for group in coupled_groups:
-        if parameter_name.lower() in [p.lower() for p in group]:
-            if command_action.lower() in [p.lower().replace('outputs.', '').replace('inputs.', '') for p in group]:
-                return True
-    
-    return False
 
 def is_valid_command_format(command_action, command_value):
     """Validate command format"""
@@ -1158,14 +1178,3 @@ def is_valid_command_format(command_action, command_value):
         
     return True
 
-def is_dangerous_command_combination(device_id, target_device, command_action):
-    """Check for dangerous command combinations"""
-    # Restart commands are always dangerous (could cause device to go offline)
-    if command_action == 'restart':
-        return True
-        
-    # Output commands to the same device are normal and safe
-    # They are the intended use case for subscriptions
-    # No other commands are considered dangerous
-        
-    return False

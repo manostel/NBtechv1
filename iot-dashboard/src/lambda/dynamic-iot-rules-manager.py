@@ -307,6 +307,7 @@ async def create_subscription_record(user_email, subscription_data):
             'parameter_name': subscription_data['parameter_name'],
             'condition_type': subscription_data['condition_type'],
             'threshold_value': subscription_data.get('threshold_value'),
+            'tolerance_percent': subscription_data.get('tolerance_percent'),  # Optional: custom tolerance percentage
             'notification_method': subscription_data['notification_method'],
             'enabled': subscription_data.get('enabled', True),
             'description': subscription_data.get('description', ''),
@@ -330,12 +331,13 @@ async def update_subscription_record(user_email, subscription_id, subscription_d
                 'user_email': user_email,
                 'subscription_id': subscription_id
             },
-            UpdateExpression='SET device_id = :device_id, parameter_name = :parameter_name, condition_type = :condition_type, threshold_value = :threshold_value, notification_method = :notification_method, enabled = :enabled, description = :description, updated_at = :updated_at',
+            UpdateExpression='SET device_id = :device_id, parameter_name = :parameter_name, condition_type = :condition_type, threshold_value = :threshold_value, tolerance_percent = :tolerance_percent, notification_method = :notification_method, enabled = :enabled, description = :description, updated_at = :updated_at',
             ExpressionAttributeValues={
                 ':device_id': subscription_data['device_id'],
                 ':parameter_name': subscription_data['parameter_name'],
                 ':condition_type': subscription_data['condition_type'],
                 ':threshold_value': subscription_data.get('threshold_value'),
+                ':tolerance_percent': subscription_data.get('tolerance_percent'),
                 ':notification_method': subscription_data['notification_method'],
                 ':enabled': subscription_data.get('enabled', True),
                 ':description': subscription_data.get('description', ''),

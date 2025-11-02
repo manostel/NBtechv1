@@ -245,6 +245,14 @@ def create_subscription(user_email, subscription_data):
         timestamp = datetime.now(timezone.utc).timestamp()
         subscription_id = f"{user_email}_{subscription_data['device_id']}_{subscription_data['parameter_name']}_{timestamp}"
         
+        # Convert tolerance_percent from float to Decimal for DynamoDB compatibility
+        tolerance_percent_value = subscription_data.get('tolerance_percent')
+        if tolerance_percent_value is not None:
+            if isinstance(tolerance_percent_value, float):
+                tolerance_percent_value = Decimal(str(tolerance_percent_value))
+            elif isinstance(tolerance_percent_value, (int, str)):
+                tolerance_percent_value = Decimal(str(tolerance_percent_value))
+        
         # Create subscription object
         subscription = {
             'user_email': user_email,
@@ -255,6 +263,7 @@ def create_subscription(user_email, subscription_data):
             'condition_type': subscription_data['condition_type'],
             'threshold_value': subscription_data.get('threshold_value', None),
             'cooldown_ms': int(subscription_data.get('cooldown_ms', 30000)) if str(subscription_data.get('cooldown_ms', '')).strip() != '' else 30000,
+            'tolerance_percent': tolerance_percent_value,  # Decimal type for DynamoDB (0.01 = 1%, 0.02 = 2%, etc.)
             'notification_method': subscription_data['notification_method'],
             'enabled': subscription_data.get('enabled', True),
             'description': subscription_data.get('description', ''),
@@ -340,8 +349,16 @@ def update_subscription(user_email, subscription_id, subscription_data):
                         new_value != conflict_value):
                         return False, f"Another active subscription monitoring '{subscription_data['parameter_name']}' would trigger a different command for {conflict_action} ({conflict_value} vs {new_value}). This would cause conflicting actions. Please disable the existing subscription or adjust your command settings."
         
-        # Update subscription - include commands and cooldown in the update
-        update_expression = "SET device_id = :device_id, parameter_type = :parameter_type, parameter_name = :parameter_name, condition_type = :condition_type, threshold_value = :threshold_value, cooldown_ms = :cooldown_ms, notification_method = :notification_method, enabled = :enabled, description = :description, commands = :commands, updated_at = :updated_at"
+        # Update subscription - include commands, cooldown, and tolerance in the update
+        update_expression = "SET device_id = :device_id, parameter_type = :parameter_type, parameter_name = :parameter_name, condition_type = :condition_type, threshold_value = :threshold_value, cooldown_ms = :cooldown_ms, tolerance_percent = :tolerance_percent, notification_method = :notification_method, enabled = :enabled, description = :description, commands = :commands, updated_at = :updated_at"
+        
+        # Convert tolerance_percent from float to Decimal for DynamoDB compatibility
+        tolerance_percent_value = subscription_data.get('tolerance_percent')
+        if tolerance_percent_value is not None:
+            if isinstance(tolerance_percent_value, float):
+                tolerance_percent_value = Decimal(str(tolerance_percent_value))
+            elif isinstance(tolerance_percent_value, (int, str)):
+                tolerance_percent_value = Decimal(str(tolerance_percent_value))
         
         expression_values = {
             ':device_id': subscription_data['device_id'],
@@ -349,6 +366,7 @@ def update_subscription(user_email, subscription_id, subscription_data):
             ':parameter_name': subscription_data['parameter_name'],
             ':condition_type': subscription_data['condition_type'],
             ':threshold_value': subscription_data.get('threshold_value', None),
+            ':tolerance_percent': tolerance_percent_value,  # Decimal type for DynamoDB
             ':notification_method': subscription_data['notification_method'],
             ':cooldown_ms': int(subscription_data.get('cooldown_ms', 30000)) if str(subscription_data.get('cooldown_ms', '')).strip() != '' else 30000,
             ':enabled': subscription_data.get('enabled', True),
