@@ -664,6 +664,78 @@ def lambda_handler(event, context):
                 'available_parameters': params,
                 'success': True
             })
+
+        elif action == 'get_notifications':
+            # Get notifications from IoT_SubscriptionNotifications table
+            try:
+                notifications_table = dynamodb.Table('IoT_SubscriptionNotifications')
+                
+                # Query notifications for this user
+                response = notifications_table.query(
+                    KeyConditionExpression=Key('user_email').eq(user_email),
+                    ScanIndexForward=False,  # Most recent first
+                    Limit=body.get('limit', 50)  # Default 50, can be overridden
+                )
+                
+                notifications = response.get('Items', [])
+                
+                # Convert Decimal to float for JSON serialization
+                for notification in notifications:
+                    if 'current_value' in notification and isinstance(notification['current_value'], Decimal):
+                        notification['current_value'] = float(notification['current_value'])
+                    if 'threshold_value' in notification and notification['threshold_value'] is not None:
+                        if isinstance(notification['threshold_value'], Decimal):
+                            notification['threshold_value'] = float(notification['threshold_value'])
+                
+                return cors_response(200, {
+                    'notifications': notifications,
+                    'count': len(notifications),
+                    'success': True
+                })
+            except Exception as e:
+                logger.error(f"Error fetching notifications: {str(e)}")
+                return cors_response(500, {
+                    'error': f"Error fetching notifications: {str(e)}",
+                    'success': False
+                })
+
+        elif action == 'mark_notification_read':
+            # Mark a notification as read
+            try:
+                notification_id = body.get('notification_id')
+                if not notification_id:
+                    return cors_response(400, {
+                        'error': 'Missing notification_id',
+                        'success': False
+                    })
+                
+                notifications_table = dynamodb.Table('IoT_SubscriptionNotifications')
+                
+                # Update notification to mark as read
+                notifications_table.update_item(
+                    Key={
+                        'user_email': user_email,
+                        'notification_id': notification_id
+                    },
+                    UpdateExpression='SET #read = :read',
+                    ExpressionAttributeNames={
+                        '#read': 'read'
+                    },
+                    ExpressionAttributeValues={
+                        ':read': True
+                    }
+                )
+                
+                return cors_response(200, {
+                    'message': 'Notification marked as read',
+                    'success': True
+                })
+            except Exception as e:
+                logger.error(f"Error marking notification as read: {str(e)}")
+                return cors_response(500, {
+                    'error': f"Error marking notification as read: {str(e)}",
+                    'success': False
+                })
         
         else:
             return cors_response(400, {

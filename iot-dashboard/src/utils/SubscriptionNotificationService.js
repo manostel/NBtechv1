@@ -31,9 +31,9 @@ class SubscriptionNotificationService extends EventEmitter {
   }
 
   startPolling() {
-    // Poll for subscription triggers every 30 seconds
+    // Poll for notifications from IoT_SubscriptionNotifications table every 30 seconds
     this.pollingInterval = setInterval(async () => {
-      await this.checkSubscriptionTriggers();
+      await this.fetchNotifications();
     }, 30000);
   }
 
@@ -44,6 +44,114 @@ class SubscriptionNotificationService extends EventEmitter {
     }
   }
 
+  async fetchNotifications() {
+    try {
+      // Fetch notifications from IoT_SubscriptionNotifications table
+      const userEmail = localStorage.getItem('user_email');
+      if (!userEmail) return;
+
+      const response = await fetch('https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/manage-subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          action: 'get_notifications',
+          user_email: userEmail,
+          limit: 50  // Fetch last 50 notifications
+        })
+      });
+
+      if (!response.ok) {
+        // If notifications table doesn't exist yet, fall back to old method
+        console.warn('Notifications API not available, falling back to subscription checking');
+        await this.checkSubscriptionTriggers();
+        return;
+      }
+
+      const result = await response.json();
+      if (!result.success) return;
+
+      const notifications = result.notifications || [];
+      
+      // Get list of already processed notification IDs
+      const processedIds = new Set(
+        JSON.parse(localStorage.getItem('processed_notification_ids') || '[]')
+      );
+
+      // Process new notifications (unread ones we haven't seen before)
+      const newNotifications = notifications.filter(notif => 
+        !notif.read && !processedIds.has(notif.notification_id)
+      );
+
+      for (const notification of newNotifications) {
+        // Mark as processed
+        processedIds.add(notification.notification_id);
+        
+        // Emit notification event
+        const formattedNotification = {
+          id: notification.notification_id,
+          type: 'subscription_trigger',
+          title: `Device Alert: ${notification.device_id}`,
+          message: notification.message || this.formatNotificationMessageFromNotification(notification),
+          subscription: {
+            subscription_id: notification.subscription_id,
+            device_id: notification.device_id,
+            parameter_name: notification.parameter_name,
+            condition_type: notification.condition_type
+          },
+          currentValue: notification.current_value,
+          timestamp: notification.timestamp,
+          severity: this.getNotificationSeverityFromParam(notification.parameter_name)
+        };
+
+        this.emit('notification', formattedNotification);
+        this.storeNotification(formattedNotification);
+      }
+
+      // Save processed IDs (keep last 1000)
+      const processedArray = Array.from(processedIds);
+      if (processedArray.length > 1000) {
+        processedArray.splice(0, processedArray.length - 1000);
+      }
+      localStorage.setItem('processed_notification_ids', JSON.stringify(processedArray));
+
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      // Fall back to old method if notifications API fails
+      await this.checkSubscriptionTriggers();
+    }
+  }
+
+  formatNotificationMessageFromNotification(notification) {
+    const { parameter_name, current_value, condition_type, threshold_value } = notification;
+    
+    switch (condition_type) {
+      case 'change':
+        return `${parameter_name} changed to ${current_value}`;
+      case 'above':
+        return `${parameter_name} (${current_value}) is above threshold (${threshold_value})`;
+      case 'below':
+        return `${parameter_name} (${current_value}) is below threshold (${threshold_value})`;
+      case 'equals':
+        return `${parameter_name} equals ${current_value}`;
+      case 'not_equals':
+        return `${parameter_name} (${current_value}) is not equal to ${threshold_value}`;
+      default:
+        return `${parameter_name} value changed to ${current_value}`;
+    }
+  }
+
+  getNotificationSeverityFromParam(parameterName) {
+    const criticalParams = ['battery', 'signal_quality', 'status'];
+    if (criticalParams.includes(parameterName)) {
+      return 'error';
+    }
+    return 'info';
+  }
+
+  // Keep old method as fallback
   async checkSubscriptionTriggers() {
     try {
       // Get all active subscriptions for the current user
