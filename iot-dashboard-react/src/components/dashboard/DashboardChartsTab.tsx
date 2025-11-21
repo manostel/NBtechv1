@@ -155,7 +155,7 @@ const DashboardChartsTab = ({
       yMin: isFinite(yMin) && yMin >= 0 ? Math.max(0, yMin * 0.9) : 0,
       yMax: isFinite(yMax) ? yMax * 1.1 : null
     };
-    };
+  };
 
     const chartOptions = {
       responsive: true,
@@ -478,7 +478,7 @@ const DashboardChartsTab = ({
           <Button
             size="small"
             variant="outlined"
-          onClick={() => {
+            onClick={() => {
               // Try multiple ways to access the chart instance
               const chart = chartInstancesRef.current[metricKey] || 
                            localChartRef.current?.chartInstance || 
@@ -495,44 +495,44 @@ const DashboardChartsTab = ({
               }
             }}
             disabled={!zoomedCharts[metricKey]}
-          sx={{
+            sx={{ 
               fontSize: '0.75rem',
               minWidth: 'auto',
               px: 1,
               py: 0.5,
               height: '32px',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            color: '#E0E0E0',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: '#E0E0E0',
               borderColor: 'rgba(255, 255, 255, 0.3)',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 borderColor: 'rgba(255, 255, 255, 0.5)',
               },
               '&:disabled': {
                 opacity: 0.3,
                 borderColor: 'rgba(255, 255, 255, 0.1)',
-            }
-          }}
-        >
+              }
+            }}
+          >
             Reset Zoom
           </Button>
-        <IconButton
-          onClick={() => handleFullscreenToggleChart(chartData)}
-          sx={{
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            color: '#E0E0E0',
+          <IconButton
+            onClick={() => handleFullscreenToggleChart(chartData)}
+            sx={{
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: '#E0E0E0',
               pointerEvents: 'auto',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            },
-            transition: 'all 0.2s ease-in-out',
-            '& .MuiSvgIcon-root': {
-              fontSize: '1.2rem'
-            }
-          }}
-        >
-          {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-        </IconButton>
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              },
+              transition: 'all 0.2s ease-in-out',
+              '& .MuiSvgIcon-root': {
+                fontSize: '1.2rem'
+              }
+            }}
+          >
+            {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+          </IconButton>
         </Box>
         <Box
           sx={{
@@ -544,11 +544,11 @@ const DashboardChartsTab = ({
             }
           }}
         >
-        <Line
-          ref={localChartRef}
-          data={chartData}
-          options={interactiveOptions}
-        />
+          <Line
+            ref={localChartRef}
+            data={chartData}
+            options={interactiveOptions}
+          />
         </Box>
       </Box>
     );

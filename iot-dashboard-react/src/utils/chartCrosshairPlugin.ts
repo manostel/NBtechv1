@@ -2,7 +2,31 @@
  * Chart.js plugin to display a vertical crosshair line on hover/touch
  * Snaps to nearest data point when dragging and highlights the point
  */
-export const crosshairPlugin = {
+import { Chart, Plugin } from 'chart.js';
+
+interface CrosshairPluginOptions {
+  width?: number;
+  color?: string;
+  dash?: number[];
+  snapToDataPoints?: boolean;
+  highlightPointRadius?: number;
+}
+
+interface CrosshairState {
+  x: number | null;
+  draw: boolean;
+  dataPointIndex: number | null;
+  dataPointX: number | null;
+  isZooming: boolean;
+}
+
+declare module 'chart.js' {
+  interface Chart {
+    crosshair?: CrosshairState;
+  }
+}
+
+export const crosshairPlugin: Plugin<'line', CrosshairPluginOptions> = {
   id: 'crosshair',
   defaults: {
     width: 1,
@@ -11,7 +35,7 @@ export const crosshairPlugin = {
     snapToDataPoints: true,
     highlightPointRadius: 6,
   },
-  afterInit: (chart) => {
+  afterInit: (chart: Chart) => {
     chart.crosshair = {
       x: null,
       draw: false,
@@ -20,20 +44,11 @@ export const crosshairPlugin = {
       isZooming: false
     };
   },
-  afterEvent: (chart, args) => {
-    // Ensure crosshair is initialized
-    if (!chart.crosshair) {
-      chart.crosshair = {
-        x: null,
-        draw: false,
-        dataPointIndex: null,
-        dataPointX: null,
-        isZooming: false
-      };
-    }
-    
+  afterEvent: (chart: Chart, args: any) => {
     const { event, inChartArea } = args;
     const { canvas } = chart;
+    
+    if (!chart.crosshair) return;
     
     // Keep crosshair visible during zoom - only hide during active pinch gesture
     if (event.native) {
@@ -44,21 +59,8 @@ export const crosshairPlugin = {
       }
       // Reset zooming flag when single touch ends
       if (event.native.type === 'touchend' && (!event.native.touches || event.native.touches.length === 0)) {
-        if (chart.crosshair) {
-          chart.crosshair.isZooming = false;
-        }
+        chart.crosshair.isZooming = false;
       }
-    }
-    
-    // Ensure crosshair is initialized
-    if (!chart.crosshair) {
-      chart.crosshair = {
-        x: null,
-        draw: false,
-        dataPointIndex: null,
-        dataPointX: null,
-        isZooming: false
-      };
     }
     
     if (!inChartArea) {
@@ -70,7 +72,7 @@ export const crosshairPlugin = {
     }
 
     // Chart.js provides event.x which works for both mouse and touch
-    let x = event.x;
+    let x: number | undefined = event.x;
     
     if (x === undefined || x === null) {
       chart.crosshair.draw = false;
@@ -81,7 +83,7 @@ export const crosshairPlugin = {
     }
     
     // Snap to nearest data point if enabled
-    const pluginOptions = chart.options.plugins?.crosshair || {};
+    const pluginOptions = (chart.options.plugins?.crosshair as CrosshairPluginOptions) || {};
     if (pluginOptions.snapToDataPoints !== false) {
       const xScale = chart.scales.x;
       
@@ -91,12 +93,12 @@ export const crosshairPlugin = {
         if (firstDatasetMeta && firstDatasetMeta.data && firstDatasetMeta.data.length > 0) {
           // Use actual point positions from the chart
           let nearestX = x;
-          let nearestIndex = null;
+          let nearestIndex: number | null = null;
           let minDistance = Infinity;
           
-          firstDatasetMeta.data.forEach((point, index) => {
+          firstDatasetMeta.data.forEach((point: any, index: number) => {
             if (point && typeof point.x === 'number' && !isNaN(point.x)) {
-              const distance = Math.abs(point.x - x);
+              const distance = Math.abs(point.x - x!);
               
               if (distance < minDistance) {
                 minDistance = distance;
@@ -112,11 +114,11 @@ export const crosshairPlugin = {
         } else if (xScale && chart.data && chart.data.labels) {
           // Fallback: use labels to find nearest point
           let nearestX = x;
-          let nearestIndex = null;
+          let nearestIndex: number | null = null;
           let minDistance = Infinity;
           
-          chart.data.labels.forEach((label, index) => {
-            let labelValue;
+          chart.data.labels.forEach((label: any, index: number) => {
+            let labelValue: number | null = null;
             
             // Handle time scale (Date objects) vs regular scale
             if (xScale.type === 'time') {
@@ -125,7 +127,7 @@ export const crosshairPlugin = {
                 labelValue = label.getTime();
               } else if (typeof label === 'string' || typeof label === 'number') {
                 try {
-                  labelValue = xScale.parse(label, index);
+                  labelValue = (xScale as any).parse(label, index);
                 } catch (e) {
                   labelValue = null;
                 }
@@ -135,7 +137,7 @@ export const crosshairPlugin = {
             } else {
               // For regular scales, use parse method
               try {
-                labelValue = xScale.parse(label, index);
+                labelValue = (xScale as any).parse(label, index);
               } catch (e) {
                 labelValue = null;
               }
@@ -146,7 +148,7 @@ export const crosshairPlugin = {
                 const pixelX = xScale.getPixelForValue(labelValue);
                 
                 if (pixelX !== null && pixelX !== undefined && !isNaN(pixelX)) {
-                  const distance = Math.abs(pixelX - x);
+                  const distance = Math.abs(pixelX - x!);
                   
                   if (distance < minDistance) {
                     minDistance = distance;
@@ -171,16 +173,10 @@ export const crosshairPlugin = {
     chart.crosshair.draw = true;
     chart.draw();
   },
-  afterDraw: (chart) => {
-    const { ctx, chartArea } = chart;
-    const crosshair = chart.crosshair;
+  afterDraw: (chart: Chart) => {
+    const { ctx, chartArea, crosshair } = chart;
     
-    // Safety checks: ensure crosshair and chartArea exist
-    if (!crosshair || !chartArea || !ctx) {
-      return;
-    }
-    
-    if (!crosshair.draw || crosshair.x === null || crosshair.x === undefined) {
+    if (!crosshair || !crosshair.draw || crosshair.x === null) {
       return;
     }
 
@@ -191,7 +187,7 @@ export const crosshairPlugin = {
       return;
     }
 
-    const pluginOptions = chart.options.plugins?.crosshair || {};
+    const pluginOptions = (chart.options.plugins?.crosshair as CrosshairPluginOptions) || {};
     const width = pluginOptions.width || 2;
     const color = pluginOptions.color || 'rgba(255, 255, 255, 0.6)';
     const dash = pluginOptions.dash || [5, 5];
@@ -212,11 +208,11 @@ export const crosshairPlugin = {
     if (crosshair.dataPointIndex !== null && chart.data && chart.data.datasets) {
       const dataIndex = crosshair.dataPointIndex;
       
-      chart.data.datasets.forEach((dataset, datasetIndex) => {
+      chart.data.datasets.forEach((dataset: any, datasetIndex: number) => {
         const meta = chart.getDatasetMeta(datasetIndex);
         
         if (meta && meta.data && meta.data[dataIndex]) {
-          const point = meta.data[dataIndex];
+          const point: any = meta.data[dataIndex];
           const value = dataset.data[dataIndex];
           
           // Check if point is valid and within chart area
@@ -251,4 +247,5 @@ export const crosshairPlugin = {
     ctx.restore();
   }
 };
+
 

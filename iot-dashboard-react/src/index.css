@@ -1,0 +1,79 @@
+html {
+  height: 100%;
+  background-color: #1e1e2f; /* Set default dark theme color */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Exo 2", "Roboto", "Helvetica", "Arial", sans-serif;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  background-color: inherit;
+  /* Add safe area insets */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow-x: hidden;
+  background-color: inherit;
+  /* Add safe area insets */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Set explicit dark mode colors to prevent flashes */
+[data-theme='dark'] {
+  background-color: #1e1e2f !important;
+  color: #f4f4f4 !important;
+}
+
+[data-theme='dark'] body,
+[data-theme='dark'] #root {
+  background-color: #1e1e2f !important;
+}
+
+/* Add a specific style for transitions to ensure smooth theme changes */
+.page-transition {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Add viewport meta tag styles */
+@viewport {
+  viewport-fit: cover;
+}
+
+/* Subtle modern retro styling */
+.retro-text {
+  font-family: "Exo 2", "Roboto", "Helvetica", "Arial", sans-serif;
+  letter-spacing: 0.3px;
+}
+
+.retro-title {
+  font-family: "Exo 2", "Roboto", "Helvetica", "Arial", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+/* Subtle retro button styling */
+.retro-button {
+  font-family: "Exo 2", "Roboto", "Helvetica", "Arial", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
+/* Allow chart canvas to handle pinch-zoom while allowing vertical scrolling */
+@media (pointer: coarse) {
+  canvas {
+    touch-action: pan-y pinch-zoom !important;
+  }
+}

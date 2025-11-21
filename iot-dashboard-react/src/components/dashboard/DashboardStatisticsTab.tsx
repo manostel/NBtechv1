@@ -1,0 +1,225 @@
+import React from 'react';
+import { Box, Grid, Typography, Paper, useTheme } from '@mui/material';
+import { 
+  Timeline as TimelineIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  Speed as SpeedIcon
+} from '@mui/icons-material';
+import SharedControls from './SharedControls';
+
+const DashboardStatisticsTab = ({ 
+  metricsData, 
+  metricsConfig,
+  timeRange,
+  selectedVariables,
+  availableVariables,
+  onVariableChange,
+  onTimeRangeChange,
+  onApply
+}) => {
+  const theme = useTheme();
+
+  const calculateStatistics = (data, key) => {
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return null;
+    }
+
+    const values = data.map(item => item[key]).filter(val => val !== undefined && val !== null);
+    if (values.length === 0) return null;
+
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    const average = sum / values.length;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    
+    // Calculate standard deviation
+    const squareDiffs = values.map(val => Math.pow(val - average, 2));
+    const avgSquareDiff = squareDiffs.reduce((acc, val) => acc + val, 0) / values.length;
+    const standardDeviation = Math.sqrt(avgSquareDiff);
+
+    return {
+      average,
+      min,
+      max,
+      standardDeviation,
+      count: values.length
+    };
+  };
+
+  const StatCard = ({ title, value, unit, icon, color }) => (
+    <Paper 
+      elevation={0}
+      sx={{ 
+        p: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: 3,
+        background: theme.palette.mode === 'dark'
+          ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+        backdropFilter: 'blur(12px)',
+        boxShadow: theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+        border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+        transition: 'all 0.3s ease',
+        '&:hover': {
+          boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          transform: 'translateY(-2px)'
+        }
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, minHeight: 24 }}>
+        {icon && React.cloneElement(icon, { sx: { fontSize: 20, color: color || theme.palette.primary.main, mr: 1 } })}
+        <Typography variant="subtitle2" color="textSecondary" sx={{ fontWeight: 400, fontSize: '0.95rem', textAlign: 'left' }}>
+          {title}
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-start', gap: 0.5, ml: 0 }}>
+        <Typography
+          variant="h4"
+          component="div"
+          sx={{ fontSize: '1.2rem', fontWeight: 400, lineHeight: 1 }}
+        >
+          {value !== undefined ? value.toFixed(2) : 'N/A'}
+        </Typography>
+        {unit && (
+          <Typography 
+            component="span" 
+            variant="body2" 
+            color="textSecondary"
+            sx={{ fontSize: '0.9rem', ml: 0 }}
+          >
+            {unit}
+          </Typography>
+        )}
+      </Box>
+    </Paper>
+  );
+
+  let dataPointsCount = null;
+  const statsList = selectedVariables.map((key) => {
+    const config = metricsConfig[key];
+    if (!config) return null;
+
+    const stats = calculateStatistics(metricsData.data, key);
+    if (!stats) return null;
+    if (dataPointsCount === null) dataPointsCount = stats.count;
+
+    return (
+      <Grid item xs={12} key={key}>
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1, 
+            mb: 2,
+            mt: 2,
+            px: 2,
+            py: 1.5,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+            borderRadius: 3,
+            border: '1px solid #e3f2fd',
+            position: 'relative',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: 'linear-gradient(90deg, #2196f3, #4caf50)',
+              borderRadius: '3px 3px 0 0',
+              opacity: 0.4
+            }
+          }}>
+            <Box sx={{ 
+              p: 0.5, 
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #2196f3, #4caf50)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <TimelineIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
+            </Box>
+            <Typography variant="h6" sx={{ 
+              fontSize: '1rem', 
+              fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
+              fontWeight: 500,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              color: '#E0E0E0'
+            }}>
+              {config.label}
+            </Typography>
+          </Box>
+          <Grid container spacing={2}>
+            <Grid item xs={6} sm={6} md={3}>
+              <StatCard
+                title="Average"
+                value={stats.average}
+                unit={config.unit}
+                icon={<TimelineIcon color="primary" />}
+                color={theme.palette.primary.main}
+              />
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <StatCard
+                title="Minimum"
+                value={stats.min}
+                unit={config.unit}
+                icon={<TrendingDownIcon color="error" />}
+                color={theme.palette.error.main}
+              />
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <StatCard
+                title="Maximum"
+                value={stats.max}
+                unit={config.unit}
+                icon={<TrendingUpIcon color="success" />}
+                color={theme.palette.success.main}
+              />
+            </Grid>
+            <Grid item xs={6} sm={6} md={3}>
+              <StatCard
+                title="Standard Deviation"
+                value={stats.standardDeviation}
+                unit={config.unit}
+                icon={<SpeedIcon color="warning" />}
+                color={theme.palette.warning.main}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+      </Grid>
+    );
+  }).filter(Boolean);
+
+  return (
+    <Box sx={{ py: 0, px: 0.5 }}>
+      <SharedControls
+        selectedVariables={selectedVariables}
+        availableVariables={availableVariables}
+        onVariableChange={onVariableChange}
+        timeRange={timeRange}
+        onTimeRangeChange={onTimeRangeChange}
+        onApply={onApply}
+        title={<span style={{ fontWeight: 400, fontSize: '1rem' }}>Statistics</span>}
+      />
+      <Grid container spacing={2}>
+        {statsList}
+      </Grid>
+      {dataPointsCount !== null && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 2, textAlign: 'center' }}>
+          Based on {dataPointsCount} data points
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
+export default DashboardStatisticsTab; 
