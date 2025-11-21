@@ -70,3 +70,10 @@ body {
   font-weight: 400;
   letter-spacing: 0.3px;
 }
+
+/* Allow chart canvas to handle pinch-zoom while allowing vertical scrolling */
+@media (pointer: coarse) {
+  canvas {
+    touch-action: pan-y pinch-zoom !important;
+  }
+}

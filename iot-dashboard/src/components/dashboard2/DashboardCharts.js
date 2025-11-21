@@ -12,6 +12,7 @@ import {
   Legend,
   Filler
 } from 'chart.js';
+import { crosshairPlugin } from '../../utils/chartCrosshairPlugin';
 
 ChartJS.register(
   CategoryScale,
@@ -21,7 +22,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  crosshairPlugin
 );
 
 export default function DashboardCharts({ metricsData, metricsConfig, isLoading }) {
@@ -49,6 +51,14 @@ export default function DashboardCharts({ metricsData, metricsConfig, isLoading 
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      axis: 'x',
+      intersect: false
+    },
+    onHover: (event, activeElements) => {
+      event.native.target.style.cursor = activeElements.length > 0 ? 'crosshair' : 'default';
+    },
     plugins: {
       legend: {
         position: 'top',
@@ -63,6 +73,7 @@ export default function DashboardCharts({ metricsData, metricsConfig, isLoading 
       tooltip: {
         mode: 'index',
         intersect: false,
+        enabled: true,
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         padding: 10,
         titleFont: {
@@ -71,6 +82,11 @@ export default function DashboardCharts({ metricsData, metricsConfig, isLoading 
         bodyFont: {
           size: 12
         }
+      },
+      crosshair: {
+        width: 2,
+        color: 'rgba(255, 255, 255, 0.6)',
+        dash: [5, 5]
       }
     },
     scales: {
@@ -92,11 +108,6 @@ export default function DashboardCharts({ metricsData, metricsConfig, isLoading 
         }
       }
     },
-    interaction: {
-      mode: 'nearest',
-      axis: 'x',
-      intersect: false
-    }
   };
 
   return (

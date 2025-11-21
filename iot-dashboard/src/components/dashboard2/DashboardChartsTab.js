@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Grid, Paper, useTheme, IconButton, Dialog, Typography } from '@mui/material';
+import { Box, Grid, Paper, useTheme, IconButton, Dialog, Typography, Button } from '@mui/material';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -15,8 +15,10 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import zoomPlugin from 'chartjs-plugin-zoom';
+import { crosshairPlugin } from '../../utils/chartCrosshairPlugin';
+import { isMobileDevice } from '../../utils/deviceDetection';
 import SharedControls from './SharedControls';
-import { Fullscreen as FullscreenIcon, FullscreenExit as FullscreenExitIcon, Refresh as RefreshIcon, Lock as LockIcon, LockOpen as LockOpenIcon, TrendingUp as TrendingUpIcon } from '@mui/icons-material';
+import { Fullscreen as FullscreenIcon, FullscreenExit as FullscreenExitIcon, Refresh as RefreshIcon, TrendingUp as TrendingUpIcon } from '@mui/icons-material';
 import { format, subMinutes, subHours, subDays } from 'date-fns';
 
 ChartJS.register(
@@ -29,7 +31,8 @@ ChartJS.register(
   Legend,
   TimeScale,
   Filler,
-  zoomPlugin
+  zoomPlugin,
+  crosshairPlugin
 );
 
 const DashboardChartsTab = ({ 
@@ -45,9 +48,11 @@ const DashboardChartsTab = ({
 }) => {
   const theme = useTheme();
   const chartRefs = useRef({});
+  const chartInstancesRef = useRef({});
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenChart, setFullscreenChart] = useState(null);
-  const [chartLocks, setChartLocks] = useState({});
+  const [zoomedCharts, setZoomedCharts] = useState({});
+  const isMobile = isMobileDevice();
 
   const handleFullscreenToggle = () => {
     if (!document.fullscreenElement) {
@@ -78,10 +83,6 @@ const DashboardChartsTab = ({
   const handleFullscreenClose = () => {
     setIsFullscreen(false);
     setFullscreenChart(null);
-  };
-
-  const handleToggleLock = (metricKey) => {
-    setChartLocks((prev) => ({ ...prev, [metricKey]: !prev[metricKey] }));
   };
 
   const getTimeUnit = () => {
@@ -118,6 +119,44 @@ const DashboardChartsTab = ({
     }
     };
 
+  // Calculate data boundaries for zoom limits
+  const getDataBoundaries = (data) => {
+    if (!data || !data.labels || data.labels.length === 0) {
+      return {
+        xMin: null,
+        xMax: null,
+        yMin: 0,
+        yMax: null
+      };
+    }
+
+    // Get time boundaries (x-axis)
+    const timestamps = data.labels.map(label => new Date(label).getTime());
+    const xMin = Math.min(...timestamps);
+    const xMax = Math.max(...timestamps);
+
+    // Get value boundaries (y-axis)
+    let yMin = Infinity;
+    let yMax = -Infinity;
+
+    data.datasets.forEach(dataset => {
+      const values = dataset.data.filter(v => v !== null && v !== undefined && !isNaN(v));
+      if (values.length > 0) {
+        const datasetMin = Math.min(...values);
+        const datasetMax = Math.max(...values);
+        yMin = Math.min(yMin, datasetMin);
+        yMax = Math.max(yMax, datasetMax);
+      }
+    });
+
+    return {
+      xMin: isFinite(xMin) ? xMin : null,
+      xMax: isFinite(xMax) ? xMax : null,
+      yMin: isFinite(yMin) && yMin >= 0 ? Math.max(0, yMin * 0.9) : 0,
+      yMax: isFinite(yMax) ? yMax * 1.1 : null
+    };
+  };
+
     const chartOptions = {
       responsive: true,
       maintainAspectRatio: false,
@@ -126,9 +165,12 @@ const DashboardChartsTab = ({
         easing: 'easeInOutQuart'
       },
       interaction: {
-        mode: 'nearest',
+        mode: 'index',
         axis: 'x',
         intersect: false
+      },
+      onHover: (event, activeElements) => {
+        event.native.target.style.cursor = activeElements.length > 0 ? 'crosshair' : 'default';
       },
       layout: {
         padding: {
@@ -185,32 +227,6 @@ const DashboardChartsTab = ({
           },
           hideDelay: 100,
         },
-        zoom: {
-          pan: {
-            enabled: true,
-            mode: 'x',
-            modifierKey: 'ctrl',
-          },
-          zoom: {
-            wheel: {
-              enabled: true,
-              modifierKey: 'ctrl',
-            },
-            pinch: {
-              enabled: true,
-            },
-            mode: 'x',
-            drag: {
-              enabled: true,
-              backgroundColor: 'rgba(0,0,0,0.1)',
-              borderColor: 'rgba(0,0,0,0.3)',
-              borderWidth: 1
-            }
-          },
-          limits: {
-            x: {min: 'original', max: 'original'}
-          }
-        }
       },
       scales: {
         x: {
@@ -276,12 +292,12 @@ const DashboardChartsTab = ({
       }
     };
 
+
   const renderChart = (data, metricKey) => {
     if (!chartRefs.current[metricKey]) {
       chartRefs.current[metricKey] = React.createRef();
     }
     const localChartRef = chartRefs.current[metricKey];
-    const isLocked = chartLocks[metricKey] !== false; // default locked
     if (!data || !Array.isArray(data) || data.length === 0) {
       return (
         <Box sx={{ p: 1, textAlign: 'center' }}>
@@ -310,27 +326,120 @@ const DashboardChartsTab = ({
       }]
     };
 
-    // Chart options: disable pan/zoom/touch when locked
+    // Calculate boundaries for this chart
+    const boundaries = getDataBoundaries(chartData);
+
+    // Chart options
     const interactiveOptions = {
       ...chartOptions,
       plugins: {
         ...chartOptions.plugins,
         tooltip: {
           ...chartOptions.plugins.tooltip,
+          enabled: true,
+          mode: 'index',
+          intersect: false,
           animation: {
             duration: 150,
             easing: 'easeOutQuad',
           },
           hideDelay: 100,
         },
+        crosshair: {
+          width: 2,
+          color: 'rgba(255, 255, 255, 0.6)',
+          dash: [5, 5],
+          snapToDataPoints: true,
+          highlightPointRadius: 6
+        },
         zoom: {
-          ...chartOptions.plugins.zoom,
-          pan: { ...chartOptions.plugins.zoom.pan, enabled: !isLocked },
+          limits: {
+            x: boundaries.xMin !== null && boundaries.xMax !== null
+              ? {min: boundaries.xMin, max: boundaries.xMax}
+              : {min: 'original', max: 'original'},
+            y: boundaries.yMax !== null
+              ? {min: 'original', max: 'original'}
+              : {min: 0, max: 'original'}
+          },
+          pan: {
+            enabled: !isMobile,
+            mode: 'x',
+            modifierKey: 'ctrl',
+            threshold: 10,
+          },
           zoom: {
-            ...chartOptions.plugins.zoom.zoom,
-            wheel: { ...chartOptions.plugins.zoom.zoom.wheel, enabled: !isLocked },
-            pinch: { ...chartOptions.plugins.zoom.zoom.pinch, enabled: !isLocked },
-            drag: { ...chartOptions.plugins.zoom.zoom.drag, enabled: !isLocked },
+            wheel: {
+              enabled: !isMobile,
+              modifierKey: 'ctrl',
+            },
+            pinch: {
+              enabled: isMobile,
+            },
+            drag: {
+              enabled: false,
+            },
+            mode: 'x',
+            onZoom: ({ chart }) => {
+              // Enable button immediately when zoom starts
+              chartInstancesRef.current[metricKey] = chart;
+              setZoomedCharts(prev => {
+                // Only update if not already enabled to avoid unnecessary re-renders
+                if (prev[metricKey] !== true) {
+                  return {
+                    ...prev,
+                    [metricKey]: true
+                  };
+                }
+                return prev;
+              });
+            },
+            onZoomComplete: ({ chart }) => {
+              chartInstancesRef.current[metricKey] = chart;
+              // Check if back to original zoom level
+              const xScale = chart.scales.x;
+              if (xScale && boundaries.xMin !== null && boundaries.xMax !== null) {
+                const currentRange = xScale.max - xScale.min;
+                const originalRange = boundaries.xMax - boundaries.xMin;
+                const rangeDiff = Math.abs(currentRange - originalRange);
+                const minDiff = Math.abs(xScale.min - boundaries.xMin);
+                const maxDiff = Math.abs(xScale.max - boundaries.xMax);
+                
+                // Consider at original if range is very close AND both min/max are close
+                // Use stricter thresholds to avoid false positives during active zoom
+                const isAtOriginal = rangeDiff < (originalRange * 0.02) && minDiff < 2000 && maxDiff < 2000;
+                
+                // Only update state if it would actually change
+                setZoomedCharts(prev => {
+                  const currentState = prev[metricKey];
+                  if (isAtOriginal && currentState !== false) {
+                    // At original and button is enabled - disable it
+                    return {
+                      ...prev,
+                      [metricKey]: false
+                    };
+                  } else if (!isAtOriginal && currentState !== true) {
+                    // Not at original and button is disabled - enable it
+                    return {
+                      ...prev,
+                      [metricKey]: true
+                    };
+                  }
+                  // No state change needed
+                  return prev;
+                });
+              } else {
+                // If boundaries not available, assume zoomed
+                setZoomedCharts(prev => {
+                  if (prev[metricKey] !== true) {
+                    return {
+                      ...prev,
+                      [metricKey]: true
+                    };
+                  }
+                  return prev;
+                });
+              }
+            }
           },
         },
       },
@@ -350,80 +459,97 @@ const DashboardChartsTab = ({
           mt: 0,
           mb: 0,
           px: 0,
-          touchAction: isLocked ? 'pan-y' : 'auto',
+          touchAction: isMobile ? 'pan-y' : 'auto',
+          overscrollBehavior: 'contain'
         }}
       >
-        <IconButton
-          onClick={() => handleToggleLock(metricKey)}
-          sx={{
-            position: 'absolute',
-            top: 48,
-            right: 88,
-            zIndex: 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            color: '#E0E0E0',
-            mr: 1,
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            },
-            transition: 'all 0.2s ease-in-out',
-            '& .MuiSvgIcon-root': {
-              fontSize: '1.2rem'
-            }
-          }}
-        >
-          {isLocked ? <LockIcon /> : <LockOpenIcon />}
-        </IconButton>
-        <IconButton
-          onClick={() => {
-            if (localChartRef.current && localChartRef.current.resetZoom) {
-              localChartRef.current.resetZoom();
-            }
-          }}
-          sx={{
-            position: 'absolute',
-            top: 48,
-            right: 48,
-            zIndex: 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            color: '#E0E0E0',
-            mr: 1,
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            },
-            transition: 'all 0.2s ease-in-out',
-            '& .MuiSvgIcon-root': {
-              fontSize: '1.2rem'
-            }
-          }}
-        >
-          <RefreshIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => handleFullscreenToggleChart(chartData)}
+        <Box
           sx={{
             position: 'absolute',
             top: 48,
             right: 8,
-            zIndex: 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            color: '#E0E0E0',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            },
-            transition: 'all 0.2s ease-in-out',
-            '& .MuiSvgIcon-root': {
-              fontSize: '1.2rem'
+            zIndex: 10,
+            display: 'flex',
+            gap: 0.5,
+            alignItems: 'center',
+            pointerEvents: 'auto'
+          }}
+        >
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              // Try multiple ways to access the chart instance
+              const chart = chartInstancesRef.current[metricKey] || 
+                           localChartRef.current?.chartInstance || 
+                           localChartRef.current?.chart ||
+                           (localChartRef.current && ChartJS.getChart(localChartRef.current.canvas)) ||
+                           localChartRef.current;
+              
+              if (chart?.resetZoom) {
+                chart.resetZoom();
+                setZoomedCharts(prev => ({
+                  ...prev,
+                  [metricKey]: false
+                }));
+              }
+            }}
+            disabled={!zoomedCharts[metricKey]}
+            sx={{ 
+              fontSize: '0.75rem',
+              minWidth: 'auto',
+              px: 1,
+              py: 0.5,
+              height: '32px',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: '#E0E0E0',
+              borderColor: 'rgba(255, 255, 255, 0.3)',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderColor: 'rgba(255, 255, 255, 0.5)',
+              },
+              '&:disabled': {
+                opacity: 0.3,
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+              }
+            }}
+          >
+            Reset Zoom
+          </Button>
+          <IconButton
+            onClick={() => handleFullscreenToggleChart(chartData)}
+            sx={{
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: '#E0E0E0',
+              pointerEvents: 'auto',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              },
+              transition: 'all 0.2s ease-in-out',
+              '& .MuiSvgIcon-root': {
+                fontSize: '1.2rem'
+              }
+            }}
+          >
+            {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+          </IconButton>
+        </Box>
+        <Box
+          sx={{
+            width: '100%',
+            height: '100%',
+            position: 'relative',
+            '& canvas': {
+              touchAction: isMobile ? 'pan-y pinch-zoom' : 'auto',
             }
           }}
         >
-          {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-        </IconButton>
-        <Line
-          ref={localChartRef}
-          data={chartData}
-          options={interactiveOptions}
-        />
+          <Line
+            ref={localChartRef}
+            data={chartData}
+            options={interactiveOptions}
+          />
+        </Box>
       </Box>
     );
   };

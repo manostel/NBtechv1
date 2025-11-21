@@ -13,8 +13,10 @@ import {
   Filler,
   TimeScale
 } from 'chart.js';
-import zoomPlugin from 'chartjs-plugin-zoom';
 import 'chartjs-adapter-date-fns';
+import zoomPlugin from 'chartjs-plugin-zoom';
+import { crosshairPlugin } from '../../utils/chartCrosshairPlugin';
+import { isMobileDevice } from '../../utils/deviceDetection';
 
 ChartJS.register(
   CategoryScale,
@@ -26,7 +28,8 @@ ChartJS.register(
   Legend,
   Filler,
   TimeScale,
-  zoomPlugin
+  zoomPlugin,
+  crosshairPlugin
 );
 
 // Set global Chart.js defaults for legend text color
@@ -44,13 +47,74 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
   const [chartData, setChartData] = useState(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [isZoomed, setIsZoomed] = useState(false);
   const chartRef = useRef(null);
+  const chartInstanceRef = useRef(null);
+  const isMobile = isMobileDevice();
 
   const DASHBOARD_DATA_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data";
 
+  // Calculate data boundaries for zoom limits
+  const getDataBoundaries = (data) => {
+    if (!data || !data.labels || data.labels.length === 0) {
+      return {
+        xMin: null,
+        xMax: null,
+        yMin: 0,
+        yMax: null,
+        y1Min: 0,
+        y1Max: null
+      };
+    }
+
+    // Get time boundaries (x-axis)
+    const timestamps = data.labels.map(label => new Date(label).getTime());
+    const xMin = Math.min(...timestamps);
+    const xMax = Math.max(...timestamps);
+
+    // Get value boundaries (y-axis)
+    let yMin = Infinity;
+    let yMax = -Infinity;
+    let y1Min = Infinity;
+    let y1Max = -Infinity;
+
+    data.datasets.forEach(dataset => {
+      const values = dataset.data.filter(v => v !== null && v !== undefined && !isNaN(v));
+      if (values.length > 0) {
+        const datasetMin = Math.min(...values);
+        const datasetMax = Math.max(...values);
+        
+        if (dataset.yAxisID === 'y1') {
+          y1Min = Math.min(y1Min, datasetMin);
+          y1Max = Math.max(y1Max, datasetMax);
+        } else {
+          yMin = Math.min(yMin, datasetMin);
+          yMax = Math.max(yMax, datasetMax);
+        }
+      }
+    });
+
+    return {
+      xMin: isFinite(xMin) ? xMin : null,
+      xMax: isFinite(xMax) ? xMax : null,
+      yMin: isFinite(yMin) && yMin >= 0 ? Math.max(0, yMin * 0.9) : 0,
+      yMax: isFinite(yMax) ? yMax * 1.1 : null,
+      y1Min: isFinite(y1Min) && y1Min >= 0 ? Math.max(0, y1Min * 0.9) : 0,
+      y1Max: isFinite(y1Max) ? y1Max * 1.1 : null
+    };
+  };
+
   const resetZoom = () => {
-    if (chartRef.current) {
-      chartRef.current.resetZoom();
+    // Try multiple ways to access the chart instance
+    const chart = chartInstanceRef.current || 
+                  chartRef.current?.chartInstance || 
+                  chartRef.current?.chart ||
+                  (chartRef.current && ChartJS.getChart(chartRef.current.canvas)) ||
+                  chartRef.current;
+    
+    if (chart?.resetZoom) {
+      chart.resetZoom();
+      setIsZoomed(false);
     }
   };
 
@@ -281,6 +345,16 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
     }
   };
 
+  // Calculate boundaries from current chart data
+  const boundaries = chartData ? getDataBoundaries(chartData) : {
+    xMin: null,
+    xMax: null,
+    yMin: 0,
+    yMax: null,
+    y1Min: 0,
+    y1Max: null
+  };
+
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -330,6 +404,7 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
       tooltip: {
         mode: 'index',
         intersect: false,
+        enabled: true,
         backgroundColor: 'rgba(0, 0, 0, 0.85)',
         titleColor: '#fff',
         bodyColor: '#fff',
@@ -347,6 +422,79 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
         callbacks: {
           label: function(context) {
             return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}`;
+          }
+        }
+      },
+      crosshair: {
+        width: 2,
+        color: 'rgba(255, 255, 255, 0.6)',
+        dash: [5, 5],
+        snapToDataPoints: true,
+        highlightPointRadius: 6
+      },
+      zoom: {
+        limits: {
+          x: boundaries.xMin !== null && boundaries.xMax !== null 
+            ? {min: boundaries.xMin, max: boundaries.xMax}
+            : {min: 'original', max: 'original'},
+          y: boundaries.yMax !== null
+            ? {min: 'original', max: 'original'}
+            : {min: 0, max: 'original'},
+          y1: boundaries.y1Max !== null
+            ? {min: 'original', max: 'original'}
+            : {min: 0, max: 'original'}
+        },
+        pan: {
+          enabled: !isMobile,
+          mode: 'x',
+          modifierKey: 'ctrl',
+          threshold: 10,
+        },
+        zoom: {
+          wheel: {
+            enabled: !isMobile,
+            modifierKey: 'ctrl',
+          },
+          pinch: {
+            enabled: isMobile,
+          },
+          drag: {
+            enabled: false,
+          },
+          mode: 'x',
+          onZoom: ({ chart }) => {
+            // Enable button immediately when zoom starts
+            chartInstanceRef.current = chart;
+            setIsZoomed(prev => prev !== true ? true : prev);
+          },
+          onZoomComplete: ({ chart }) => {
+            chartInstanceRef.current = chart;
+            // Check if back to original zoom level
+            const xScale = chart.scales.x;
+            if (xScale && boundaries.xMin !== null && boundaries.xMax !== null) {
+              const currentRange = xScale.max - xScale.min;
+              const originalRange = boundaries.xMax - boundaries.xMin;
+              const rangeDiff = Math.abs(currentRange - originalRange);
+              const minDiff = Math.abs(xScale.min - boundaries.xMin);
+              const maxDiff = Math.abs(xScale.max - boundaries.xMax);
+              
+              // Consider at original if range is very close AND both min/max are close
+              // Use stricter thresholds to avoid false positives during active zoom
+              const isAtOriginal = rangeDiff < (originalRange * 0.02) && minDiff < 2000 && maxDiff < 2000;
+              
+              // Only update state if it would actually change
+              setIsZoomed(prev => {
+                if (isAtOriginal && prev !== false) {
+                  return false;
+                } else if (!isAtOriginal && prev !== true) {
+                  return true;
+                }
+                return prev;
+              });
+            } else {
+              // If boundaries not available, assume zoomed
+              setIsZoomed(prev => prev !== true ? true : prev);
+            }
           }
         }
       }
@@ -475,60 +623,12 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
       }
     },
     interaction: {
-      mode: 'nearest',
+      mode: 'index',
       axis: 'x',
       intersect: false
     },
-    plugins: {
-      zoom: {
-        zoom: {
-          wheel: {
-            enabled: true,
-          },
-          pinch: {
-            enabled: true
-          },
-          mode: 'xy',
-          limits: {
-            x: {min: 'original', max: 'original'},
-            y: {min: 0, max: 'original'},
-            y1: {min: 0, max: 'original'}
-          },
-          // Keep boolean/state Y-axis bottom anchored at 0
-          onZoom: ({ chart }) => {
-            try {
-              if (chart.options?.scales?.y) {
-                chart.options.scales.y.min = 0;
-              }
-              if (chart.options?.scales?.y1) {
-                chart.options.scales.y1.min = 0;
-              }
-              chart.update('none');
-            } catch (_) { /* no-op */ }
-          }
-        },
-        pan: {
-          enabled: true,
-          // Prevent vertical pan to keep min anchored at 0 for all views
-          mode: 'x',
-          limits: {
-            x: {min: 'original', max: 'original'},
-            y: {min: 0, max: 'original'},
-            y1: {min: 0, max: 'original'}
-          },
-          onPan: ({ chart }) => {
-            try {
-              if (chart.options?.scales?.y) {
-                chart.options.scales.y.min = 0;
-              }
-              if (chart.options?.scales?.y1) {
-                chart.options.scales.y1.min = 0;
-              }
-              chart.update('none');
-            } catch (_) { /* no-op */ }
-          }
-        }
-      }
+    onHover: (event, activeElements) => {
+      event.native.target.style.cursor = activeElements.length > 0 ? 'crosshair' : 'default';
     },
     elements: {
       point: {
@@ -727,12 +827,24 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
             size="small"
             variant="outlined"
             onClick={resetZoom}
+            disabled={!isZoomed}
             sx={{ 
               fontSize: '0.75rem',
               minWidth: 'auto',
               px: 1,
               py: 0.5,
-              height: '32px'
+              height: '32px',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: '#E0E0E0',
+              borderColor: 'rgba(255, 255, 255, 0.3)',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderColor: 'rgba(255, 255, 255, 0.5)',
+              },
+              '&:disabled': {
+                opacity: 0.3,
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+              }
             }}
           >
             Reset Zoom
@@ -757,6 +869,7 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
           position: 'relative',
           overflow: 'hidden',
           transition: 'all 0.3s ease',
+          touchAction: isMobile ? 'pan-y' : 'auto',
           '&::before': {
             content: '""',
             position: 'absolute',
@@ -855,7 +968,21 @@ const OverviewChart = ({ metricsConfig, selectedVariables, isLoading, device, us
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ width: '100%', height: '100%', maxWidth: '100%' }}>
+          <Box 
+            sx={{ 
+              width: '100%', 
+              height: '100%', 
+              maxWidth: '100%',
+              position: 'relative',
+              '& canvas': {
+                touchAction: isMobile ? 'pan-y pinch-zoom' : 'auto',
+              },
+              WebkitTouchCallout: 'none',
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+              overscrollBehavior: 'contain'
+            }}
+          >
             <Line ref={chartRef} data={chartData} options={options} />
           </Box>
         )}
