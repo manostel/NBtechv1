@@ -46,10 +46,10 @@ const SharedControls: React.FC<SharedControlsProps> = ({
   return (
     <Box sx={{ 
       display: 'flex', 
-      flexDirection: 'row',
-      flexWrap: 'nowrap',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
+      flexDirection: 'row', 
+      flexWrap: 'nowrap', 
+      alignItems: 'center', 
+      justifyContent: 'flex-end', 
       gap: { xs: 0.5, sm: 2 },
       minWidth: 0,
       '& > *': { width: 'auto', minWidth: 0 }

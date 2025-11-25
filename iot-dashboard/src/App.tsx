@@ -4,7 +4,6 @@ import LoginPage from "./features/auth/components/LoginPage";
 import RegisterPage from "./features/auth/components/RegisterPage";
 import DevicesPage from "./features/devices/components/DevicesPage";
 import Dashboard from "./features/dashboard/components/Dashboard";
-import SettingsPage from "./pages/SettingsPage";
 import { CustomThemeProvider } from "./context/ThemeContext";
 import { useAuthStore } from "./stores/authStore";
 import "./App.css";
@@ -49,7 +48,6 @@ function App(): JSX.Element {
                         <Navigate to="/devices" />
                       )}
                     />
-                    <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/" />} />
                     <Route 
                       path="/bluetooth" 
                       element={<BluetoothControl />} 
