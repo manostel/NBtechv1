@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "356592998660",
+    "project_id": "nbtech-iot",
+    "storage_bucket": "nbtech-iot.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:356592998660:android:ffb244678868f52cd15851",
+        "android_client_info": {
+          "package_name": "com.telectronio.iotdashboard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYwJ_QUKPC6lXBt08sIMokzYb-Y9KoOog"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

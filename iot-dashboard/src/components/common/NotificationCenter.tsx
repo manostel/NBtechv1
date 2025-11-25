@@ -139,8 +139,25 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
   const unreadNotifications = notifications.filter(n => !n.read && !n.dismissed);
   const readNotifications = notifications.filter(n => n.read && !n.dismissed);
 
-  const uniqueTypes = Array.from(new Set(notifications.map(n => n.type)));
-  const uniqueChannels: NotificationChannel[] = ['system', 'alarm', 'subscription', 'device', 'command', 'user'];
+  const KNOWN_TYPES = [
+    'alarm',
+    'device_status',
+    'command',
+    'output_change',
+    'input_change',
+    'subscription_trigger',
+    'scheduler_trigger'
+  ];
+
+  const uniqueTypes = Array.from(new Set([...KNOWN_TYPES, ...notifications.map(n => n.type)]));
+  const uniqueChannels: NotificationChannel[] = ['system', 'alarm', 'subscription', 'device', 'command', 'user', 'scheduler'];
+
+  const formatTypeLabel = (type: string) => {
+    return type
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
   return (
     <Drawer
@@ -247,7 +264,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
                 <MenuItem value="all">{t('filters.all')}</MenuItem>
                 {uniqueTypes.map((type) => (
                   <MenuItem key={type} value={type}>
-                    {type}
+                    {formatTypeLabel(type)}
                   </MenuItem>
                 ))}
               </Select>

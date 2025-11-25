@@ -17,7 +17,34 @@ const TriggeredAlarms: React.FC<TriggeredAlarmsProps> = ({ triggeredAlarms, metr
   const { t } = useTranslation();
   
   if (!triggeredAlarms || triggeredAlarms.length === 0) {
-    return null;
+    return (
+      <Paper 
+        elevation={0}
+        sx={{ 
+          mt: 3, 
+          p: 3, 
+          textAlign: 'center',
+          borderRadius: 3,
+          background: (theme) => theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.7) 0%, rgba(31, 37, 71, 0.8) 50%, rgba(26, 31, 60, 0.7) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 250, 252, 0.8) 50%, rgba(255, 255, 255, 0.7) 100%)',
+          backdropFilter: 'blur(10px)',
+          border: (theme) => theme.palette.mode === 'dark' 
+            ? '1px dashed rgba(255, 255, 255, 0.1)' 
+            : '1px dashed rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <CheckCircleIcon sx={{ fontSize: 48, color: 'success.main', opacity: 0.8, mb: 1 }} />
+          <Typography variant="h6" sx={{ fontWeight: 500 }}>
+            {t('dashboard.noTriggeredAlarms')}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {t('dashboard.systemsNormal')}
+          </Typography>
+        </Box>
+      </Paper>
+    );
   }
 
   const getSeverityIcon = (severity?: string) => {

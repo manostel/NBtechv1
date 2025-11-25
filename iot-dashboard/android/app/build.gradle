@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.nbtech.iotdashboard"
+    namespace "com.telectronio.iotdashboard"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.nbtech.iotdashboard"
+        applicationId "com.telectronio.iotdashboard"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

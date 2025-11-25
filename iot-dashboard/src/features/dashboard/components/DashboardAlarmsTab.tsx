@@ -40,7 +40,8 @@ import {
   TrendingUp as TrendingUpIcon,
   DeviceHub as DeviceIcon,
   Input as InputIcon,
-  Output as OutputIcon
+  Output as OutputIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import notificationManager from '../../../services/NotificationManager';
@@ -950,22 +951,36 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             </Box>
           )}
           {!isLoading && triggeredAlarms.length === 0 ? (
-            <Box sx={{ 
+            <Card sx={{ 
               textAlign: 'center', 
-              py: 4,
+              py: 6,
+              px: 2,
               borderRadius: 3,
-              border: '2px dashed',
-              borderColor: 'divider',
-              bgcolor: 'grey.50'
+              background: (theme) => theme.palette.mode === 'dark'
+                ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.7) 0%, rgba(31, 37, 71, 0.8) 50%, rgba(26, 31, 60, 0.7) 100%)'
+                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 250, 252, 0.8) 50%, rgba(255, 255, 255, 0.7) 100%)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) => theme.palette.mode === 'dark' 
+                ? '1px dashed rgba(255, 255, 255, 0.1)' 
+                : '1px dashed rgba(0, 0, 0, 0.1)',
+              boxShadow: 'none'
             }}>
-              <WarningIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-              <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+              <Box sx={{ 
+                display: 'inline-flex', 
+                p: 2, 
+                borderRadius: '50%', 
+                bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(76, 175, 80, 0.1)',
+                mb: 2 
+              }}>
+                <CheckCircleIcon sx={{ fontSize: 48, color: '#4caf50' }} />
+              </Box>
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
                 {t('alarms.noTriggeredAlarms')}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 400, mx: 'auto' }}>
                 {t('alarms.allSystemsNormal', { defaultValue: 'All systems are operating normally' })}
               </Typography>
-            </Box>
+            </Card>
           ) : (
             <Box>
               {/* Filter Summary for Triggered Alarms */}
@@ -1280,30 +1295,47 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             </Box>
           )}
           {!isLoading && alarms.length === 0 ? (
-            <Box sx={{ 
+            <Paper sx={{ 
               textAlign: 'center', 
-              py: 4,
+              py: 6,
+              px: 2,
               borderRadius: 3,
-              border: '2px dashed',
-              borderColor: 'divider',
-              bgcolor: 'grey.50'
+              background: (theme) => theme.palette.mode === 'dark'
+                ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.7) 0%, rgba(31, 37, 71, 0.8) 50%, rgba(26, 31, 60, 0.7) 100%)'
+                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 250, 252, 0.8) 50%, rgba(255, 255, 255, 0.7) 100%)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) => theme.palette.mode === 'dark' 
+                ? '1px dashed rgba(255, 255, 255, 0.1)' 
+                : '1px dashed rgba(0, 0, 0, 0.1)',
+              boxShadow: 'none'
             }}>
-              <NotificationsIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-              <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+              <NotificationsIcon sx={{ 
+                fontSize: 64, 
+                color: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', 
+                mb: 2 
+              }} />
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
                 {t('alarms.noAlarms')}
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}>
                 {t('alarms.setupAlarms', { defaultValue: 'Set up alarms to monitor your device parameters' })}
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => setNewAlarmDialog(true)}
-                sx={{ textTransform: 'none', fontWeight: 600 }}
+                sx={{ 
+                  textTransform: 'none', 
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  px: 3,
+                  background: 'linear-gradient(135deg, #4caf50, #2196f3)',
+                  boxShadow: '0 4px 12px rgba(33, 150, 243, 0.3)'
+                }}
               >
                 {t('alarms.createAlarm')}
               </Button>
-            </Box>
+            </Paper>
           ) : (
             <Box>
               {/* Filter Summary */}

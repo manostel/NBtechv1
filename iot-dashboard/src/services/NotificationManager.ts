@@ -1,13 +1,11 @@
-// Professional Notification System
-// Enterprise-grade notification management with advanced features
-
+import { Device, Alarm } from '../types';
 import { EventEmitter } from '../utils/EventEmitter';
 import NotificationService from '../utils/NotificationService';
-import { Device, Alarm } from '../types';
 
+// ... (existing types)
 export type NotificationSeverity = 'success' | 'error' | 'warning' | 'info';
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'critical';
-export type NotificationChannel = 'system' | 'alarm' | 'subscription' | 'device' | 'command' | 'user';
+export type NotificationChannel = 'system' | 'alarm' | 'subscription' | 'device' | 'command' | 'user' | 'scheduler';
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
 
 export interface NotificationAction {
@@ -43,6 +41,7 @@ export interface NotificationOptions {
   tags?: string[]; // For filtering/categorization
   category?: string; // Notification category
   silent?: boolean; // Don't emit events (for internal use)
+  enableAWSSNS?: boolean; // Explicit override for this notification
 }
 
 export interface QueuedNotification extends NotificationOptions {
@@ -71,6 +70,8 @@ export interface NotificationConfig {
   notificationExpirationHours?: number;
   retryAttempts?: number;
   retryDelay?: number;
+  enableAWSSNS?: boolean;
+  snsApiUrl?: string; // New config for API Gateway URL
 }
 
 export interface NotificationMetrics {
@@ -122,6 +123,8 @@ class NotificationManager extends EventEmitter {
     notificationExpirationHours: 24,
     retryAttempts: 3,
     retryDelay: 1000,
+    enableAWSSNS: false,
+    snsApiUrl: 'https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/sns-notification', // Must be configured
   };
 
   constructor(config?: NotificationConfig) {
@@ -131,9 +134,7 @@ class NotificationManager extends EventEmitter {
     this.initialize();
   }
 
-  /**
-   * Initialize the notification manager
-   */
+  // ... (initialize, initializeNativeNotifications, initializeMetrics, addMiddleware, removeMiddleware, updateConfig, getConfig, getMetrics, resetMetrics methods remain same)
   private async initialize() {
     if (this.isInitialized) return;
 
@@ -156,9 +157,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Initialize native notifications (Capacitor)
-   */
   private async initializeNativeNotifications() {
     try {
       await NotificationService.initialize();
@@ -169,9 +167,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Initialize metrics
-   */
   private initializeMetrics(): NotificationMetrics {
     return {
       totalSent: 0,
@@ -196,52 +191,35 @@ class NotificationManager extends EventEmitter {
         device: 0,
         command: 0,
         user: 0,
+        scheduler: 0,
       },
     };
   }
 
-  /**
-   * Add middleware
-   */
   addMiddleware(middleware: NotificationMiddleware) {
     this.middlewares.push(middleware);
     this.log('debug', `Middleware added: ${middleware.name}`);
   }
 
-  /**
-   * Remove middleware
-   */
   removeMiddleware(name: string) {
     this.middlewares = this.middlewares.filter(m => m.name !== name);
     this.log('debug', `Middleware removed: ${name}`);
   }
 
-  /**
-   * Update configuration
-   */
   updateConfig(config: Partial<NotificationConfig>) {
     this.config = { ...this.config, ...config };
     this.log('info', 'Configuration updated', config);
     this.emit('configUpdated', this.config);
   }
 
-  /**
-   * Get current configuration
-   */
   getConfig(): Readonly<Required<NotificationConfig>> {
     return { ...this.config };
   }
 
-  /**
-   * Get metrics
-   */
   getMetrics(): Readonly<NotificationMetrics> {
     return { ...this.metrics };
   }
 
-  /**
-   * Reset metrics
-   */
   resetMetrics() {
     this.metrics = this.initializeMetrics();
     this.log('info', 'Metrics reset');
@@ -284,6 +262,7 @@ class NotificationManager extends EventEmitter {
         dismissed: false,
         expired: false,
         retryCount: 0,
+        enableAWSSNS: options.enableAWSSNS !== undefined ? options.enableAWSSNS : this.config.enableAWSSNS
       };
 
       // Apply middlewares
@@ -363,9 +342,8 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Validate notification options
-   */
+  // ... (validateNotification, inferChannel, calculateExpirationTime, isExpired methods remain same)
+
   private validateNotification(options: NotificationOptions): void {
     if (!options.title || options.title.trim().length === 0) {
       throw new Error('Notification title is required');
@@ -378,9 +356,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Infer channel from notification options
-   */
   private inferChannel(options: NotificationOptions): NotificationChannel {
     if (options.alarmId) return 'alarm';
     if (options.subscriptionId) return 'subscription';
@@ -389,16 +364,10 @@ class NotificationManager extends EventEmitter {
     return 'system';
   }
 
-  /**
-   * Calculate expiration time
-   */
   private calculateExpirationTime(): number {
     return Date.now() + (this.config.notificationExpirationHours * 60 * 60 * 1000);
   }
 
-  /**
-   * Check if notification is expired
-   */
   private isExpired(notification: QueuedNotification): boolean {
     if (!notification.expirationTime) return false;
     return Date.now() > notification.expirationTime;
@@ -438,6 +407,19 @@ class NotificationManager extends EventEmitter {
             await this.showNativeNotificationWithRetry(notification);
           }
 
+          // Send AWS SNS push notification
+          // Only for high-priority notifications or when configured to do so
+          // Check explicit override or global config combined with priority/visibility
+          const shouldSendSNS = notification.enableAWSSNS || 
+                               (this.config.enableAWSSNS && 
+                                (notification.priority === 'high' || 
+                                 notification.priority === 'critical' || 
+                                 document.hidden));
+
+          if (shouldSendSNS) {
+            await this.sendAWSPushNotification(notification);
+          }
+
           // Add to history
           this.addToHistory(notification);
 
@@ -453,9 +435,8 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Show native notification with retry logic
-   */
+  // ... (showNativeNotificationWithRetry, handleNotificationError, startQueueProcessor, startCleanupTasks, cleanupExpiredNotifications, cleanupThrottleMap, cleanupDeduplicationMap, checkRateLimit, checkThrottle, isDuplicate, updateDeduplicationMap, groupNotification, updateMetrics, generateId, generateGroupKey, showNativeNotification methods remain same)
+  
   private async showNativeNotificationWithRetry(notification: QueuedNotification, attempt = 0): Promise<void> {
     try {
       await this.showNativeNotification(notification);
@@ -476,9 +457,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Handle notification processing error
-   */
   private handleNotificationError(notification: QueuedNotification, error: Error) {
     notification.lastError = error.message;
     notification.retryCount = (notification.retryCount || 0) + 1;
@@ -497,9 +475,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Start queue processor
-   */
   private startQueueProcessor() {
     if (this.queueProcessorInterval) {
       clearInterval(this.queueProcessorInterval);
@@ -512,9 +487,6 @@ class NotificationManager extends EventEmitter {
     }, this.config.queueProcessingInterval);
   }
 
-  /**
-   * Start cleanup tasks
-   */
   private startCleanupTasks() {
     // Clean up expired notifications every hour
     const cleanupInterval = setInterval(() => {
@@ -526,9 +498,6 @@ class NotificationManager extends EventEmitter {
     this.cleanupIntervals.push(cleanupInterval);
   }
 
-  /**
-   * Clean up expired notifications
-   */
   private cleanupExpiredNotifications() {
     const now = Date.now();
     let cleaned = 0;
@@ -559,9 +528,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Clean up throttle map
-   */
   private cleanupThrottleMap() {
     const now = Date.now();
     const throttleWindow = this.config.throttleDuration * 2;
@@ -573,9 +539,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Clean up deduplication map
-   */
   private cleanupDeduplicationMap() {
     const now = Date.now();
     const dedupWindow = this.config.deduplicationWindow;
@@ -587,9 +550,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Check rate limiting
-   */
   private checkRateLimit(): boolean {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
@@ -601,9 +561,6 @@ class NotificationManager extends EventEmitter {
     return recentCount < this.config.maxNotificationsPerMinute;
   }
 
-  /**
-   * Check throttling (prevent spam)
-   */
   private checkThrottle(notification: QueuedNotification): boolean {
     const throttleKey = notification.groupKey || notification.type || 'general';
     const lastTime = this.throttleMap.get(throttleKey) || 0;
@@ -617,9 +574,6 @@ class NotificationManager extends EventEmitter {
     return true;
   }
 
-  /**
-   * Check if notification is duplicate
-   */
   private isDuplicate(notification: QueuedNotification): boolean {
     const dedupKey = `${notification.type}_${notification.deviceId}_${notification.message}`;
     const entry = this.deduplicationMap.get(dedupKey);
@@ -635,9 +589,6 @@ class NotificationManager extends EventEmitter {
     return false;
   }
 
-  /**
-   * Update deduplication map
-   */
   private updateDeduplicationMap(notification: QueuedNotification) {
     const dedupKey = `${notification.type}_${notification.deviceId}_${notification.message}`;
     this.deduplicationMap.set(dedupKey, {
@@ -646,9 +597,6 @@ class NotificationManager extends EventEmitter {
     });
   }
 
-  /**
-   * Group similar notifications
-   */
   private groupNotification(notification: QueuedNotification) {
     const groupKey = notification.groupKey || 'general';
     const existing = this.groupingMap.get(groupKey) || [];
@@ -671,9 +619,6 @@ class NotificationManager extends EventEmitter {
     }, this.config.groupingWindow);
   }
 
-  /**
-   * Update metrics
-   */
   private updateMetrics(
     metric: 'totalSent' | 'totalRead' | 'totalDismissed' | 'totalExpired' | 'totalThrottled' | 'totalDeduplicated' | 'totalGrouped' | 'totalFailed',
     notification: QueuedNotification | { type?: string; severity?: NotificationSeverity; channel?: NotificationChannel }
@@ -720,23 +665,14 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Generate unique ID
-   */
   private generateId(): string {
     return `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Generate group key for similar notifications
-   */
   private generateGroupKey(options: NotificationOptions): string {
     return `${options.type}_${options.deviceId}_${options.severity}`;
   }
 
-  /**
-   * Show native notification
-   */
   private async showNativeNotification(notification: QueuedNotification) {
     try {
       await NotificationService.showNotification({
@@ -752,8 +688,54 @@ class NotificationManager extends EventEmitter {
   }
 
   /**
-   * Check if native notification should be shown
+   * Send push notification via AWS SNS
    */
+  private async sendAWSPushNotification(notification: QueuedNotification): Promise<void> {
+    if (!this.config.snsApiUrl) {
+        this.log('warn', 'SNS API URL not configured. Skipping push notification.');
+        return;
+    }
+
+    try {
+      // Construct the payload
+      // Note: In a real app, you would map the notification to a specific TargetARN (user or topic)
+      // stored in your backend or passed in the notification options.
+      // For now, we assume the backend handles the routing or broadcasts.
+      const payload = {
+        action: 'send_notification',
+        message: notification.message,
+        subject: notification.title,
+        type: notification.type,
+        // In a real implementation, you'd pass the user's ARN or a Topic ARN
+        // For this demo, we'll let the backend decide or use a default if available
+        // target_arn: "arn:aws:sns:..." 
+      };
+
+      const response = await fetch(this.config.snsApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Add Authorization header if needed (e.g., from localStorage)
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`SNS API responded with status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      this.log('info', `AWS SNS push notification sent: ${notification.id}`, result);
+      
+    } catch (error) {
+      this.log('error', `Error sending AWS SNS push notification: ${error}`);
+      // We don't throw here to avoid disrupting the main notification flow
+    }
+  }
+
+  // ... (shouldShowNative, addToHistory, markAsRead, markAllAsRead, dismiss, clearAll, getUnreadCount, getNotifications, saveHistory, loadHistory, log, destroy methods remain same)
+
   private shouldShowNative(notification: QueuedNotification): boolean {
     // Only show native for high priority or critical notifications
     // Or if user is not actively viewing the app
@@ -762,9 +744,6 @@ class NotificationManager extends EventEmitter {
            document.hidden; // User is not viewing the page
   }
 
-  /**
-   * Add notification to history
-   */
   private addToHistory(notification: QueuedNotification) {
     this.history.unshift(notification);
     
@@ -777,9 +756,6 @@ class NotificationManager extends EventEmitter {
     this.saveHistory();
   }
 
-  /**
-   * Mark notification as read
-   */
   markAsRead(notificationId: string) {
     const notification = this.history.find(n => n.id === notificationId);
     if (notification && !notification.read) {
@@ -791,9 +767,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Mark all notifications as read
-   */
   markAllAsRead() {
     const unreadCount = this.history.filter(n => !n.read && !n.dismissed).length;
     this.history.forEach(n => {
@@ -807,9 +780,6 @@ class NotificationManager extends EventEmitter {
     this.log('info', `Marked ${unreadCount} notifications as read`);
   }
 
-  /**
-   * Dismiss notification
-   */
   dismiss(notificationId: string) {
     const notification = this.history.find(n => n.id === notificationId);
     if (notification && !notification.dismissed) {
@@ -821,9 +791,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Clear all notifications
-   */
   clearAll() {
     const count = this.history.length;
     this.history = [];
@@ -833,16 +800,10 @@ class NotificationManager extends EventEmitter {
     this.log('info', `Cleared ${count} notifications`);
   }
 
-  /**
-   * Get unread count
-   */
   getUnreadCount(): number {
     return this.history.filter(n => !n.read && !n.dismissed && !n.expired).length;
   }
 
-  /**
-   * Get notifications
-   */
   getNotifications(options?: {
     unreadOnly?: boolean;
     limit?: number;
@@ -892,9 +853,6 @@ class NotificationManager extends EventEmitter {
     return notifications;
   }
 
-  /**
-   * Save history to localStorage
-   */
   private saveHistory() {
     try {
       const historyToSave = this.history.slice(0, 100).map(n => ({
@@ -915,9 +873,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Load history from localStorage
-   */
   private loadHistory() {
     try {
       const saved = localStorage.getItem('notification_history');
@@ -931,9 +886,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Logging utility
-   */
   private log(level: LogLevel, message: string, ...args: any[]) {
     const levels: Record<LogLevel, number> = {
       silent: 0,
@@ -965,9 +917,6 @@ class NotificationManager extends EventEmitter {
     }
   }
 
-  /**
-   * Destroy and cleanup
-   */
   destroy() {
     if (this.queueProcessorInterval) {
       clearInterval(this.queueProcessorInterval);
@@ -988,9 +937,6 @@ class NotificationManager extends EventEmitter {
     this.emit('destroyed');
   }
 
-  /**
-   * Get device display name
-   */
   private getDeviceDisplayName(device: Device | { device_id?: string; name?: string; device_name?: string; client_id?: string }): string {
     if (!device) return 'Unknown Device';
     if ('name' in device && device.name) return device.name;
@@ -1000,7 +946,8 @@ class NotificationManager extends EventEmitter {
     return 'Unknown Device';
   }
 
-  // Convenience methods for common notification types
+  // ... (notifyAlarm, notifyDeviceStatusChange, notifySubscriptionTrigger, notifyCommandResult, notifyOutputChange, notifyInputChange, notifySubscriptionTriggered, notifySchedulerTrigger, notifyMultipleOutputChanges methods remain same)
+
   async notifyAlarm(alarm: Alarm, device: Device) {
     const deviceName = this.getDeviceDisplayName(device);
     return this.notify({
@@ -1014,6 +961,7 @@ class NotificationManager extends EventEmitter {
       deviceId: device.client_id,
       groupKey: `alarm_${alarm.alarm_id}`,
       tags: ['alarm', 'device', device.client_id],
+      enableAWSSNS: true, // Critical alarms should always send push notifications
       actions: [
         {
           label: 'View Device',
@@ -1041,23 +989,128 @@ class NotificationManager extends EventEmitter {
       groupKey: `status_${device.client_id}`,
       duration: isCritical ? 0 : 5000,
       tags: ['device', 'status', device.client_id],
+      enableAWSSNS: isCritical, // Only push if critical (offline)
     });
   }
 
   async notifySubscriptionTrigger(subscription: any, currentValue: any, device?: Device | { name?: string; device_name?: string }) {
-    // Format message based on condition type
+    return this.notifySubscriptionTriggered(subscription, currentValue, device);
+  }
+
+  async notifyCommandResult(device: Device, command: string, success: boolean) {
+    return this.notify({
+      title: `Command ${success ? 'Success' : 'Failed'}`,
+      message: `${command} command ${success ? 'executed successfully' : 'failed'} on ${device.name || device.client_id}`,
+      severity: success ? 'success' : 'error',
+      priority: 'normal',
+      type: 'command',
+      channel: 'command',
+      deviceId: device.client_id,
+      duration: 3000,
+      tags: ['command', device.client_id],
+    });
+  }
+
+  async notifyOutputChange(
+    device: Device,
+    outputNumber: 1 | 2,
+    oldState: boolean,
+    newState: boolean,
+    triggeredBy?: 'manual' | 'scheduler' | 'subscription' | 'unknown'
+  ) {
+    const deviceName = this.getDeviceDisplayName(device);
+    const outputName = `Output ${outputNumber}`;
+    const stateText = newState ? 'ON' : 'OFF';
+    const triggeredByText = triggeredBy ? ` (via ${triggeredBy})` : '';
+
+    return this.notify({
+      title: `${outputName} Changed: ${deviceName}`,
+      message: `${deviceName}: ${outputName} turned ${stateText}${triggeredByText}`,
+      severity: 'info',
+      priority: 'normal',
+      type: 'output_change',
+      channel: 'device',
+      deviceId: device.client_id,
+      duration: 4000,
+      tags: ['output', 'device', device.client_id, `output${outputNumber}`, stateText.toLowerCase()],
+      data: {
+        outputNumber,
+        oldState,
+        newState,
+        triggeredBy: triggeredBy || 'unknown',
+      },
+      actions: [
+        {
+          label: 'View Device',
+          action: 'view_device',
+          variant: 'primary',
+        },
+      ],
+    });
+  }
+
+  async notifyInputChange(
+    device: Device,
+    inputNumber: 1 | 2,
+    oldState: boolean | number,
+    newState: boolean | number
+  ) {
+    const deviceName = this.getDeviceDisplayName(device);
+    const inputName = `Input ${inputNumber}`;
+    const isHigh = newState === true || newState === 1;
+    const stateText = isHigh ? 'ON' : 'OFF';
+
+    return this.notify({
+      title: `${inputName} Changed: ${deviceName}`,
+      message: `${deviceName}: ${inputName} changed to ${stateText}`,
+      severity: 'info',
+      priority: 'normal',
+      type: 'input_change',
+      channel: 'device',
+      deviceId: device.client_id,
+      duration: 4000,
+      tags: ['input', 'device', device.client_id, `input${inputNumber}`, stateText.toLowerCase()],
+      data: {
+        inputNumber,
+        oldState,
+        newState,
+      },
+      actions: [
+        {
+          label: 'View Device',
+          action: 'view_device',
+          variant: 'primary',
+        },
+      ],
+    });
+  }
+
+  async notifySubscriptionTriggered(
+    subscription: {
+      subscription_id: string;
+      device_id: string;
+      parameter_name: string;
+      condition_type: string;
+      threshold_value?: number | string;
+      user_email?: string;
+    },
+    currentValue: number | string,
+    device?: Device | { name?: string; device_name?: string; client_id?: string }
+  ) {
+    let deviceName = 'Device';
+    let deviceId = subscription.device_id;
+    
+    if (device) {
+      deviceName = this.getDeviceDisplayName(device);
+      deviceId = (device as any).client_id || subscription.device_id;
+    } else {
+      deviceName = subscription.device_id;
+    }
+
     let message = '';
     const conditionType = subscription.condition_type || 'change';
     const parameterName = subscription.parameter_name || 'parameter';
     const thresholdValue = subscription.threshold_value;
-
-    // Get device name - prefer passed device object, fallback to subscription data
-    let deviceName = 'Device';
-    if (device) {
-      deviceName = this.getDeviceDisplayName(device);
-    } else if (subscription.device_id) {
-      deviceName = subscription.device_id;
-    }
 
     switch (conditionType) {
       case 'change':
@@ -1079,22 +1132,145 @@ class NotificationManager extends EventEmitter {
         message = `${deviceName}: ${parameterName} value changed to ${currentValue}`;
     }
 
-    // Determine severity based on parameter type
-    const criticalParams = ['battery', 'signal_quality', 'status'];
-    const severity = criticalParams.includes(parameterName) ? 'warning' : 'info';
-    const priority = criticalParams.includes(parameterName) ? 'high' : 'normal';
+    const criticalParams = ['battery', 'signal_quality', 'status', 'temperature', 'pressure'];
+    const warningParams = ['humidity', 'motor_speed'];
+    const isCritical = criticalParams.some(p => parameterName.toLowerCase().includes(p));
+    const isWarning = warningParams.some(p => parameterName.toLowerCase().includes(p));
+    
+    const severity = isCritical ? 'error' : isWarning ? 'warning' : 'info';
+    const priority = isCritical ? 'high' : isWarning ? 'normal' : 'normal';
 
     return this.notify({
       title: `Subscription Alert: ${deviceName}`,
       message: message,
       severity: severity as NotificationSeverity,
       priority: priority,
-      type: 'subscription',
+      type: 'subscription_trigger',
       channel: 'subscription',
       subscriptionId: subscription.subscription_id,
-      deviceId: subscription.device_id,
+      deviceId: deviceId,
       groupKey: `subscription_${subscription.subscription_id}`,
-      tags: ['subscription', subscription.device_id, parameterName],
+      tags: ['subscription', 'trigger', deviceId, parameterName],
+      duration: isCritical ? 0 : 5000,
+      enableAWSSNS: isCritical, // Push for critical subscription alerts
+      actions: [
+        {
+          label: 'View Device',
+          action: 'view_device',
+          variant: 'primary',
+        },
+        {
+          label: 'View Subscription',
+          action: 'view_subscription',
+          variant: 'secondary',
+        },
+      ],
+      data: {
+        subscription: subscription,
+        currentValue: currentValue,
+        conditionType: conditionType,
+        thresholdValue: thresholdValue,
+      },
+    });
+  }
+
+  async notifySchedulerTrigger(
+    task: {
+      task_id: string;
+      name: string;
+      device_id: string;
+      command: string;
+      target?: string;
+      value?: string | number;
+      type: 'one_time' | 'recurring';
+      schedule?: string;
+    },
+    success: boolean,
+    device?: Device | { name?: string; device_name?: string; client_id?: string }
+  ) {
+    const deviceName = device ? this.getDeviceDisplayName(device) : task.device_id;
+    const taskName = task.name || 'Scheduled Task';
+    
+    let commandDescription = task.command;
+    if (task.command === 'TOGGLE_1_ON' || task.command === 'TOGGLE_1_OFF') {
+      commandDescription = `Output 1 ${task.command.includes('ON') ? 'ON' : 'OFF'}`;
+    } else if (task.command === 'TOGGLE_2_ON' || task.command === 'TOGGLE_2_OFF') {
+      commandDescription = `Output 2 ${task.command.includes('ON') ? 'ON' : 'OFF'}`;
+    } else if (task.command === 'SET_SPEED') {
+      commandDescription = `Motor Speed: ${task.value}%`;
+    } else {
+      commandDescription = task.command;
+    }
+
+    const scheduleType = task.type === 'one_time' ? 'One-time' : 'Recurring';
+    const message = success
+      ? `${taskName}: ${commandDescription} executed successfully on ${deviceName} (${scheduleType})`
+      : `${taskName}: Failed to execute ${commandDescription} on ${deviceName} (${scheduleType})`;
+
+    return this.notify({
+      title: `Scheduler ${success ? 'Executed' : 'Failed'}: ${deviceName}`,
+      message: message,
+      severity: success ? 'success' : 'error',
+      priority: success ? 'normal' : 'high',
+      type: 'scheduler_trigger',
+      channel: 'scheduler',
+      deviceId: task.device_id,
+      duration: success ? 4000 : 0,
+      tags: ['scheduler', 'task', task.device_id, task.task_id, success ? 'success' : 'failed'],
+      enableAWSSNS: !success, // Push only on failure
+      actions: success
+        ? [
+            {
+              label: 'View Device',
+              action: 'view_device',
+              variant: 'primary',
+            },
+          ]
+        : [
+            {
+              label: 'View Device',
+              action: 'view_device',
+              variant: 'primary',
+            },
+            {
+              label: 'View Scheduler',
+              action: 'view_scheduler',
+              variant: 'secondary',
+            },
+          ],
+      data: {
+        task: task,
+        success: success,
+        executedAt: new Date().toISOString(),
+        scheduleType: task.type,
+      },
+    });
+  }
+
+  async notifyMultipleOutputChanges(
+    device: Device,
+    changes: Array<{ outputNumber: 1 | 2; oldState: boolean; newState: boolean }>,
+    triggeredBy?: 'manual' | 'scheduler' | 'subscription' | 'unknown'
+  ) {
+    const deviceName = this.getDeviceDisplayName(device);
+    const changesText = changes
+      .map(c => `Output ${c.outputNumber}: ${c.newState ? 'ON' : 'OFF'}`)
+      .join(', ');
+
+    return this.notify({
+      title: `Multiple Outputs Changed: ${deviceName}`,
+      message: `${deviceName}: ${changesText}${triggeredBy ? ` (via ${triggeredBy})` : ''}`,
+      severity: 'info',
+      priority: 'normal',
+      type: 'output_change',
+      channel: 'device',
+      deviceId: device.client_id,
+      duration: 5000,
+      tags: ['output', 'device', device.client_id, 'multiple'],
+      data: {
+        changes: changes,
+        triggeredBy: triggeredBy || 'unknown',
+      },
       actions: [
         {
           label: 'View Device',
@@ -1102,25 +1278,6 @@ class NotificationManager extends EventEmitter {
           variant: 'primary',
         },
       ],
-      data: {
-        subscription: subscription,
-        currentValue: currentValue,
-        conditionType: conditionType,
-      },
-    });
-  }
-
-  async notifyCommandResult(device: Device, command: string, success: boolean) {
-    return this.notify({
-      title: `Command ${success ? 'Success' : 'Failed'}`,
-      message: `${command} command ${success ? 'executed successfully' : 'failed'} on ${device.name || device.client_id}`,
-      severity: success ? 'success' : 'error',
-      priority: 'normal',
-      type: 'command',
-      channel: 'command',
-      deviceId: device.client_id,
-      duration: 3000,
-      tags: ['command', device.client_id],
     });
   }
 }

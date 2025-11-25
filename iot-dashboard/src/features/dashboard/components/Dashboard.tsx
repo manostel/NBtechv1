@@ -43,6 +43,7 @@ import {
   Build as BuildIcon
 } from '@mui/icons-material';
 import useNotificationStore from '../../../stores/notificationStore';
+import notificationManager from '../../../services/NotificationManager';
 import HeaderActions from '../../../components/common/HeaderActions';
 import UserEmailDisplay from '../../../components/common/UserEmailDisplay';
 import { useTranslation } from 'react-i18next';
@@ -59,6 +60,7 @@ import DashboardSubscriptionsTab from './DashboardSubscriptionsTab';
 import DashboardSchedulerTab from './DashboardSchedulerTab';
 import DeviceNotificationService from '../../../utils/DeviceNotificationService';
 import NotificationService from '../../../utils/NotificationService';
+import PushNotificationService from '../../../utils/PushNotificationService';
 import { useGlobalTimer } from '../../../hooks/useGlobalTimer';
 import { Device, User, MetricsConfig, DeviceData } from '../../../types';
 import './Dashboard.css';
@@ -161,6 +163,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [metricsData, setMetricsData] = useState<any>(null);
   const [deviceState, setDeviceState] = useState<DeviceData | null>(null);
+  const previousDeviceStateRef = useRef<DeviceData | null>(null);
   const [alarms, setAlarms] = useState<any[]>([]);
   const [triggeredAlarms, setTriggeredAlarms] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -569,6 +572,61 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
       const deviceState = await response.json();
       
       if (deviceState) {
+        // Check for output changes and notify
+        const previousState = previousDeviceStateRef.current;
+        if (previousState && device) {
+          const prevOut1 = previousState.out1_state === 1;
+          const prevOut2 = previousState.out2_state === 1;
+          const prevIn1 = previousState.in1_state === 1;
+          const prevIn2 = previousState.in2_state === 1;
+          
+          // Compare with new state
+          const newOut1 = deviceState.out1_state === 1;
+          const newOut2 = deviceState.out2_state === 1;
+          const newIn1 = deviceState.in1_state === 1;
+          const newIn2 = deviceState.in2_state === 1;
+          
+          // Notify on output changes
+          if (prevOut1 !== newOut1) {
+            notificationManager.notifyOutputChange(
+              device,
+              1,
+              prevOut1,
+              newOut1,
+              'unknown' // Could be scheduler, subscription, or manual
+            );
+          }
+          if (prevOut2 !== newOut2) {
+            notificationManager.notifyOutputChange(
+              device,
+              2,
+              prevOut2,
+              newOut2,
+              'unknown'
+            );
+          }
+
+          // Notify on input changes
+          if (prevIn1 !== newIn1) {
+            notificationManager.notifyInputChange(
+              device,
+              1,
+              prevIn1,
+              newIn1
+            );
+          }
+          if (prevIn2 !== newIn2) {
+            notificationManager.notifyInputChange(
+              device,
+              2,
+              prevIn2,
+              newIn2
+            );
+          }
+        }
+        
+        // Update previous state reference
+        previousDeviceStateRef.current = deviceState;
         setDeviceState(deviceState);
         return deviceState;
       } else {

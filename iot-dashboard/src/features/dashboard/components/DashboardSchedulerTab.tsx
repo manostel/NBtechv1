@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, 
   Typography, 
@@ -56,6 +56,7 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { Device, User } from '../../../types';
+import notificationManager from '../../../services/NotificationManager';
 
 const SCHEDULER_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/manage-scheduler";
 
@@ -90,6 +91,7 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device, u
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const previousTasksRef = useRef<Map<string, number>>(new Map()); // Track last_run timestamps
   
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -124,10 +126,17 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device, u
     { value: '0', label: t('scheduler.days.sun') },
   ];
 
-  // Fetch tasks on mount
+  // Fetch tasks on mount and poll for updates
   useEffect(() => {
     if (user?.email) {
       fetchTasks();
+      
+      // Poll every 30 seconds to check for new scheduler executions
+      const interval = setInterval(() => {
+        fetchTasks();
+      }, 30000); // 30 seconds
+      
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -151,7 +160,37 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device, u
 
       const data = await response.json();
       if (response.ok && data.success) {
-        setSchedules(data.tasks || []);
+        const tasks = data.tasks || [];
+        
+        // Check for new scheduler executions
+        tasks.forEach((task: ScheduledTask) => {
+          if (task.last_run) {
+            const previousLastRun = previousTasksRef.current.get(task.task_id);
+            // If last_run changed and is recent (within last 2 minutes), notify
+            if (previousLastRun !== task.last_run) {
+              const now = Math.floor(Date.now() / 1000);
+              const timeSinceExecution = now - task.last_run;
+              
+              // Only notify if execution happened in the last 2 minutes
+              if (timeSinceExecution < 120 && previousLastRun !== undefined) {
+                const success = task.last_status === 'success';
+                notificationManager.notifySchedulerTrigger(
+                  task,
+                  success,
+                  device
+                );
+              }
+              
+              // Update tracking
+              previousTasksRef.current.set(task.task_id, task.last_run);
+            } else if (previousLastRun === undefined) {
+              // First time seeing this task, just track it
+              previousTasksRef.current.set(task.task_id, task.last_run);
+            }
+          }
+        });
+        
+        setSchedules(tasks);
       } else {
         throw new Error(data.error || 'Failed to fetch tasks');
       }

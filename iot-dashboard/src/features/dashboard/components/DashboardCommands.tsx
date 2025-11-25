@@ -23,6 +23,7 @@ import BatterySaverIcon from '@mui/icons-material/BatterySaver';
 import PowerIcon from '@mui/icons-material/Power';
 import { Device } from '../../../types';
 import { useTranslation } from 'react-i18next';
+import notificationManager from '../../../services/NotificationManager';
 
 const COMMAND_API_URL = 'https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command';
 // const STATUS_API_URL = 'https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/data-dashboard-state';
@@ -143,6 +144,8 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
 
   const handleSwitchChange = async (led: number, isOn: boolean) => {
     setIsLoading(true);
+    const oldState = led === 1 ? output1State : output2State;
+    
     try {
       const command = isOn ? `TOGGLE_${led}_ON` : `TOGGLE_${led}_OFF`;
       
@@ -163,16 +166,40 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       
       // Update the UI with the final state
       if (finalState) {
-        setOutput1State(finalState.out1_state === 1);
-        setOutput2State(finalState.out2_state === 1);
+        const newOutput1State = finalState.out1_state === 1;
+        const newOutput2State = finalState.out2_state === 1;
+        
+        // Check if output state actually changed and notify
+        if (led === 1 && newOutput1State !== oldState) {
+          await notificationManager.notifyOutputChange(
+            device,
+            1,
+            oldState,
+            newOutput1State,
+            'manual'
+          );
+        } else if (led === 2 && newOutput2State !== oldState) {
+          await notificationManager.notifyOutputChange(
+            device,
+            2,
+            oldState,
+            newOutput2State,
+            'manual'
+          );
+        }
+        
+        setOutput1State(newOutput1State);
+        setOutput2State(newOutput2State);
         setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
         setPowerSavingMode(finalState.power_saving === 1);
       }
+      /*
       setSnackbar({
         open: true,
         message: t('commands.ledStateUpdated', { led }),
         severity: 'success'
       });
+      */
     } catch (error: any) {
       console.error('Error in handleSwitchChange:', error);
       setSnackbar({
