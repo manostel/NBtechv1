@@ -1,6 +1,0 @@
-{
-  "appId": "com.nbtech.iotdashboard",
-  "appName": "IoT Dashboard",
-  "webDir": "build",
-  "bundledWebRuntime": false
-}
