@@ -160,7 +160,11 @@
     "motorSpeed": "Motor Speed",
     "powerSaving": "Power Saving",
     "time": "Time",
-    "value": "Value"
+    "value": "Value",
+    "resetZoom": "Reset Zoom",
+    "fullscreen": "Fullscreen",
+    "fullscreenRotate": "Fullscreen (Rotate)",
+    "export": "Export Chart"
   },
   "alarms": {
     "title": "Alarms",
