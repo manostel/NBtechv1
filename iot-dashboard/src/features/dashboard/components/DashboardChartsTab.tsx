@@ -85,18 +85,35 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
     setFullscreenChart(chartData);
     setIsFullscreen(true);
     
-    // On mobile, try to lock orientation to landscape for better chart viewing
-    if (isMobile && 'orientation' in screen) {
-      try {
-        // Request orientation lock (if supported)
-        if ('lock' in screen.orientation) {
-          await (screen.orientation as any).lock('landscape').catch(() => {
-            // Ignore errors - not all browsers/devices support this
-          });
+    // On mobile, force landscape orientation for better chart viewing
+    if (isMobile) {
+      // Use setTimeout to ensure dialog is rendered first
+      setTimeout(async () => {
+        try {
+          // Screen Orientation API - try multiple landscape options
+          if ('orientation' in screen && 'lock' in screen.orientation) {
+            try {
+              await (screen.orientation as any).lock('landscape');
+            } catch (err1: any) {
+              // Try landscape-primary if landscape fails
+              try {
+                await (screen.orientation as any).lock('landscape-primary');
+              } catch (err2: any) {
+                // Try landscape-secondary as last resort
+                try {
+                  await (screen.orientation as any).lock('landscape-secondary');
+                } catch (err3: any) {
+                  console.log('Orientation lock not available. User may need to rotate manually.');
+                }
+              }
+            }
+          } else {
+            console.log('Screen Orientation API not supported');
+          }
+        } catch (error) {
+          console.log('Orientation lock error:', error);
         }
-      } catch (error) {
-        // Ignore errors - orientation lock may not be supported
-      }
+      }, 100);
     }
   };
 
@@ -105,13 +122,22 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
     setFullscreenChart(null);
     
     // On mobile, unlock orientation when exiting fullscreen
-    if (isMobile && 'orientation' in screen && 'unlock' in screen.orientation) {
+    if (isMobile) {
       try {
-        await (screen.orientation as any).unlock().catch(() => {
-          // Ignore errors
-        });
+        // Unlock orientation
+        if ('orientation' in screen && 'unlock' in screen.orientation) {
+          await (screen.orientation as any).unlock().catch(() => {
+            // Ignore errors
+          });
+        }
+        // Exit fullscreen if we entered it
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {
+            // Ignore errors
+          });
+        }
       } catch (error) {
-        // Ignore errors
+        console.log('Orientation unlock error:', error);
       }
     }
   };
@@ -214,7 +240,13 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
         display: false, // Hide legend since we have title in header
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: theme.palette.mode === 'dark' 
+          ? 'rgba(0, 0, 0, 0.95)' 
+          : 'rgba(255, 255, 255, 0.98)',
+        borderColor: theme.palette.mode === 'dark' 
+          ? 'rgba(255, 255, 255, 0.2)' 
+          : 'rgba(0, 0, 0, 0.2)',
+        borderWidth: 1,
         titleFont: {
           size: 14,
           weight: 'bold'
@@ -225,6 +257,8 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
         padding: 12,
         cornerRadius: 8,
         displayColors: true,
+        titleColor: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
+        bodyColor: theme.palette.mode === 'dark' ? '#E0E0E0' : '#333333',
         callbacks: {
           label: function(context: any) {
             const label = context.dataset.label || '';
@@ -258,7 +292,10 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
         },
         grid: {
           display: true, 
-          color: 'rgba(255, 255, 255, 0.1)'
+          color: theme.palette.mode === 'dark' 
+            ? 'rgba(255, 255, 255, 0.15)' 
+            : 'rgba(0, 0, 0, 0.15)',
+          lineWidth: 1
         },
         ticks: {
           maxRotation: 45,
@@ -266,7 +303,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
           font: {
             size: 11
           },
-          color: '#E0E0E0'
+          color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000'
         },
         title: {
           display: true,
@@ -275,20 +312,23 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
             size: 12,
             weight: 'bold'
           },
-          color: '#E0E0E0'
+          color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000'
         }
       },
       y: {
         beginAtZero: true,
         grid: {
           display: true,
-          color: 'rgba(255, 255, 255, 0.1)'
+          color: theme.palette.mode === 'dark' 
+            ? 'rgba(255, 255, 255, 0.15)' 
+            : 'rgba(0, 0, 0, 0.15)',
+          lineWidth: 1
         },
         ticks: { 
           font: {
             size: 11
           },
-          color: '#E0E0E0',
+          color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
           callback: function(value) {
             if (typeof value === 'number') {
               return value.toFixed(1);
@@ -303,7 +343,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
             size: 12,
             weight: 'bold'
           },
-          color: '#E0E0E0'
+          color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000'
         }
       }
     }
@@ -476,7 +516,10 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
           width: '100%',
           height: isFullscreen ? '100vh' : '400px',
           transition: 'height 0.3s ease',
-          backgroundColor: '#1a1f3c',
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.98) 50%, rgba(255, 255, 255, 0.95) 100%)',
+          backdropFilter: 'blur(12px)',
           borderRadius: 3,
           p: 0,
           m: 0,
@@ -484,7 +527,10 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
           mb: 0,
           px: 0,
           touchAction: isMobile ? 'pan-y' : 'auto',
-          overscrollBehavior: 'contain'
+          overscrollBehavior: 'contain',
+          border: theme.palette.mode === 'dark' 
+            ? '1px solid rgba(255, 255, 255, 0.1)' 
+            : '1px solid rgba(0, 0, 0, 0.08)',
         }}
       >
         <Box
@@ -710,7 +756,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
                     disabled={!zoomedCharts[metricKey]}
                     sx={{
                       backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      color: '#E0E0E0',
+                      color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
                       border: '1px solid rgba(255, 255, 255, 0.2)',
                       '&:hover': {
                         backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -736,7 +782,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
                       const chartData = {
                         labels: (metricsData?.data || []).map((d: any) => new Date(d.timestamp.replace('Z', ''))),
                         datasets: [{
-                          label: `${metricsConfig[metricKey]?.label || metricKey} (${metricsConfig[metricKey]?.unit || ''})`,
+                          label: metricsConfig[metricKey]?.unit || '', // Only show unit in legend, label is in header
                           data: (metricsData?.data || []).map((d: any) => parseFloat(d[metricKey])),
                           borderColor: metricsConfig[metricKey]?.color || '#2196f3',
                           backgroundColor: `${metricsConfig[metricKey]?.color || '#2196f3'}20`,
@@ -749,13 +795,18 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
                           pointBorderColor: '#fff',
                           pointBorderWidth: 2,
                           pointStyle: 'circle'
-                        }]
+                        }],
+                        // Store metadata for CSV export
+                        metricKey: metricKey,
+                        metricLabel: metricsConfig[metricKey]?.label || metricKey,
+                        metricUnit: metricsConfig[metricKey]?.unit || '',
+                        rawData: metricsData?.data || []
                       };
                       handleFullscreenToggleChart(chartData);
                     }}
                     sx={{
                       backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      color: '#E0E0E0',
+                      color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
                       border: '1px solid rgba(255, 255, 255, 0.2)',
                       '&:hover': {
                         backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -827,47 +878,55 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <TrendingUpIcon sx={{ 
-                fontSize: '2rem',
+                fontSize: '1.75rem',
+                color: theme.palette.mode === 'dark' ? '#4caf50' : '#1976d2'
+              }} />
+              <Typography variant="h5" sx={{ 
+                fontWeight: 600,
+                fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
                 background: theme.palette.mode === 'dark'
                   ? 'linear-gradient(45deg, #4caf50, #2196f3)'
                   : 'linear-gradient(45deg, #1976d2, #388e3c)',
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent'
-              }} />
-              <Box>
-                <Typography variant="h5" sx={{ 
-                  fontWeight: 700,
-                  fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
-                  background: theme.palette.mode === 'dark'
-                    ? 'linear-gradient(45deg, #4caf50, #2196f3)'
-                    : 'linear-gradient(45deg, #1976d2, #388e3c)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  mb: 0.5
-                }}>
-                  {fullscreenChart?.datasets?.[0]?.label?.split(' (')[0] || 'Chart'}
-                </Typography>
-                <Typography variant="body2" sx={{ 
-                  color: theme.palette.text.secondary,
-                  fontSize: '0.875rem'
-                }}>
-                  {t('dashboard.fullscreen')} - {new Date().toLocaleString()}
-                </Typography>
-              </Box>
+              }}>
+                {(fullscreenChart as any)?.metricLabel || fullscreenChart?.datasets?.[0]?.label?.split(' (')[0] || 'Chart'} {(fullscreenChart as any)?.metricUnit ? `(${(fullscreenChart as any).metricUnit})` : ''}
+              </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <IconButton
                 onClick={() => {
-                  // Export chart as image
-                  if (fullscreenChart) {
-                    // This would require the actual chart instance from the fullscreen view
-                    // For now, we can implement a basic export
+                  // Export chart data as CSV
+                  if (fullscreenChart && (fullscreenChart as any).rawData) {
+                    const rawData = (fullscreenChart as any).rawData;
+                    const metricKey = (fullscreenChart as any).metricKey || 'metric';
+                    const metricLabel = (fullscreenChart as any).metricLabel || metricKey;
+                    const metricUnit = (fullscreenChart as any).metricUnit || '';
+                    
+                    // Create CSV content
+                    const headers = ['Timestamp', `${metricLabel}${metricUnit ? ` (${metricUnit})` : ''}`];
+                    const csvRows = [headers.join(',')];
+                    
+                    // Add data rows
+                    rawData.forEach((d: any) => {
+                      const timestamp = d.timestamp ? new Date(d.timestamp.replace('Z', '')).toISOString() : '';
+                      const value = d[metricKey] !== null && d[metricKey] !== undefined ? parseFloat(d[metricKey]) : '';
+                      csvRows.push(`${timestamp},${value}`);
+                    });
+                    
+                    // Create and download CSV file
+                    const csvContent = csvRows.join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                     const link = document.createElement('a');
-                    link.download = `chart-${Date.now()}.png`;
-                    // TODO: Implement actual chart export using chart.toBase64Image() when chart instance is available
-                    console.log('Export functionality - chart instance needed');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `${metricLabel.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
                   }
                 }}
                 sx={{
@@ -880,7 +939,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
                   },
                   transition: 'all 0.2s ease-in-out'
                 }}
-                title={t('charts.export') || 'Export Chart'}
+                title={t('dashboard.export') || 'Export Chart as CSV'}
               >
                 <DownloadIcon />
               </IconButton>
@@ -910,12 +969,16 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
           <Box sx={{ 
             flex: 1, 
             position: 'relative',
-            p: { xs: 2, sm: 4 },
+            p: { xs: 3, sm: 4 },
             overflow: 'hidden',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            minHeight: 0
+            minHeight: 0,
+            background: theme.palette.mode === 'dark'
+              ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.6) 0%, rgba(31, 37, 71, 0.7) 50%, rgba(26, 31, 60, 0.6) 100%)'
+              : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 250, 252, 0.8) 50%, rgba(255, 255, 255, 0.7) 100%)',
+            backdropFilter: 'blur(20px)',
           }}>
             {fullscreenChart && (() => {
               const fullscreenBoundaries = getDataBoundaries(fullscreenChart);
@@ -926,26 +989,17 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
                 plugins: {
                   ...chartOptions.plugins,
                   legend: {
-                    display: true,
-                    position: 'top',
-                    align: 'start',
-                    labels: {
-                      usePointStyle: true,
-                      padding: 20,
-                      font: {
-                        size: 14,
-                        weight: 'bold'
-                      },
-                      color: theme.palette.text.primary,
-                      boxWidth: 20,
-                      boxHeight: 20,
-                    }
+                    display: false, // Hide legend in fullscreen for cleaner view
                   },
                   tooltip: {
                     ...chartOptions.plugins?.tooltip,
                     backgroundColor: theme.palette.mode === 'dark' 
-                      ? 'rgba(0, 0, 0, 0.9)' 
-                      : 'rgba(255, 255, 255, 0.95)',
+                      ? 'rgba(0, 0, 0, 0.95)' 
+                      : 'rgba(255, 255, 255, 0.98)',
+                    borderColor: theme.palette.mode === 'dark' 
+                      ? 'rgba(255, 255, 255, 0.3)' 
+                      : 'rgba(0, 0, 0, 0.3)',
+                    borderWidth: 1,
                     titleFont: {
                       size: 16,
                       weight: 'bold'
@@ -956,6 +1010,8 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
                     padding: 16,
                     cornerRadius: 12,
                     displayColors: true,
+                    titleColor: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
+                    bodyColor: theme.palette.mode === 'dark' ? '#E0E0E0' : '#333333',
                   },
                   zoom: {
                     limits: {
@@ -991,34 +1047,52 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
                   ...chartOptions.scales,
                   x: {
                     ...chartOptions.scales?.x,
+                    grid: {
+                      ...chartOptions.scales?.x?.grid,
+                      color: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.2)' 
+                        : 'rgba(0, 0, 0, 0.2)',
+                      lineWidth: 1
+                    },
                     ticks: {
                       ...chartOptions.scales?.x?.ticks,
                       font: {
                         size: 13
-                      }
+                      },
+                      color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000'
                     },
                     title: {
                       ...chartOptions.scales?.x?.title,
                       font: {
-                        size: 14,
+                        size: 15,
                         weight: 'bold'
-                      }
+                      },
+                      color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000'
                     }
                   },
                   y: {
                     ...chartOptions.scales?.y,
+                    grid: {
+                      ...chartOptions.scales?.y?.grid,
+                      color: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.2)' 
+                        : 'rgba(0, 0, 0, 0.2)',
+                      lineWidth: 1
+                    },
                     ticks: {
                       ...chartOptions.scales?.y?.ticks,
                       font: {
                         size: 13
-                      }
+                      },
+                      color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000'
                     },
                     title: {
                       ...chartOptions.scales?.y?.title,
                       font: {
-                        size: 14,
+                        size: 15,
                         weight: 'bold'
-                      }
+                      },
+                      color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000'
                     }
                   }
                 }
@@ -1030,7 +1104,16 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
                   height: '100%',
                   maxWidth: '100%',
                   maxHeight: '100%',
-                  position: 'relative'
+                  position: 'relative',
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.4) 0%, rgba(31, 37, 71, 0.5) 50%, rgba(26, 31, 60, 0.4) 100%)'
+                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(248, 250, 252, 0.6) 50%, rgba(255, 255, 255, 0.5) 100%)',
+                  backdropFilter: 'blur(10px)',
+                  borderRadius: 2,
+                  p: 2,
+                  border: theme.palette.mode === 'dark' 
+                    ? '1px solid rgba(255, 255, 255, 0.1)' 
+                    : '1px solid rgba(0, 0, 0, 0.1)',
                 }}>
                   <Line
                     data={fullscreenChart}

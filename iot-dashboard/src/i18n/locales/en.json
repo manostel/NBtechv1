@@ -164,7 +164,7 @@
     "resetZoom": "Reset Zoom",
     "fullscreen": "Fullscreen",
     "fullscreenRotate": "Fullscreen (Rotate)",
-    "export": "Export Chart"
+    "export": "Export Chart as CSV"
   },
   "alarms": {
     "title": "Alarms",
