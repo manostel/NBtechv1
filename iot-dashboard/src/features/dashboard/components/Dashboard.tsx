@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Helmet } from "react-helmet";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -36,16 +36,16 @@ import {
   useMediaQuery
 } from "@mui/material";
 import { 
-  Settings as SettingsIcon,
-  Refresh as RefreshIcon,
-  Logout as LogoutIcon,
   ArrowBack as ArrowBackIcon,
   ShowChart as ShowChartIcon,
   Map as MapIcon,
-  Notifications as NotificationsIcon,
   Assessment as AssessmentIcon,
   Build as BuildIcon
 } from '@mui/icons-material';
+import useNotificationStore from '../../../stores/notificationStore';
+import HeaderActions from '../../../components/common/HeaderActions';
+import UserEmailDisplay from '../../../components/common/UserEmailDisplay';
+import { useTranslation } from 'react-i18next';
 // @ts-ignore
 import SettingsDrawer from "./SettingsDrawer";
 // @ts-ignore
@@ -124,13 +124,39 @@ interface DashboardProps {
 
 export default function Dashboard2({ user, device, onLogout, onBack }: DashboardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
+  const { t } = useTranslation();
   // @ts-ignore
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
+  // Notification store
+  const { unreadCount, setNotificationCenterOpen } = useNotificationStore();
+  
   // Global timer hook
   const { updateDeviceStatus, getDeviceStatus } = useGlobalTimer();
-  const [selectedTab, setSelectedTab] = useState(0);
+  
+  // Initialize tab from location state (for navigation from notifications)
+  const locationTabRef = useRef<number | null>(null);
+  const [selectedTab, setSelectedTab] = useState(() => {
+    const tabFromState = (location.state as { tab?: number })?.tab;
+    if (tabFromState !== undefined) {
+      locationTabRef.current = tabFromState;
+      return tabFromState;
+    }
+    return 0;
+  });
+  
+  // Update tab when location state changes (but only once to avoid tab switching bug)
+  useEffect(() => {
+    const tabFromState = (location.state as { tab?: number })?.tab;
+    if (tabFromState !== undefined && locationTabRef.current !== tabFromState) {
+      locationTabRef.current = tabFromState;
+      setSelectedTab(tabFromState);
+      // Clear the state to prevent re-triggering on re-renders
+      window.history.replaceState({}, '', location.pathname);
+    }
+  }, [location.state, location.pathname]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [metricsData, setMetricsData] = useState<any>(null);
   const [deviceState, setDeviceState] = useState<DeviceData | null>(null);
@@ -1125,56 +1151,20 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
             >
               {device?.device || "N/A"}
             </Typography>
+            <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
+              <UserEmailDisplay email={user.email} variant="chip" />
+            </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton
-              edge="end"
-              color="inherit"
-              aria-label="refresh"
-              onClick={handleRefresh}
-              sx={{ 
-                mr: 1,
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  transform: 'scale(1.05)'
-                }
-              }}
-            >
-              <RefreshIcon />
-            </IconButton>
-            <IconButton
-              edge="end"
-              color="inherit"
-              aria-label="settings"
-              onClick={handleSettingsOpen}
-              sx={{ 
-                mr: 1,
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  transform: 'scale(1.05)'
-                }
-              }}
-            >
-              <SettingsIcon />
-            </IconButton>
-            <IconButton
-              edge="end"
-              color="inherit"
-              aria-label="logout"
-              onClick={handleLogoutClick}
-              sx={{ 
-                mr: 0.5,
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  transform: 'scale(1.05)'
-                }
-              }}
-            >
-              <LogoutIcon />
-            </IconButton>
+            <Box sx={{ display: { xs: 'flex', sm: 'none' }, alignItems: 'center' }}>
+              <UserEmailDisplay email={user.email} variant="icon" />
+            </Box>
+            <HeaderActions
+              onRefresh={handleRefresh}
+              onNotifications={() => setNotificationCenterOpen(true)}
+              onSettings={handleSettingsOpen}
+              onLogout={handleLogoutClick}
+            />
           </Box>
         </Toolbar>
       </AppBar>
@@ -1343,11 +1333,11 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
             }
           }}
         >
-            <Tab label="Overview" {...a11yProps(0)} />
-            <Tab label="Graphs" {...a11yProps(1)} />
-            <Tab label="Commands" {...a11yProps(2)} />
-            <Tab label="Alarms" {...a11yProps(3)} />
-            <Tab label="Subscriptions" {...a11yProps(4)} />
+            <Tab label={t('tabs.overview')} {...a11yProps(0)} />
+            <Tab label={t('tabs.graphs')} {...a11yProps(1)} />
+            <Tab label={t('tabs.commands')} {...a11yProps(2)} />
+            <Tab label={t('tabs.alarms')} {...a11yProps(3)} />
+            <Tab label={t('tabs.subscriptions')} {...a11yProps(4)} />
         </Tabs>
         </Box>
 

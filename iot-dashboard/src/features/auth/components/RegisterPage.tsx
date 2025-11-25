@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet";
 import { Box, Button, TextField, Typography, Paper, InputAdornment, IconButton, CircularProgress, useTheme } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { Visibility, VisibilityOff, ArrowBack } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { User } from "../../../types";
 
 // Use the same API endpoint as your Lambda
@@ -13,6 +14,7 @@ interface RegisterPageProps {
 }
 
 const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
@@ -30,7 +32,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
 
     try {
       if (password !== confirmPassword) {
-        setError("Passwords do not match");
+        setError(t('auth.passwordMismatch'));
         return;
       }
       const payload = {
@@ -157,7 +159,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
               }
             }}
           >
-            Back to Login
+            {t('common.back')} {t('auth.login')}
           </Button>
         </Box>
         <Box sx={{ textAlign: 'center', mb: 2 }}>
@@ -176,7 +178,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
               textShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            Create Account
+            {t('auth.createAccount')}
           </Typography>
           <Typography 
             variant="h6" 
@@ -191,7 +193,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
         </Box>
         <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <TextField
-            label="Email"
+            label={t('auth.email')}
             type="email"
             required
             value={email}
@@ -216,7 +218,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
             }}
           />
           <TextField
-            label="Password"
+            label={t('auth.password')}
             type={showPassword ? "text" : "password"}
             required
             value={password}
@@ -263,7 +265,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
             }}
           />
           <TextField
-            label="Confirm Password"
+            label={t('auth.confirmPassword')}
             type={showConfirmPassword ? "text" : "password"}
             required
             value={confirmPassword}
@@ -349,10 +351,10 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
             {isLoading ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CircularProgress size={20} color="inherit" />
-                <span>Registering...</span>
+                <span>{t('common.loading')}</span>
               </Box>
             ) : (
-              'Create Account'
+              t('auth.signUp')
             )}
           </Button>
           {error && <Typography color="error">{error}</Typography>}

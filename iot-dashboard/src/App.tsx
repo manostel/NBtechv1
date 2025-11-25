@@ -11,6 +11,7 @@ import "./App.css";
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { LoadingProvider } from './context/LoadingContext';
 import PageTransition from './components/common/PageTransition';
+import NotificationProvider from './components/common/NotificationProvider';
 import { CssBaseline, Box } from '@mui/material';
 import BluetoothControl from './features/devices/components/BluetoothControl';
 
@@ -31,30 +32,32 @@ function App(): JSX.Element {
         <CssBaseline />
         <Box className="App">
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <Box className="App-content">
-              <PageTransition>
-                <Routes>
-                  <Route path="/" element={user ? <Navigate to="/devices" /> : <LoginPage onLogin={login} />} />
-                  <Route path="/register" element={user ? <Navigate to="/devices" /> : <RegisterPage onRegister={login} />} />
-                  <Route path="/devices" element={user ? <DevicesPage user={user} onSelectDevice={setSelectedDevice} onLogout={logout} /> : <Navigate to="/" />} />
-                  <Route
-                    path="/dashboard"
-                    element={user && selectedDevice ? (
-                      <ErrorBoundary>
-                        <Dashboard user={user} device={selectedDevice} onLogout={logout} onBack={() => setSelectedDevice(null)} />
-                      </ErrorBoundary>
-                    ) : (
-                      <Navigate to="/devices" />
-                    )}
-                  />
-                  <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/" />} />
-                  <Route 
-                    path="/bluetooth" 
-                    element={<BluetoothControl />} 
-                  />
-                </Routes>
-              </PageTransition>
-            </Box>
+            <NotificationProvider>
+              <Box className="App-content">
+                <PageTransition>
+                  <Routes>
+                    <Route path="/" element={user ? <Navigate to="/devices" /> : <LoginPage onLogin={login} />} />
+                    <Route path="/register" element={user ? <Navigate to="/devices" /> : <RegisterPage onRegister={login} />} />
+                    <Route path="/devices" element={user ? <DevicesPage user={user} onSelectDevice={setSelectedDevice} onLogout={logout} /> : <Navigate to="/" />} />
+                    <Route
+                      path="/dashboard"
+                      element={user && selectedDevice ? (
+                        <ErrorBoundary>
+                          <Dashboard user={user} device={selectedDevice} onLogout={logout} onBack={() => setSelectedDevice(null)} />
+                        </ErrorBoundary>
+                      ) : (
+                        <Navigate to="/devices" />
+                      )}
+                    />
+                    <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/" />} />
+                    <Route 
+                      path="/bluetooth" 
+                      element={<BluetoothControl />} 
+                    />
+                  </Routes>
+                </PageTransition>
+              </Box>
+            </NotificationProvider>
           </Router>
         </Box>
       </CustomThemeProvider>

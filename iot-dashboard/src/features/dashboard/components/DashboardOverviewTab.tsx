@@ -251,7 +251,7 @@ const DashboardOverviewTab: React.FC<DashboardOverviewTabProps> = ({
           <Box sx={{ 
             p: 0.5, 
             borderRadius: 2,
-            background: 'linear-gradient(135deg, #4caf50, #2196f3)',
+          background: 'linear-gradient(135deg, #4caf50, #2196f3)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

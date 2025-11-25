@@ -1,4 +1,5 @@
 import { EventEmitter } from './EventEmitter';
+import notificationManager from '../services/NotificationManager';
 import { Subscription } from '../types';
 
 export interface RealTimeNotification {
@@ -254,7 +255,11 @@ class RealTimeSubscriptionDetector extends EventEmitter {
     }
   }
 
-  triggerSubscriptionNotification(subscription: Subscription, currentValue: any, previousValue: any) {
+  async triggerSubscriptionNotification(subscription: Subscription, currentValue: any, previousValue: any) {
+    // Send to NotificationManager
+    await notificationManager.notifySubscriptionTrigger(subscription, currentValue);
+
+    // Also create formatted notification for backward compatibility
     const notification: RealTimeNotification = {
       id: `${subscription.subscription_id}_${Date.now()}`,
       type: 'subscription_trigger',

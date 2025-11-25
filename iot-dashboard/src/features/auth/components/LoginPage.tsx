@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet";
 import { Box, Button, TextField, Typography, Paper, Checkbox, FormControlLabel, CircularProgress, InputAdornment, IconButton, useTheme } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
 import { Visibility, VisibilityOff, Login as LoginIcon } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { User } from "../../../types";
 
 // Update the API URL to include /auth
@@ -13,6 +14,7 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+  const { t } = useTranslation();
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       console.log('Login response:', data);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(data.error || t('auth.invalidCredentials'));
       }
 
       // Store the user data matching User interface
@@ -76,7 +78,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       navigate('/devices');
     } catch (error: any) {
       console.error('Login error:', error);
-      setError(error.message || 'Login failed. Please check your credentials and try again.');
+      setError(error.message || t('auth.invalidCredentials'));
     } finally {
       setIsLoading(false);
     }
@@ -184,7 +186,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         </Box>
         <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <TextField
-            label="Email"
+            label={t('auth.email')}
             type="email"
             required
             value={username}
@@ -209,7 +211,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             }}
           />
           <TextField
-            label="Password"
+            label={t('auth.password')}
             type={showPassword ? "text" : "password"}
             required
             value={password}
@@ -268,7 +270,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 }}
               />
             }
-            label="Remember me"
+            label={t('auth.rememberMe')}
             sx={{ 
               mt: 1, 
               mb: 1,
@@ -317,10 +319,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             {isLoading ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CircularProgress size={20} color="inherit" />
-                <span>Signing in...</span>
+                <span>{t('common.loading')}</span>
               </Box>
             ) : (
-              'Sign In'
+              t('auth.signIn')
             )}
           </Button>
         </Box>
@@ -376,7 +378,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 e.target.style.textDecoration = 'none';
               }}
             >
-              Create Account
+              {t('auth.createAccount')}
             </Link>
           </Typography>
         </Box>

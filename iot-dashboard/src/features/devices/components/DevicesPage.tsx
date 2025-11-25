@@ -28,7 +28,6 @@ import {
 } from "@mui/material";
 import { 
   Settings as SettingsIcon,
-  Logout as LogoutIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
@@ -36,7 +35,6 @@ import {
   VisibilityOff as VisibilityOffIcon,
   ShowChart as ShowChartIcon,
   Map as MapIcon,
-  Refresh as RefreshIcon,
   Bluetooth as BluetoothIcon,
 } from '@mui/icons-material';
 import BatteryIndicator from "../../../components/common/BatteryIndicator";
@@ -51,7 +49,10 @@ import 'leaflet/dist/leaflet.css';
 // @ts-ignore
 import BluetoothControl from './BluetoothControl';
 import { useGlobalTimer } from '../../../hooks/useGlobalTimer';
+import useNotificationStore from '../../../stores/notificationStore';
 import { Device, User, DeviceData } from '../../../types';
+import HeaderActions from '../../../components/common/HeaderActions';
+import UserEmailDisplay from '../../../components/common/UserEmailDisplay';
 
 const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
@@ -770,6 +771,9 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
   const navigate = useNavigate();
   const theme = useTheme();
   const { currentTheme, setTheme } = useCustomTheme();
+  
+  // Notification store
+  const { unreadCount, setNotificationCenterOpen } = useNotificationStore();
   
   // Global timer hook
   const { updateDeviceStatus, getDeviceStatus: getGlobalDeviceStatus } = useGlobalTimer();
@@ -1653,102 +1657,37 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                 }} />
               </Box>
             </Box>
-            <Typography 
-              variant="subtitle2" 
-              sx={{ 
-                display: { xs: 'none', sm: 'block' },
-                color: currentTheme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
-                fontWeight: 500,
-                px: 1.5,
-                py: 0.5,
-                borderRadius: 2,
-                backgroundColor: currentTheme === 'dark' 
-                  ? 'rgba(255,255,255,0.05)' 
-                  : 'rgba(0,0,0,0.05)',
-                border: `1px solid ${currentTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
-              }}
-            >
-              {user.email}
-            </Typography>
+            <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
+              <UserEmailDisplay email={user.email} variant="chip" />
+            </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-
-            {/* Refresh Button */}
-            <Tooltip title="Refresh devices">
-              <IconButton
-                edge="end"
-                color="inherit"
-                aria-label="refresh"
-                onClick={async () => {
-                  try {
-                    setIsLoading(true);
-                    await Promise.all([
-                      fetchDevices(),
-                      fetchGPSData(),
-                      fetchDeviceStates()
-                    ]);
-                    if (devices && devices.length > 0) {
-                      const deviceDataPromises = devices.map(device => fetchDeviceData(device));
-                      await Promise.all(deviceDataPromises);
-                    }
-                  } catch (error) {
-                    console.error('Error refreshing data:', error);
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                sx={{ 
-                  mr: 1,
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    transform: 'scale(1.05)'
-                  }
-                }}
-              >
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-
-            {/* Settings */}
-            <Tooltip title="Settings">
-              <IconButton
-                edge="end"
-                color="inherit"
-                aria-label="settings"
-                onClick={() => setSettingsOpen(true)}
-                sx={{ 
-                  mr: 1,
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    transform: 'scale(1.05)'
-                  }
-                }}
-              >
-                <SettingsIcon />
-              </IconButton>
-            </Tooltip>
-
-            {/* Logout */}
-            <Tooltip title="Logout">
-              <IconButton
-                edge="end"
-                color="inherit"
-                aria-label="logout"
-                onClick={handleLogout}
-                sx={{ 
-                  mr: 0.5,
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    transform: 'scale(1.05)'
-                  }
-                }}
-              >
-                <LogoutIcon />
-              </IconButton>
-            </Tooltip>
+            <Box sx={{ display: { xs: 'flex', sm: 'none' }, alignItems: 'center' }}>
+              <UserEmailDisplay email={user.email} variant="icon" />
+            </Box>
+            <HeaderActions
+            onRefresh={async () => {
+              try {
+                setIsLoading(true);
+                await Promise.all([
+                  fetchDevices(),
+                  fetchGPSData(),
+                  fetchDeviceStates()
+                ]);
+                if (devices && devices.length > 0) {
+                  const deviceDataPromises = devices.map(device => fetchDeviceData(device));
+                  await Promise.all(deviceDataPromises);
+                }
+              } catch (error) {
+                console.error('Error refreshing data:', error);
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            onNotifications={() => setNotificationCenterOpen(true)}
+            onSettings={() => setSettingsOpen(true)}
+            onLogout={handleLogout}
+          />
           </Box>
         </Toolbar>
       </AppBar>

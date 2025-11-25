@@ -43,9 +43,8 @@ import {
   Output as OutputIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
-// @ts-ignore
-import NotificationService from '../../../utils/NotificationService';
-import { Device, MetricsConfig } from '../../../types';
+import notificationManager from '../../../services/NotificationManager';
+import { Device, MetricsConfig, Alarm } from '../../../types';
 
 // API endpoints
 const MANAGE_ALARMS_API_URL = "https://ueqnh8082k.execute-api.eu-central-1.amazonaws.com/default/manage-alarms";
@@ -301,7 +300,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       // Show notifications for newly triggered alarms
       for (const alarm of newTriggeredAlarms) {
         try {
-          await NotificationService.showAlarmNotification(alarm);
+          await notificationManager.notifyAlarm(alarm, device);
         } catch (error) {
           console.error('Error showing notification for alarm:', error);
         }
@@ -325,14 +324,10 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
     }
   }, [device?.client_id]);
 
+  // Initialize notifications on mount
   useEffect(() => {
-    const initializeNotifications = async () => {
-      const notificationsEnabled = await NotificationService.initialize();
-      if (!notificationsEnabled) {
-      }
-    };
-
-    initializeNotifications();
+    // NotificationManager handles initialization automatically
+    // No need to manually initialize here
   }, []);
 
   // Fetch alarms on component mount and when device changes

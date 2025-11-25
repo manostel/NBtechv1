@@ -6,6 +6,7 @@ import App from "./App";
 import { CustomThemeProvider } from "./context/ThemeContext";
 import { queryClient } from "./lib/react-query";
 import "./index.css";
+import "./i18n/config"; // Initialize i18n
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 root.render(

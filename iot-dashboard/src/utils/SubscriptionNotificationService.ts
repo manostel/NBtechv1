@@ -1,5 +1,6 @@
 import { EventEmitter } from './EventEmitter';
-import { Subscription } from '../types';
+import notificationManager from '../services/NotificationManager';
+import { Subscription, Device } from '../types';
 
 export interface SubscriptionNotification {
   id: string;
@@ -107,12 +108,36 @@ class SubscriptionNotificationService extends EventEmitter {
         // Mark as processed
         processedIds.add(notification.notification_id);
         
-        // Emit notification event
+        // Format notification message
+        const message = notification.message || this.formatNotificationMessageFromNotification(notification);
+        const severity = this.getNotificationSeverityFromParam(notification.parameter_name);
+        
+        // Try to get device name from notification data if available
+        const deviceInfo = notification.device_name || notification.device?.name || notification.device?.device_name 
+          ? { name: notification.device_name || notification.device?.name || notification.device?.device_name }
+          : undefined;
+        
+        // Send to NotificationManager
+        await notificationManager.notifySubscriptionTrigger(
+          {
+            subscription_id: notification.subscription_id,
+            device_id: notification.device_id,
+            parameter_name: notification.parameter_name,
+            condition_type: notification.condition_type,
+            parameter_type: notification.parameter_type || 'metrics',
+            threshold_value: notification.threshold_value,
+            enabled: true,
+          } as Subscription,
+          notification.current_value,
+          deviceInfo
+        );
+
+        // Also emit for backward compatibility
         const formattedNotification: SubscriptionNotification = {
           id: notification.notification_id,
           type: 'subscription_trigger',
           title: `Device Alert: ${notification.device_id}`,
-          message: notification.message || this.formatNotificationMessageFromNotification(notification),
+          message: message,
           subscription: {
             subscription_id: notification.subscription_id,
             device_id: notification.device_id,
@@ -121,7 +146,7 @@ class SubscriptionNotificationService extends EventEmitter {
           },
           currentValue: notification.current_value,
           timestamp: notification.timestamp,
-          severity: this.getNotificationSeverityFromParam(notification.parameter_name)
+          severity: severity
         };
 
         this.emit('notification', formattedNotification);
@@ -268,16 +293,26 @@ class SubscriptionNotificationService extends EventEmitter {
     }
   }
 
-  triggerNotification(subscription: any, currentValue: any) {
+  async triggerNotification(subscription: any, currentValue: any) {
+    const message = this.formatNotificationMessage(subscription, currentValue);
+    const severity = this.getNotificationSeverity(subscription);
+    
+    // Send to NotificationManager
+    await notificationManager.notifySubscriptionTrigger(
+      subscription as Subscription,
+      currentValue
+    );
+
+    // Also create formatted notification for backward compatibility
     const notification: SubscriptionNotification = {
       id: `${subscription.subscription_id}_${Date.now()}`,
       type: 'subscription_trigger',
       title: `Device Alert: ${subscription.device_id}`,
-      message: this.formatNotificationMessage(subscription, currentValue),
+      message: message,
       subscription: subscription,
       currentValue: currentValue,
       timestamp: new Date().toISOString(),
-      severity: this.getNotificationSeverity(subscription),
+      severity: severity,
       actions: [
         {
           label: 'View Device',
