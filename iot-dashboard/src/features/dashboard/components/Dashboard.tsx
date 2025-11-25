@@ -56,6 +56,7 @@ import DashboardCommandsTab from './DashboardCommandsTab';
 import DashboardOverviewTab from './DashboardOverviewTab';
 import DashboardAlarmsTab from './DashboardAlarmsTab';
 import DashboardSubscriptionsTab from './DashboardSubscriptionsTab';
+import DashboardSchedulerTab from './DashboardSchedulerTab';
 import DeviceNotificationService from '../../../utils/DeviceNotificationService';
 import NotificationService from '../../../utils/NotificationService';
 import { useGlobalTimer } from '../../../hooks/useGlobalTimer';
@@ -929,6 +930,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
             onNotification={setSnackbar}
           />
         );
+      case 5:
+        return (
+          <DashboardSchedulerTab
+            device={device!}
+          />
+        );
       default:
         return null;
     }
@@ -1338,6 +1345,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
             <Tab label={t('tabs.commands')} {...a11yProps(2)} />
             <Tab label={t('tabs.alarms')} {...a11yProps(3)} />
             <Tab label={t('tabs.subscriptions')} {...a11yProps(4)} />
+            <Tab label={t('tabs.scheduler')} {...a11yProps(5)} />
         </Tabs>
         </Box>
 
@@ -1357,6 +1365,9 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
         </TabPanel>
         <TabPanel value={selectedTab} index={4}>
           {renderTabContent(4)}
+        </TabPanel>
+        <TabPanel value={selectedTab} index={5}>
+          {renderTabContent(5)}
         </TabPanel>
       </Container>
     </Box>
