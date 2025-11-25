@@ -53,6 +53,7 @@ import useNotificationStore from '../../../stores/notificationStore';
 import { Device, User, DeviceData } from '../../../types';
 import HeaderActions from '../../../components/common/HeaderActions';
 import UserEmailDisplay from '../../../components/common/UserEmailDisplay';
+import { useTranslation } from 'react-i18next';
 
 const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
@@ -146,7 +147,7 @@ const DeviceCardSkeleton = () => {
     );
 };
 
-const ConfigureDeviceDialog = React.memo(({ 
+const ConfigureDeviceDialog: React.FC<any> = React.memo(({ 
     device, 
     onClose, 
     deviceData, 
@@ -154,6 +155,7 @@ const ConfigureDeviceDialog = React.memo(({
     user, 
     showSnackbar 
 }: any) => {
+    const { t } = useTranslation();
     const [metricsConfig, setMetricsConfig] = useState(() => {
         const currentConfig = deviceData[device.client_id]?.metrics_visibility || {};
         const availableMetrics = Object.entries(deviceData[device.client_id]?.latest_data || {})
@@ -204,10 +206,10 @@ const ConfigureDeviceDialog = React.memo(({
             }
 
             onClose();
-            showSnackbar('Device configuration updated successfully', 'success');
+            showSnackbar(t('devices.deviceConfigUpdated'), 'success');
         } catch (error) {
             console.error('Error updating metrics configuration:', error);
-            showSnackbar('Failed to update configuration', 'error');
+            showSnackbar(t('devices.deviceConfigFailed'), 'error');
         }
     }, [device.client_id, metricsConfig, onClose, user.email, deviceData, setDeviceData, showSnackbar]);
 
@@ -260,10 +262,10 @@ const ConfigureDeviceDialog = React.memo(({
               }
             }}
         >
-            <DialogTitle sx={{ color: '#E0E0E0' }}>Configure Device Metrics</DialogTitle>
+            <DialogTitle sx={{ color: '#E0E0E0' }}>{t('devices.configureDeviceMetrics')}</DialogTitle>
             <DialogContent>
                 <DialogContentText sx={{ mb: 2, color: 'rgba(224, 224, 224, 0.7)' }}>
-                    Select which metrics you want to display on the device tile.
+                    {t('devices.selectMetrics')}
                 </DialogContentText>
                 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -279,10 +281,10 @@ const ConfigureDeviceDialog = React.memo(({
                             label={
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                                     <Typography>
-                                        {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
+                                        {t(`metrics.${key}`, { defaultValue: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ') })}
                                     </Typography>
                                     <Typography color="text.secondary">
-                                        Current: {typeof value === 'number' ? value.toFixed(1) : value}
+                                        {t('devices.current')}: {typeof value === 'number' ? value.toFixed(1) : value}
                                         {key === 'temperature' ? '°C' : key === 'humidity' ? '%' : ''}
                                     </Typography>
                                 </Box>
@@ -292,7 +294,7 @@ const ConfigureDeviceDialog = React.memo(({
                 </Box>
 
                 <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
-                    Preview
+                    {t('devices.preview')}
                 </Typography>
                 <Box sx={{ 
                     p: 2,
@@ -301,7 +303,7 @@ const ConfigureDeviceDialog = React.memo(({
                 }}>
                     {visibleMetrics.map(([key, value]: [string, any]) => (
                         <Typography key={key} variant="body2" sx={{ mb: 0.5 }}>
-                            {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}: {
+                            {t(`metrics.${key}`, { defaultValue: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ') })}: {
                                 typeof value === 'number' ? value.toFixed(1) : value
                             }{key === 'temperature' ? '°C' : key === 'humidity' ? '%' : ''}
                         </Typography>
@@ -309,9 +311,9 @@ const ConfigureDeviceDialog = React.memo(({
                 </Box>
             </DialogContent>
             <DialogActions>
-                <Button onClick={onClose}>Cancel</Button>
+                <Button onClick={onClose}>{t('common.cancel')}</Button>
                 <Button onClick={handleSaveConfig} variant="contained" color="primary">
-                    Save Configuration
+                    {t('devices.saveConfiguration')}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -329,6 +331,7 @@ L.Icon.Default.mergeOptions({
 
 const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDeviceClick, getDeviceStatus }: any) => {
   const theme = useTheme();
+  const { t } = useTranslation();
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isSatelliteView, setIsSatelliteView] = useState(false);
   const [selectedDeviceForBluetooth, setSelectedDeviceForBluetooth] = useState<Device | null>(null);
@@ -449,7 +452,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
   };
 
   const renderMetricValue = (value: any, metric: string) => {
-    if (value === undefined || value === null) return 'No data';
+    if (value === undefined || value === null) return t('metrics.noData');
     return value.toString();
   };
 
@@ -481,7 +484,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
             }
           }}
         >
-          {isSatelliteView ? 'Satellite Imagery' : 'Street Map'}
+          {isSatelliteView ? t('devices.satelliteImagery') : t('devices.streetMap')}
         </Button>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -489,13 +492,13 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
             <>
               <CircularProgress size={16} />
               <Typography variant="caption" color="text.secondary">
-                Loading GPS data...
+                {t('devices.loadingGPS')}
               </Typography>
             </>
           ) : (
             <>
               <Typography variant="caption" color="text.secondary">
-                📍 GPS: {Object.keys(gpsData).length} devices
+                📍 {t('devices.gpsDevices', { count: Object.keys(gpsData).length })}
               </Typography>
             </>
           )}
@@ -606,7 +609,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                         letterSpacing: '0.5px',
                         fontSize: '0.7rem'
                       }}>
-                        I/O States
+                        {t('devices.ioStates')}
                       </Typography>
                       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
                         {/* Inputs */}
@@ -620,7 +623,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                                 backgroundColor: deviceStates[device.client_id]?.in1_state ? '#4caf50' : '#f44336' 
                               }} />
                               <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontSize: '0.7rem' }}>
-                                IN1: {deviceStates[device.client_id]?.in1_state ? 'ON' : 'OFF'}
+                                IN1: {deviceStates[device.client_id]?.in1_state ? t('devices.on') : t('devices.off')}
                               </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -631,7 +634,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                                 backgroundColor: deviceStates[device.client_id]?.in2_state ? '#4caf50' : '#f44336' 
                               }} />
                               <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontSize: '0.7rem' }}>
-                                IN2: {deviceStates[device.client_id]?.in2_state ? 'ON' : 'OFF'}
+                                IN2: {deviceStates[device.client_id]?.in2_state ? t('devices.on') : t('devices.off')}
                               </Typography>
                             </Box>
                           </Box>
@@ -648,7 +651,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                                 backgroundColor: deviceStates[device.client_id]?.out1_state ? '#4caf50' : '#f44336' 
                               }} />
                               <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontSize: '0.7rem' }}>
-                                OUT1: {deviceStates[device.client_id]?.out1_state ? 'ON' : 'OFF'}
+                                OUT1: {deviceStates[device.client_id]?.out1_state ? t('devices.on') : t('devices.off')}
                               </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -659,7 +662,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                                 backgroundColor: deviceStates[device.client_id]?.out2_state ? '#4caf50' : '#f44336' 
                               }} />
                               <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontSize: '0.7rem' }}>
-                                OUT2: {deviceStates[device.client_id]?.out2_state ? 'ON' : 'OFF'}
+                                OUT2: {deviceStates[device.client_id]?.out2_state ? t('devices.on') : t('devices.off')}
                               </Typography>
                             </Box>
                           </Box>
@@ -670,7 +673,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                         <Box sx={{ mt: 0.75, pt: 0.75, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                             <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem' }}>
-                              Motor:
+                              {t('devices.motor')}:
                             </Typography>
                             <Typography variant="caption" sx={{ color: theme.palette.text.primary, fontWeight: 600, fontSize: '0.7rem' }}>
                               {deviceStates[device.client_id]?.motor_speed}%
@@ -690,7 +693,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                     if (availableMetrics.length === 0) return null;
                     
                     const getShortLabel = (metric: string) => {
-                      return metric.charAt(0).toUpperCase() + metric.slice(1).replace(/_/g, ' ');
+                      return t(`metrics.${metric}`, { defaultValue: metric.charAt(0).toUpperCase() + metric.slice(1).replace(/_/g, ' ') });
                     };
                     
                     return (
@@ -710,7 +713,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                           letterSpacing: '0.5px',
                           fontSize: '0.7rem'
                         }}>
-                          Metrics
+                          {t('metrics.title')}
                         </Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           {availableMetrics.map((metric) => (
@@ -745,7 +748,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                       setSelectedDevice(null);
                     }}
                   >
-                    View Details
+                    {t('devices.viewDetails')}
                   </Button>
                 </Box>
               </Popup>
@@ -768,6 +771,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
 };
 
 const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogout }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const theme = useTheme();
   const { currentTheme, setTheme } = useCustomTheme();
@@ -1210,11 +1214,11 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
       
       setDeleteDialogOpen(false);
       setDeviceToDelete(null);
-      showSnackbar('Device deleted successfully', 'success');
+      showSnackbar(t('devices.deviceDeleted'), 'success');
     } catch (err: any) {
       console.error('Error deleting device:', err);
       setError(err.message);
-      showSnackbar('Failed to delete device: ' + err.message, 'error');
+      showSnackbar(t('devices.deviceDeleteFailed') + ': ' + err.message, 'error');
     }
   };
 
@@ -1278,7 +1282,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
         });
 
         if (!addDeviceResponse.ok) {
-            throw new Error('Failed to create new device');
+            throw new Error(t('devices.createDeviceFailed'));
         }
 
         const deleteResponse = await fetch(DEVICES_API_URL, {
@@ -1295,7 +1299,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
         });
 
         if (!deleteResponse.ok) {
-            throw new Error('Failed to delete old device');
+            throw new Error(t('devices.deleteDeviceFailed'));
         }
 
         setOpenClientIdConfirmDialog(false);
@@ -1306,11 +1310,11 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
 
         await fetchDevices();
 
-        showSnackbar('Device Client ID updated successfully', 'success');
+        showSnackbar(t('devices.clientIdUpdated'), 'success');
 
     } catch (error: any) {
         console.error('Error updating client ID:', error);
-        showSnackbar('Failed to update Client ID: ' + error.message, 'error');
+        showSnackbar(t('devices.clientIdUpdateFailed') + ': ' + error.message, 'error');
     }
   };
 
@@ -1341,7 +1345,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
         });
 
         if (!updateDeviceResponse.ok) {
-            throw new Error('Failed to update device name');
+            throw new Error(t('devices.updateDeviceNameFailed'));
         }
 
         setDevices(prevDevices => 
@@ -1364,11 +1368,11 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
         setEditingDevice(null);
         setEditDeviceName("");
 
-        showSnackbar('Device name updated successfully', 'success');
+        showSnackbar(t('devices.deviceNameUpdated'), 'success');
 
     } catch (error: any) {
         console.error('Error updating device:', error);
-        showSnackbar('Failed to update device: ' + error.message, 'error');
+        showSnackbar(t('devices.deviceUpdateFailed') + ': ' + error.message, 'error');
     }
   };
 
@@ -1398,21 +1402,20 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
       <DialogTitle>Warning: Changing Client ID</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ color: 'warning.main', mb: 2 }}>
-          Warning: Changing the Client ID will create a new device and the old device data will no longer be accessible. 
-          This action cannot be undone.
+          {t('devices.changeClientIdWarning')}
         </DialogContentText>
         <DialogContentText>
-          Are you sure you want to change the Client ID from "{editingDevice?.client_id}" to "{newClientId}"?
+          {t('devices.confirmChangeClientId', { old: editingDevice?.client_id, new: newClientId })}
         </DialogContentText>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => setOpenClientIdConfirmDialog(false)}>Cancel</Button>
+        <Button onClick={() => setOpenClientIdConfirmDialog(false)}>{t('common.cancel')}</Button>
         <Button 
           onClick={handleClientIdChangeConfirm} 
           variant="contained" 
           color="warning"
         >
-          Change Client ID
+          {t('devices.changeClientId')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -1581,7 +1584,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
       }
     }}>
       <Helmet>
-        <title>Devices - IoT Dashboard</title>
+        <title>{t('devices.title')} - IoT Dashboard</title>
         <style>{`
           @keyframes pulse {
             0% { opacity: 1; transform: scale(1); }
@@ -1750,7 +1753,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <ShowChartIcon sx={{ fontSize: '1.1rem' }} />
-                All Devices
+                {t('devices.allDevices')}
               </Box>
             } 
           />
@@ -1758,7 +1761,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                 label={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <MapIcon sx={{ fontSize: '1.1rem', color: 'inherit' }} key="map-icon" />
-                    Map View
+                    {t('devices.mapView')}
                   </Box>
                 } 
               />
@@ -1800,7 +1803,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                 {devices.filter(device => {
                   const deviceStatus = getDeviceStatus(deviceData[device.client_id], device.client_id);
                   return deviceStatus.status === 'Online';
-                }).length} Online
+                }).length} {t('devices.online')}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1817,7 +1820,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                 {devices.filter(device => {
                   const deviceStatus = getDeviceStatus(deviceData[device.client_id], device.client_id);
                   return deviceStatus.status === 'Offline';
-                }).length} Offline
+                }).length} {t('devices.offline')}
               </Typography>
             </Box>
           </Box>
@@ -1827,7 +1830,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
             color: currentTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
             fontStyle: 'italic'
           }}>
-            Last updated: {new Date().toLocaleTimeString('en-GB', { hour12: false })}
+            {t('time.lastUpdated')}: {new Date().toLocaleTimeString('en-GB', { hour12: false })}
           </Typography>
         </Box>
       </Box>
@@ -1864,7 +1867,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                   fontSize: '0.75rem'
                 }}
               >
-                Sort A-Z
+                {t('devices.sortAZ')}
               </Button>
               <Button 
                 variant={sortOrder === "desc" ? "contained" : "outlined"}
@@ -1876,7 +1879,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                   fontSize: '0.75rem'
                 }}
               >
-                Sort Z-A
+                {t('devices.sortZA')}
               </Button>
             </Box>
           </Box>
@@ -1898,10 +1901,10 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                 >
                   <AddIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
                   <Typography variant="h6" gutterBottom>
-                    No Devices Found
+                    {t('devices.noDevicesFound')}
                   </Typography>
                   <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                    Get started by adding your first device
+                    {t('devices.getStarted')}
                   </Typography>
                   <Button 
                     variant="contained" 
@@ -1909,7 +1912,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                     startIcon={<AddIcon />}
                     onClick={() => setAddDeviceOpen(true)}
                   >
-                    Add New Device
+                    {t('devices.addDevice')}
                   </Button>
                 </Paper>
               </Grid>
@@ -1960,7 +1963,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                       >
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                           <Typography variant="h6" sx={{ color: '#E0E0E0' }}>
-                            {device.device_name || 'Unknown Device'}
+                            {device.device_name || t('devices.unknownDevice')}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <IconButton
@@ -2001,7 +2004,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
 
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                           <Typography variant="body2" color="textSecondary" sx={{ color: 'rgba(224,224,224,0.8)' }}>
-                            ID: {showId[device.client_id] ? device.client_id : '••••••••••'}
+                            {t('devices.id')}: {showId[device.client_id] ? device.client_id : '••••••••••'}
                           </Typography>
                           <IconButton 
                             size="small" 
@@ -2070,7 +2073,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                               letterSpacing: '0.5px',
                               fontSize: '0.7rem'
                             }}>
-                              I/O States
+                              {t('devices.ioStates')}
                             </Typography>
                             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
                               <Box>
@@ -2083,7 +2086,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                                       backgroundColor: deviceStates[device.client_id]?.in1_state ? '#4caf50' : '#f44336' 
                                     }} />
                                     <Typography variant="caption" sx={{ color: '#E0E0E0', fontSize: '0.7rem' }}>
-                                      IN1: {deviceStates[device.client_id]?.in1_state ? 'ON' : 'OFF'}
+                                      IN1: {deviceStates[device.client_id]?.in1_state ? t('devices.on') : t('devices.off')}
                                     </Typography>
                                   </Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -2094,7 +2097,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                                       backgroundColor: deviceStates[device.client_id]?.in2_state ? '#4caf50' : '#f44336' 
                                     }} />
                                     <Typography variant="caption" sx={{ color: '#E0E0E0', fontSize: '0.7rem' }}>
-                                      IN2: {deviceStates[device.client_id]?.in2_state ? 'ON' : 'OFF'}
+                                      IN2: {deviceStates[device.client_id]?.in2_state ? t('devices.on') : t('devices.off')}
                                     </Typography>
                                   </Box>
                                 </Box>
@@ -2110,7 +2113,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                                       backgroundColor: deviceStates[device.client_id]?.out1_state ? '#4caf50' : '#f44336' 
                                     }} />
                                     <Typography variant="caption" sx={{ color: '#E0E0E0', fontSize: '0.7rem' }}>
-                                      OUT1: {deviceStates[device.client_id]?.out1_state ? 'ON' : 'OFF'}
+                                      OUT1: {deviceStates[device.client_id]?.out1_state ? t('devices.on') : t('devices.off')}
                                     </Typography>
                                   </Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -2121,7 +2124,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                                       backgroundColor: deviceStates[device.client_id]?.out2_state ? '#4caf50' : '#f44336' 
                                     }} />
                                     <Typography variant="caption" sx={{ color: '#E0E0E0', fontSize: '0.7rem' }}>
-                                      OUT2: {deviceStates[device.client_id]?.out2_state ? 'ON' : 'OFF'}
+                                      OUT2: {deviceStates[device.client_id]?.out2_state ? t('devices.on') : t('devices.off')}
                                     </Typography>
                                   </Box>
                                 </Box>
@@ -2132,7 +2135,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                               <Box sx={{ mt: 0.75, pt: 0.75, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                                   <Typography variant="caption" sx={{ color: 'rgba(224,224,224,0.7)', fontSize: '0.7rem' }}>
-                                    Motor:
+                                    {t('devices.motor')}:
                                   </Typography>
                                   <Typography variant="caption" sx={{ color: '#E0E0E0', fontWeight: 600, fontSize: '0.7rem' }}>
                                     {deviceStates[device.client_id]?.motor_speed}%
@@ -2183,13 +2186,13 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                                 letterSpacing: '0.5px', 
                                 fontSize: '0.7rem'
                               }}>
-                                Metrics
+                                {t('metrics.title')}
                               </Typography>
                               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                 {metrics.map(([key, value]) => {
                                   const formattedValue = typeof value === 'number' ? value.toFixed(1) : value;
                                   const unit = key === 'temperature' ? '°C' : key === 'humidity' ? '%' : key === 'pressure' ? ' hPa' : '';
-                                  const label = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+                                  const label = t(`metrics.${key}`, { defaultValue: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ') });
 
                                   return (
                                     <Box key={key} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -2210,7 +2213,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 'auto', pt: 1, color: 'rgba(224,224,224,0.7)' }}>
                           <Box sx={{ width: 10, height: 10, borderRadius: '50%', background: 'linear-gradient(90deg, #2196f3, #4caf50)' }} />
                           <Typography variant="caption" sx={{ color: 'rgba(224,224,224,0.75)' }}>
-                            {latestData.timestamp ? new Date(latestData.timestamp).toLocaleString('en-GB', { hour12: false }) : 'Never'}
+                            {latestData.timestamp ? new Date(latestData.timestamp).toLocaleString('en-GB', { hour12: false }) : t('time.never')}
                           </Typography>
                         </Box>
 
@@ -2222,7 +2225,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                           pt: 1,
                           borderTop: `1px solid ${theme.palette.divider}`
                         }}>
-                          <Tooltip title="Configure Metrics">
+                          <Tooltip title={t('devices.configure')}>
                             <IconButton
                               size="small"
                               onClick={(e) => {
@@ -2233,7 +2236,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                               <SettingsIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Edit Device">
+                          <Tooltip title={t('devices.editDevice')}>
                             <IconButton
                               size="small"
                               onClick={(e) => {
@@ -2244,7 +2247,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                               <EditIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete Device">
+                          <Tooltip title={t('devices.deleteDevice')}>
                             <IconButton
                               size="small"
                               onClick={(e) => {
@@ -2288,10 +2291,10 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                     <Box sx={{ textAlign: 'center' }}>
                       <AddIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
                       <Typography variant="h6" color="primary">
-                        Add New Device
+                        {t('devices.addDevice')}
                       </Typography>
                       <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                        Click to register a new device
+                        {t('devices.clickToRegister')}
                       </Typography>
                     </Box>
                   </Paper>
@@ -2338,12 +2341,12 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           }
         }}
       >
-        <DialogTitle sx={{ color: '#E0E0E0' }}>Add New Device</DialogTitle>
+        <DialogTitle sx={{ color: '#E0E0E0' }}>{t('devices.addDevice')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Device Name"
+            label={t('devices.deviceName')}
             fullWidth
             value={newDeviceName}
             onChange={(e) => setNewDeviceName(e.target.value)}
@@ -2351,16 +2354,16 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           />
           <TextField
             margin="dense"
-            label="Client ID"
+            label={t('devices.clientId')}
             fullWidth
             value={newClientId}
             onChange={(e) => setNewClientId(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddDeviceOpen(false)}>Cancel</Button>
+          <Button onClick={() => setAddDeviceOpen(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleAddDevice} variant="contained" color="primary">
-            Add Device
+            {t('devices.addDevice')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2388,16 +2391,16 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           }
         }}
       >
-        <DialogTitle sx={{ color: '#E0E0E0' }}>Delete Device</DialogTitle>
+        <DialogTitle sx={{ color: '#E0E0E0' }}>{t('devices.deleteDevice')}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
-            Are you sure you want to delete this device? This action cannot be undone.
+            {t('devices.deleteDeviceConfirm')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setDeleteDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Delete
+            {t('common.delete')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2440,15 +2443,15 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           }
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #4caf50, #2196f3)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Edit Device</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #4caf50, #2196f3)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t('devices.editDevice')}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ color: 'rgba(224, 224, 224, 0.7)', mb: 1 }}>
-            Update device name or client ID.
+            {t('devices.updateDeviceInfo')}
           </DialogContentText>
           <TextField
             autoFocus
             margin="dense"
-            label="Device Name"
+            label={t('devices.deviceName')}
             type="text"
             fullWidth
             variant="outlined"
@@ -2458,7 +2461,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           />
           <TextField
             margin="dense"
-            label="Client ID"
+            label={t('devices.clientId')}
             type="text"
             fullWidth
             variant="outlined"
@@ -2466,13 +2469,13 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
             onChange={handleClientIdChange}
             onBlur={handleClientIdBlur}
             sx={{ mb: 2 }}
-            helperText="Warning: Changing Client ID will create a new device and delete the old one"
+            helperText={t('devices.clientIdWarning')}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseEditDialog} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>Cancel</Button>
+          <Button onClick={handleCloseEditDialog} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>{t('common.cancel')}</Button>
           <Button onClick={handleEditDevice} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600, borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>
-            Save
+            {t('common.save')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2499,37 +2502,36 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           }
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #ff9800, #e91e63)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Warning: Changing Client ID</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #ff9800, #e91e63)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t('devices.warningChangingClientId')}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ color: 'rgba(224, 224, 224, 0.85)' }}>
-            You are about to change the device's Client ID from "{editingDevice?.client_id}" to "{newClientId}". 
-            This action will:
+            {t('devices.clientIdChangeEffects', { old: editingDevice?.client_id, new: newClientId })}
           </DialogContentText>
           <Box component="ul" sx={{ mt: 1, mb: 2 }}>
             <Box component="li">
               <DialogContentText>
-                Create a new device entry with the new Client ID
+                {t('devices.createNewDevice')}
               </DialogContentText>
             </Box>
             <Box component="li">
               <DialogContentText>
-                Delete the old device entry
+                {t('devices.deleteOldDevice')}
               </DialogContentText>
             </Box>
             <Box component="li">
               <DialogContentText>
-                Potentially affect any existing data or connections
+                {t('devices.affectData')}
               </DialogContentText>
             </Box>
           </Box>
           <DialogContentText sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
-            Are you sure you want to proceed with this change?
+            {t('devices.confirmProceed')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setClientIdWarningOpen(false)} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>Cancel</Button>
+          <Button onClick={() => setClientIdWarningOpen(false)} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>{t('common.cancel')}</Button>
           <Button onClick={handleClientIdChangeConfirm} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600, borderColor: 'warning.main', color: 'warning.main', '&:hover': { borderColor: 'warning.dark', backgroundColor: 'rgba(255,152,0,0.06)' } }}>
-            Proceed with Change
+            {t('devices.proceedWithChange')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2558,17 +2560,17 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           }
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #4caf50, #2196f3)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Configure Device</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #4caf50, #2196f3)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t('devices.deviceConfiguration')}</DialogTitle>
         <DialogContent>
           {/* Implement the logic to configure the device */}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfigureDialogOpen(false)} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>Cancel</Button>
+          <Button onClick={() => setConfigureDialogOpen(false)} variant="outlined" sx={{ textTransform: 'none', borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>{t('common.cancel')}</Button>
           <Button onClick={() => {
             setConfigureDialogOpen(false);
-            showSnackbar('Device configuration updated successfully', 'success');
+            showSnackbar(t('devices.deviceConfigUpdated'), 'success');
           }} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600, borderColor: 'text.secondary', color: 'text.primary', '&:hover': { borderColor: 'text.primary', backgroundColor: 'rgba(0,0,0,0.04)' } }}>
-            Save
+            {t('common.save')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2612,16 +2614,16 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           }
         }}
       >
-        <DialogTitle id="logout-dialog-title" sx={{ color: '#E0E0E0' }}>{"Confirm Logout"}</DialogTitle>
+        <DialogTitle id="logout-dialog-title" sx={{ color: '#E0E0E0' }}>{t('logout.confirm')}</DialogTitle>
         <DialogContent>
           <DialogContentText id="logout-dialog-description" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
-            Are you sure you want to log out?
+            {t('logout.message')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleLogoutCancel}>Cancel</Button>
+          <Button onClick={handleLogoutCancel}>{t('logout.cancel')}</Button>
           <Button onClick={handleLogoutConfirm} autoFocus>
-            Logout
+            {t('logout.logout')}
           </Button>
         </DialogActions>
       </Dialog>

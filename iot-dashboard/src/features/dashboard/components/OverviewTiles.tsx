@@ -1,5 +1,6 @@
 import React from 'react';
 import { Grid, Paper, Typography, Box, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button, List, ListItem, ListItemIcon, ListItemText, useTheme } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
 import InfoIcon from '@mui/icons-material/Info';
@@ -241,11 +242,12 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
   triggeredAlarms,
   deviceState
 }) => {
+  const { t } = useTranslation();
 
   if (!metricsData || !metricsConfig || !selectedVariables) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography>Loading metrics...</Typography>
+        <Typography>{t('dashboard.loadingMetrics')}</Typography>
       </Box>
     );
   }
@@ -338,14 +340,14 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
                   WebkitTextFillColor: 'transparent', 
                   lineHeight: 1.2 
                 }}>
-                  Device Status
+                  {t('dashboard.deviceStatus')}
                 </Typography>
               </Box>
             </Grid>
             {/* Input States - Grouped together (2 per row) */}
             <Grid item xs={6} sm={6}>
               <OverviewTile
-                title="Input 1"
+                title={t('dashboard.input1')}
                 value={deviceState.in1_state === 1 ? 'ON' : 'OFF'}
                 icon={undefined}
                 color="#2196f3"
@@ -357,7 +359,7 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
 
             <Grid item xs={6} sm={6}>
               <OverviewTile
-                title="Input 2"
+                title={t('dashboard.input2')}
                 value={deviceState.in2_state === 1 ? 'ON' : 'OFF'}
                 icon={undefined}
                 color="#2196f3"
@@ -370,7 +372,7 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
             {/* Output States - Grouped together (2 per row) */}
             <Grid item xs={6} sm={6}>
               <OverviewTile
-                title="Output 1"
+                title={t('dashboard.output1')}
                 value={deviceState.out1_state === 1 ? 'ON' : 'OFF'}
                 icon={undefined}
                 color="#2196f3"
@@ -382,7 +384,7 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
 
             <Grid item xs={6} sm={6}>
               <OverviewTile
-                title="Output 2"
+                title={t('dashboard.output2')}
                 value={deviceState.out2_state === 1 ? 'ON' : 'OFF'}
                 icon={undefined}
                 color="#2196f3"
@@ -395,7 +397,7 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
             {/* Charging Status */}
             <Grid item xs={6} sm={6} md={4} lg={3}>
               <OverviewTile
-                title="Charging"
+                title={t('dashboard.charging')}
                 value={deviceState.charging === 1 ? 'ON' : 'OFF'}
                 icon={undefined}
                 color="#2196f3"
@@ -408,7 +410,7 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
             {/* Motor Speed */}
             <Grid item xs={6} sm={6} md={4} lg={3}>
               <OverviewTile
-                title="Motor Speed"
+                title={t('dashboard.motorSpeed')}
                 value={deviceState.motor_speed || 0}
                 unit="%"
                 icon={undefined}
@@ -421,7 +423,7 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
             {/* Power Saving */}
             <Grid item xs={6} sm={6} md={4} lg={3}>
               <OverviewTile
-                title="Power Saving"
+                title={t('dashboard.powerSaving')}
                 value={deviceState.power_saving === 1 ? 'ON' : 'OFF'}
                 icon={undefined}
                 color="#2196f3"
@@ -434,7 +436,7 @@ const OverviewTiles: React.FC<OverviewTilesProps> = ({
         ) : (
           <Grid item xs={12}>
             <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 2 }}>
-              No device state data available
+              {t('dashboard.noDeviceStateData')}
             </Typography>
           </Grid>
         )}

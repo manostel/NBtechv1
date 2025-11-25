@@ -22,6 +22,7 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import BatterySaverIcon from '@mui/icons-material/BatterySaver';
 import PowerIcon from '@mui/icons-material/Power';
 import { Device } from '../../../types';
+import { useTranslation } from 'react-i18next';
 
 const COMMAND_API_URL = 'https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command';
 // const STATUS_API_URL = 'https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/data-dashboard-state';
@@ -45,6 +46,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
   fetchDeviceState,
   setSnackbar
 }) => {
+  const { t } = useTranslation();
   const [output1State, setOutput1State] = useState(false);
   const [output2State, setOutput2State] = useState(false);
   const [motorSpeed, setMotorSpeed] = useState('');
@@ -168,14 +170,14 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       }
       setSnackbar({
         open: true,
-        message: `LED ${led} state updated successfully`,
+        message: t('commands.ledStateUpdated', { led }),
         severity: 'success'
       });
     } catch (error: any) {
       console.error('Error in handleSwitchChange:', error);
       setSnackbar({
         open: true,
-        message: error.message || 'Failed to update switch state',
+        message: error.message || t('commands.failedUpdateSwitch'),
         severity: 'error'
       });
     } finally {
@@ -212,14 +214,14 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       }
       setSnackbar({
         open: true,
-        message: `Power saving mode updated to ${isOn ? 'ON' : 'OFF'}`,
+        message: t('commands.powerSavingUpdated', { state: isOn ? 'ON' : 'OFF' }),
         severity: 'success'
       });
     } catch (error: any) {
       console.error('Error in handlePowerSavingChange:', error);
       setSnackbar({
         open: true,
-        message: error.message || 'Failed to update power saving mode',
+        message: error.message || t('commands.failedUpdatePowerSaving'),
         severity: 'error'
       });
     } finally {
@@ -236,13 +238,13 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       setError(null);
       setCommandFeedback({
         show: true,
-        message: 'Sending speed command...',
+        message: t('commands.sendingSpeedCommand'),
         loading: true
       });
 
       const speed = parseInt(motorSpeed);
       if (isNaN(speed) || speed < 0 || speed > 100) {
-        throw new Error('Speed must be between 0 and 100');
+        throw new Error(t('commands.speedRangeError'));
       }
 
       // Send the command directly using the internal sendCommand function
@@ -263,7 +265,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
         setMotorSpeed(finalState.motor_speed?.toString() || "0");
         setCommandFeedback({
           show: true,
-          message: 'Speed updated successfully',
+          message: t('commands.speedUpdated'),
           loading: false
         });
       }
@@ -272,7 +274,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       setError(error.message);
       setCommandFeedback({
         show: true,
-        message: error.message || 'Failed to update speed',
+        message: error.message || t('commands.failedUpdateSpeed'),
         loading: false
       });
     } finally {
@@ -288,7 +290,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
 
       setSnackbar({
         open: true,
-        message: 'Restart command sent successfully',
+        message: t('commands.restartCommandSent'),
         severity: 'success'
       });
 
@@ -313,7 +315,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       console.error('Error in handleRestart:', error);
       setSnackbar({
         open: true,
-        message: error.message || 'Failed to restart device',
+        message: error.message || t('commands.failedRestart'),
         severity: 'error'
       });
     } finally {
@@ -340,7 +342,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       }}>
         <CircularProgress size={60} />
         <Typography variant="body2" color="text.secondary">
-          Processing command...
+          {t('commands.processingCommand')}
         </Typography>
       </Box>
     );
@@ -392,7 +394,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                 <PowerIcon sx={{ color: 'rgba(224, 224, 224, 0.7)', fontSize: '1.1rem', mr: 1 }} />
                 <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#E0E0E0' }}>
-                  Output Controls
+                  {t('commands.outputControls')}
                 </Typography>
               </Box>
 
@@ -410,11 +412,11 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                      Output 1
+                      {t('commands.output1')}
                     </Typography>
                     <Chip 
                       size="small" 
-                      label={output1State ? 'ON' : 'OFF'} 
+                      label={output1State ? t('devices.on') : t('devices.off')} 
                       variant="outlined"
                       color={output1State ? 'success' : 'default'}
                       sx={{ fontSize: '0.75rem', height: '20px' }}
@@ -452,11 +454,11 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                      Output 2
+                      {t('commands.output2')}
                     </Typography>
                     <Chip 
                       size="small" 
-                      label={output2State ? 'ON' : 'OFF'} 
+                      label={output2State ? t('devices.on') : t('devices.off')} 
                       variant="outlined"
                       color={output2State ? 'success' : 'default'}
                       sx={{ fontSize: '0.75rem', height: '20px' }}
@@ -519,13 +521,13 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                 <SpeedIcon sx={{ color: 'rgba(224, 224, 224, 0.7)', fontSize: '1.1rem', mr: 1 }} />
                 <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#E0E0E0' }}>
-                  Motor Speed
+                  {t('commands.motorSpeed')}
                 </Typography>
               </Box>
 
               <form onSubmit={handleSpeedSubmit}>
                 <TextField
-                  label="Speed (0-100)"
+                  label={t('commands.motorSpeed') + ' (0-100)'}
                   type="number"
                   value={motorSpeed}
                   onChange={(e) => setMotorSpeed(e.target.value)}
@@ -568,7 +570,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                     }
                   }}
                 >
-                  {isVerifying ? 'Setting Speed...' : 'Set Speed'}
+                  {isVerifying ? t('commands.sendingSpeedCommand') : t('commands.motorSpeed')}
                 </Button>
               </form>
 
@@ -615,7 +617,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
               <BatterySaverIcon sx={{ fontSize: '1.1rem', color: 'rgba(224, 224, 224, 0.7)', mr: 1 }} />
               <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#E0E0E0' }}>
-                Power Saving Mode
+                {t('commands.powerSaving')}
               </Typography>
             </Box>
             <Box sx={{ 
@@ -630,11 +632,11 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                  Status
+                  {t('common.status', { defaultValue: 'Status' })}
                 </Typography>
                 <Chip 
                   size="small" 
-                  label={powerSavingMode ? 'Enabled' : 'Disabled'} 
+                  label={powerSavingMode ? t('alarms.enabled') : t('alarms.disabled')} 
                   variant="outlined"
                   color={powerSavingMode ? 'success' : 'default'}
                   sx={{ fontSize: '0.75rem', height: '20px' }}
@@ -685,7 +687,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
               <RestartAltIcon sx={{ fontSize: '1.1rem', color: 'rgba(224, 224, 224, 0.7)', mr: 1 }} />
               <Typography variant="subtitle2" sx={{ fontWeight: 500, color: '#E0E0E0' }}>
-                Restart Device
+                {t('commands.restartDevice')}
               </Typography>
             </Box>
 
@@ -708,7 +710,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                 }
               }}
             >
-              Restart Device
+              {t('commands.restart')}
             </Button>
           </CardContent>
         </Card>
@@ -728,15 +730,15 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
 
     {/* Restart Confirmation Dialog */}
     <Dialog open={restartDialogOpen} onClose={closeRestartDialog} maxWidth="xs" fullWidth>
-      <DialogTitle>Restart device?</DialogTitle>
+      <DialogTitle>{t('commands.restartDevice')}</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          This will immediately send a restart command to the device. Ongoing operations will be interrupted. Do you want to proceed?
+          {t('commands.restartConfirm')}
         </DialogContentText>
       </DialogContent>
       <DialogActions>
-        <Button onClick={closeRestartDialog} variant="outlined">Cancel</Button>
-        <Button onClick={confirmRestart} variant="contained" color="error">Restart</Button>
+        <Button onClick={closeRestartDialog} variant="outlined">{t('common.cancel')}</Button>
+        <Button onClick={confirmRestart} variant="contained" color="error">{t('commands.restart')}</Button>
       </DialogActions>
     </Dialog>
   </Box>

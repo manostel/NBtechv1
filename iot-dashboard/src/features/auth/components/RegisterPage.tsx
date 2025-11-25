@@ -1,9 +1,10 @@
 import React, { useState, FormEvent } from "react";
 import { Helmet } from "react-helmet";
-import { Box, Button, TextField, Typography, Paper, InputAdornment, IconButton, CircularProgress, useTheme } from "@mui/material";
+import { Box, Button, TextField, Typography, Paper, InputAdornment, IconButton, CircularProgress, useTheme, Select, MenuItem, FormControl } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { Visibility, VisibilityOff, ArrowBack } from '@mui/icons-material';
+import { Visibility, VisibilityOff, ArrowBack, Language as LanguageIcon } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { SelectChangeEvent } from "@mui/material";
 import { User } from "../../../types";
 
 // Use the same API endpoint as your Lambda
@@ -14,7 +15,7 @@ interface RegisterPageProps {
 }
 
 const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
@@ -22,8 +23,16 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [language, setLanguage] = useState<string>(() => i18n.language || 'en');
   const navigate = useNavigate();
   const theme = useTheme();
+
+  const handleLanguageChange = (e: SelectChangeEvent<string>) => {
+    const newLanguage = e.target.value;
+    setLanguage(newLanguage);
+    i18n.changeLanguage(newLanguage);
+    localStorage.setItem('i18nextLng', newLanguage);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -104,6 +113,77 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister }) => {
         }
       }}
     >
+      {/* Language Selector - Top Right of Screen */}
+      <Box sx={{ 
+        position: 'fixed', 
+        top: 16, 
+        right: 16,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        zIndex: 1000
+      }}>
+        <LanguageIcon 
+          sx={{ 
+            fontSize: '1.2rem', 
+            color: theme.palette.text.primary,
+            opacity: 0.8
+          }} 
+        />
+        <FormControl 
+          size="small" 
+          sx={{ 
+            minWidth: 120,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+              backgroundColor: theme.palette.mode === 'dark' 
+                ? 'rgba(26, 31, 60, 0.8)' 
+                : 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(10px)',
+              '&:hover': {
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(26, 31, 60, 0.9)' 
+                  : 'rgba(255, 255, 255, 0.95)',
+              },
+              '&.Mui-focused': {
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(26, 31, 60, 0.95)' 
+                  : 'rgba(255, 255, 255, 1)',
+              }
+            },
+            '& .MuiSelect-select': {
+              py: 1,
+              fontSize: '0.875rem',
+              color: theme.palette.text.primary,
+            }
+          }}
+        >
+          <Select
+            value={language}
+            onChange={handleLanguageChange}
+            sx={{
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.2)' 
+                  : 'rgba(0, 0, 0, 0.2)',
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.3)' 
+                  : 'rgba(0, 0, 0, 0.3)',
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.mode === 'dark' 
+                  ? '#4caf50' 
+                  : '#1976d2',
+              }
+            }}
+          >
+            <MenuItem value="en">English</MenuItem>
+            <MenuItem value="el">Ελληνικά</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
       <Helmet>
         <title>Register | IoT Dashboard</title>
         <meta name="description" content="Register for your IoT Dashboard" />

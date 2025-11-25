@@ -57,54 +57,55 @@ import { useTheme } from '@mui/material/styles';
 // @ts-ignore
 import SubscriptionNotificationService from '../../../utils/SubscriptionNotificationService';
 import { Device, User } from '../../../types';
+import { useTranslation } from 'react-i18next';
 
 // API Configuration
 const SUBSCRIPTIONS_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/manage-subscriptions";
 const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 
-// Parameter type configurations
+// Parameter type configurations - will be translated in component
 const PARAMETER_TYPES: any = {
   inputs: {
-    label: 'Inputs',
+    labelKey: 'subscriptions.inputs',
     icon: <InputIcon />,
     parameters: ['inputs.IN1', 'inputs.IN2']
   },
   outputs: {
-    label: 'Outputs', 
+    labelKey: 'subscriptions.outputs',
     icon: <OutputIcon />,
     parameters: ['outputs.OUT1', 'outputs.OUT2', 'outputs.speed', 'outputs.charging']
   },
   metrics: {
-    label: 'Metrics',
+    labelKey: 'subscriptions.metrics',
     icon: <TrendingUpIcon />,
     parameters: ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure']
   },
   variables: {
-    label: 'Variables',
+    labelKey: 'subscriptions.variables',
     icon: <SettingsIcon />,
     parameters: ['motor_speed', 'power_saving', 'outputs.power_saving']
   },
   status: {
-    label: 'Status',
+    labelKey: 'subscriptions.status',
     icon: <DeviceIcon />,
     parameters: ['status']
   }
 };
 
-// Condition types for subscriptions
-const CONDITION_TYPES = [
-  { value: 'change', label: 'Any Change', description: 'Notify on any value change' },
-  { value: 'above', label: 'Above Threshold', description: 'Notify when value exceeds threshold' },
-  { value: 'below', label: 'Below Threshold', description: 'Notify when value falls below threshold' },
-  { value: 'equals', label: 'Equals Value', description: 'Notify when value equals specific value' },
-  { value: 'not_equals', label: 'Not Equals Value', description: 'Notify when value does not equal specific value' }
+// Condition types for subscriptions - will be translated in component
+const getConditionTypes = (t: any) => [
+  { value: 'change', label: t('subscriptions.anyChange'), description: t('subscriptions.notifyOnChange', { param: '{{param}}' }) },
+  { value: 'above', label: t('subscriptions.aboveThreshold'), description: t('subscriptions.notifyAbove', { param: '{{param}}', value: '{{value}}' }) },
+  { value: 'below', label: t('subscriptions.belowThreshold'), description: t('subscriptions.notifyBelow', { param: '{{param}}', value: '{{value}}' }) },
+  { value: 'equals', label: t('subscriptions.equalsValue'), description: t('subscriptions.notifyEquals', { param: '{{param}}', value: '{{value}}' }) },
+  { value: 'not_equals', label: t('subscriptions.notEqualsValue'), description: t('subscriptions.notifyNotEquals', { param: '{{param}}', value: '{{value}}' }) }
 ];
 
-// Notification methods
-const NOTIFICATION_METHODS = [
-  { value: 'in_app', label: 'In-App Notification', description: 'Show notification in dashboard' },
-  { value: 'email', label: 'Email Alert', description: 'Send email notification' },
-  { value: 'both', label: 'Both', description: 'In-app and email notifications' }
+// Notification methods - will be translated in component
+const getNotificationMethods = (t: any) => [
+  { value: 'in_app', label: t('subscriptions.inAppNotification'), description: t('subscriptions.showNotificationInDashboard') },
+  { value: 'email', label: t('subscriptions.emailAlert'), description: t('subscriptions.sendEmailNotification') },
+  { value: 'both', label: t('subscriptions.both'), description: t('subscriptions.inAppAndEmail') }
 ];
 
 interface DashboardSubscriptionsTabProps {
@@ -118,6 +119,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
   user, 
   onNotification 
 }) => {
+  const { t } = useTranslation();
   console.log('DashboardSubscriptionsTab rendering with:', { device, user, onNotification });
   const theme = useTheme();
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
@@ -248,7 +250,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
         console.log('Subscription API not available, showing demo interface');
         setSubscriptions([]);
       } else {
-        setError('Failed to load subscriptions');
+        setError(t('subscriptions.failedLoadSubscriptions'));
       }
     } finally {
       setLoading(false);
@@ -330,7 +332,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
     try {
       // Check limits before creating
       if (!userLimits.can_create_more) {
-        setError(`Maximum subscription limit reached (${userLimits.max_subscriptions}). Please delete some subscriptions first.`);
+        setError(t('subscriptions.maximumLimitReached', { max: userLimits.max_subscriptions }));
         return;
       }
 
@@ -349,7 +351,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
       );
       
       if (isMonitoringOutputs && hasOutputCommandsOnSameDevice && existingOutputSubscriptions.length > 0) {
-        setError('⚠️ Loop Prevention: Cannot create subscription that monitors outputs on a device that already has output subscriptions. This would create an infinite loop.');
+        setError(t('subscriptions.loopPrevention'));
         return;
       }
 
@@ -397,7 +399,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
       if (!response.ok) {
         // If API doesn't exist yet, show setup message
         if (response.status === 404 || response.status === 500) {
-          setError('Subscription API not deployed yet. Please deploy the Lambda functions first.');
+          setError(t('subscriptions.subscriptionApiNotDeployed'));
           setLoading(false);
           return;
         }
@@ -406,8 +408,8 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
 
       const result = await response.json();
       if (result.success) {
-        setSuccess('Subscription created successfully');
-        setSnackbarMessage('Subscription created successfully');
+        setSuccess(t('subscriptions.subscriptionCreated'));
+        setSnackbarMessage(t('subscriptions.subscriptionCreated'));
         setSnackbarSeverity('success');
         setSnackbarOpen(true);
         setCreateDialogOpen(false);
@@ -415,7 +417,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
         loadSubscriptions();
         loadUserLimits(); // Refresh limits
       } else {
-        const errorMsg = result.error || 'Failed to create subscription';
+        const errorMsg = result.error || t('subscriptions.failedCreateSubscription');
         console.log('Subscription creation error:', errorMsg);
         setDialogError(errorMsg);
         setError(null); // Clear main page error
@@ -425,9 +427,9 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
     } catch (error: any) {
       console.error('Error creating subscription:', error);
       if (error.message.includes('Failed to fetch')) {
-        setError('Subscription API not available. Please deploy the Lambda functions first.');
+        setError(t('subscriptions.subscriptionApiNotAvailable'));
       } else {
-        setError(error.message || 'Failed to create subscription');
+        setError(error.message || t('subscriptions.failedCreateSubscription'));
       }
     } finally {
       setLoading(false);
@@ -474,15 +476,15 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
 
       const result = await response.json();
       if (result.success) {
-        setSuccess('Subscription updated successfully');
-        setSnackbarMessage('Subscription updated successfully');
+        setSuccess(t('subscriptions.subscriptionUpdated'));
+        setSnackbarMessage(t('subscriptions.subscriptionUpdated'));
         setSnackbarSeverity('success');
         setSnackbarOpen(true);
         setEditDialogOpen(false);
         resetForm();
         loadSubscriptions();
       } else {
-        const errorMsg = result.error || 'Failed to update subscription';
+        const errorMsg = result.error || t('subscriptions.failedUpdateSubscription');
         setDialogError(errorMsg);
         setError(null); // Clear main page error
         setLoading(false);
@@ -490,14 +492,14 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
       }
     } catch (error: any) {
       console.error('Error updating subscription:', error);
-      setError(error.message || 'Failed to update subscription');
+      setError(error.message || t('subscriptions.failedUpdateSubscription'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteSubscription = async (subscriptionId: string) => {
-    if (!window.confirm('Are you sure you want to delete this subscription?')) {
+    if (!window.confirm(t('subscriptions.deleteConfirm'))) {
       return;
     }
 
@@ -522,14 +524,14 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
 
       const result = await response.json();
       if (result.success) {
-        setSuccess('Subscription deleted successfully');
+        setSuccess(t('subscriptions.subscriptionDeleted'));
         loadSubscriptions();
       } else {
-        throw new Error(result.error || 'Failed to delete subscription');
+        throw new Error(result.error || t('subscriptions.failedDeleteSubscription'));
       }
     } catch (error: any) {
       console.error('Error deleting subscription:', error);
-      setError(error.message || 'Failed to delete subscription');
+      setError(error.message || t('subscriptions.failedDeleteSubscription'));
     } finally {
       setLoading(false);
     }
@@ -558,14 +560,14 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
 
       const result = await response.json();
       if (result.success) {
-        setSuccess(`Subscription ${enabled ? 'enabled' : 'disabled'} successfully`);
+        setSuccess(t('subscriptions.subscriptionToggled', { state: enabled ? t('subscriptions.enabled') : t('subscriptions.disabled') }));
         loadSubscriptions();
       } else {
-        throw new Error(result.error || 'Failed to toggle subscription');
+        throw new Error(result.error || t('subscriptions.failedToggleSubscription'));
       }
     } catch (error: any) {
       console.error('Error toggling subscription:', error);
-      setError(error.message || 'Failed to toggle subscription');
+      setError(error.message || t('subscriptions.failedToggleSubscription'));
     } finally {
       setLoading(false);
     }
@@ -662,17 +664,17 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
     
     switch (condition_type) {
       case 'change':
-        return `Notify on any change to ${parameter_name}`;
+        return t('subscriptions.notifyOnChange', { param: parameter_name });
       case 'above':
-        return `Notify when ${parameter_name} > ${threshold_value}`;
+        return t('subscriptions.notifyAbove', { param: parameter_name, value: threshold_value });
       case 'below':
-        return `Notify when ${parameter_name} < ${threshold_value}`;
+        return t('subscriptions.notifyBelow', { param: parameter_name, value: threshold_value });
       case 'equals':
-        return `Notify when ${parameter_name} = ${threshold_value}`;
+        return t('subscriptions.notifyEquals', { param: parameter_name, value: threshold_value });
       case 'not_equals':
-        return `Notify when ${parameter_name} ≠ ${threshold_value}`;
+        return t('subscriptions.notifyNotEquals', { param: parameter_name, value: threshold_value });
       default:
-        return `Monitor ${parameter_name}`;
+        return t('subscriptions.monitor', { param: parameter_name });
     }
   };
 
@@ -732,12 +734,12 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                   {getDeviceName(subscription.device_id)}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
-                  {PARAMETER_TYPES[subscription.parameter_type]?.label} • {subscription.parameter_name}
+                  {t(PARAMETER_TYPES[subscription.parameter_type]?.labelKey || 'subscriptions.status')} • {subscription.parameter_name}
                 </Typography>
               </Box>
             </Box>
             <Chip
-              label={subscription.enabled ? 'Active' : 'Inactive'}
+              label={subscription.enabled ? t('subscriptions.active') : t('subscriptions.inactive')}
               color={subscription.enabled ? 'success' : 'default'}
               size="small"
               sx={{ fontWeight: 600 }}
@@ -752,10 +754,10 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
             
             <Box sx={{ mb: 2 }}>
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, display: 'block', mb: 0.5 }}>
-                Description
+                {t('subscriptions.description')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {subscription.description || 'No description provided'}
+                {subscription.description || t('subscriptions.noDescription')}
               </Typography>
             </Box>
             
@@ -773,11 +775,11 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                   textTransform: 'uppercase',
                   letterSpacing: 0.5
                 }}>
-                  Last Triggered
+                  {t('subscriptions.lastTriggered')}
                 </Typography>
                 {subscription.trigger_count > 0 && (
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                    {subscription.trigger_count} times
+                    {subscription.trigger_count} {t('subscriptions.times')}
                   </Typography>
                 )}
               </Box>
@@ -792,7 +794,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                       second: '2-digit',
                       hour12: false
                     })
-                  : 'Not triggered yet'
+                  : t('subscriptions.notTriggeredYet')
                 }
               </Typography>
             </Box>
@@ -856,7 +858,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
               onClick={() => handleEditSubscription(subscription)}
               sx={{ textTransform: 'none', fontWeight: 500 }}
             >
-              Edit
+              {t('common.edit')}
             </Button>
             <Button
               size="small"
@@ -865,7 +867,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
               onClick={() => handleDeleteSubscription(subscription.subscription_id)}
               sx={{ textTransform: 'none', fontWeight: 500 }}
             >
-              Delete
+              {t('common.delete')}
             </Button>
           </Box>
           <Button
@@ -875,7 +877,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
             onClick={() => handleToggleSubscription(subscription.subscription_id, !subscription.enabled)}
             sx={{ textTransform: 'none', fontWeight: 500 }}
           >
-            {subscription.enabled ? 'Disable' : 'Enable'}
+            {subscription.enabled ? t('subscriptions.disabled') : t('subscriptions.enabled')}
           </Button>
         </CardActions>
       </Card>
@@ -914,20 +916,20 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
     >
       <DialogTitle sx={{ pb: 1 }}>
         <Typography variant="h5" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
-          Configure Device Subscription
+          {t('subscriptions.createSubscription')}
         </Typography>
         <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
-          Set up automated monitoring and responses for your device
+          {t('subscriptions.setupMonitoring', { defaultValue: 'Set up automated monitoring and responses for your device' })}
         </Typography>
       </DialogTitle>
       <DialogContent ref={createDialogContentRef}>
         <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item xs={12}>
         <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-          Trigger Conditions
+          {t('subscriptions.triggerConditions')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Configure the conditions that will activate this subscription
+          {t('subscriptions.configureConditions')}
         </Typography>
         
         {/* Error Display */}
@@ -971,17 +973,17 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
-              <InputLabel>Parameter Type</InputLabel>
+              <InputLabel>{t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}</InputLabel>
               <Select
                 value={formData.parameter_type}
                 onChange={(e) => setFormData({ ...formData, parameter_type: e.target.value, parameter_name: '' })}
-                label="Parameter Type"
+                label={t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}
               >
                 {Object.entries(PARAMETER_TYPES).map(([key, config]: [string, any]) => (
                   <MenuItem key={key} value={key}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       {config.icon}
-                      <Typography sx={{ ml: 1 }}>{config.label}</Typography>
+                      <Typography sx={{ ml: 1 }}>{t(config.labelKey || 'subscriptions.status')}</Typography>
                     </Box>
                   </MenuItem>
                 ))}
@@ -991,11 +993,11 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
-              <InputLabel>Parameter</InputLabel>
+              <InputLabel>{t('subscriptions.parameter')}</InputLabel>
               <Select
                 value={formData.parameter_name}
                 onChange={(e) => setFormData({ ...formData, parameter_name: e.target.value })}
-                label="Parameter"
+                label={t('subscriptions.parameter')}
                 disabled={!formData.parameter_type}
               >
                 {formData.parameter_type && PARAMETER_TYPES[formData.parameter_type]?.parameters.map((param: string) => (
@@ -1009,13 +1011,13 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
-              <InputLabel>Condition</InputLabel>
+              <InputLabel>{t('subscriptions.condition')}</InputLabel>
               <Select
                 value={formData.condition_type}
                 onChange={(e) => setFormData({ ...formData, condition_type: e.target.value })}
-                label="Condition"
+                label={t('subscriptions.condition')}
               >
-                {CONDITION_TYPES.map((condition) => (
+                {getConditionTypes(t).map((condition) => (
                   <MenuItem key={condition.value} value={condition.value}>
                     <Box>
                       <Typography>{condition.label}</Typography>
@@ -1034,11 +1036,11 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Threshold Value"
+                label={t('subscriptions.threshold')}
                 value={formData.threshold_value}
                 onChange={(e) => setFormData({ ...formData, threshold_value: e.target.value })}
                 type="number"
-                helperText="Enter the threshold value for this condition"
+                helperText={t('subscriptions.enterThreshold', { defaultValue: 'Enter the threshold value for this condition' })}
               />
             </Grid>
           )}
@@ -1046,7 +1048,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Cooldown (seconds)"
+              label={t('subscriptions.cooldownSeconds')}
               value={formData.cooldown_ms ? Math.floor(formData.cooldown_ms / 1000) : ''}
               onChange={(e) => {
                 const inputValue = e.target.value;
@@ -1063,14 +1065,14 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
               }}
               type="number"
               inputProps={{ min: 0 }}
-              helperText="Minimum time between triggers. Set 0 to disable cooldown."
+              helperText={t('subscriptions.cooldownHelper')}
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Custom Tolerance (%)"
+              label={t('subscriptions.customTolerance')}
               value={formData.tolerance_percent}
               onChange={(e) => {
                 // Only allow integers
@@ -1081,20 +1083,20 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
               }}
               type="number"
               inputProps={{ min: 0, max: 100, step: 1 }}
-              helperText="Optional: Custom sensitivity as whole percentage (e.g., 1 = 1%, 2 = 2%). Leave empty for parameter-specific defaults."
-              placeholder="Auto (default)"
+              helperText={t('subscriptions.toleranceHelper')}
+              placeholder={t('subscriptions.autoDefault', { defaultValue: 'Auto (default)' })}
             />
           </Grid>
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
-              <InputLabel>Notification Method</InputLabel>
+              <InputLabel>{t('subscriptions.notificationMethod')}</InputLabel>
               <Select
                 value={formData.notification_method}
                 onChange={(e) => setFormData({ ...formData, notification_method: e.target.value })}
-                label="Notification Method"
+                label={t('subscriptions.notificationMethod')}
               >
-                {NOTIFICATION_METHODS.map((method) => (
+                {getNotificationMethods(t).map((method) => (
                   <MenuItem key={method.value} value={method.value}>
                     <Box>
                       <Typography>{method.label}</Typography>
@@ -1111,21 +1113,21 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Rule Description"
+              label={t('subscriptions.description')}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               multiline
               rows={2}
-              helperText="Provide a descriptive name for this monitoring rule"
+              helperText={t('subscriptions.ruleDescription', { defaultValue: 'Provide a descriptive name for this monitoring rule' })}
             />
           </Grid>
           
           <Grid item xs={12}>
             <Typography variant="h6" gutterBottom sx={{ mt: 3, mb: 1 }}>
-              Command Actions
+              {t('subscriptions.automatedResponses')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Define the commands to execute when the subscription is triggered
+              {t('subscriptions.configureResponses')}
             </Typography>
           </Grid>
           
@@ -1133,7 +1135,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
             <React.Fragment key={index}>
               <Grid item xs={12} sm={3}>
                 <FormControl fullWidth>
-                  <InputLabel>Command {index + 1}</InputLabel>
+                  <InputLabel>{t('subscriptions.action')} {index + 1}</InputLabel>
                   <Select
                     value={command.action}
                     onChange={(e) => {
@@ -1141,13 +1143,13 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                       newCommands[index].action = e.target.value;
                       setFormData({ ...formData, commands: newCommands });
                     }}
-                    label={`Command ${index + 1}`}
+                    label={`${t('subscriptions.action')} ${index + 1}`}
                   >
-                    <MenuItem value="none">No Command</MenuItem>
-                    <MenuItem value="out1">Set OUT1</MenuItem>
-                    <MenuItem value="out2">Set OUT2</MenuItem>
-                    <MenuItem value="motor_speed">Set Motor Speed</MenuItem>
-                    <MenuItem value="power_saving">Set Power Saving</MenuItem>
+                    <MenuItem value="none">{t('subscriptions.noCommand', { defaultValue: 'No Command' })}</MenuItem>
+                    <MenuItem value="out1">{t('subscriptions.setOut1', { defaultValue: 'Set OUT1' })}</MenuItem>
+                    <MenuItem value="out2">{t('subscriptions.setOut2', { defaultValue: 'Set OUT2' })}</MenuItem>
+                    <MenuItem value="motor_speed">{t('subscriptions.setMotorSpeed', { defaultValue: 'Set Motor Speed' })}</MenuItem>
+                    <MenuItem value="power_saving">{t('subscriptions.setPowerSaving', { defaultValue: 'Set Power Saving' })}</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -1155,7 +1157,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
               <Grid item xs={12} sm={3}>
                 {command.action !== 'none' && (
                   <FormControl fullWidth>
-                    <InputLabel>Target Device</InputLabel>
+                    <InputLabel>{t('subscriptions.targetDevice')}</InputLabel>
                     <Select
                       value={command.target_device}
                       onChange={(e) => {
@@ -1163,9 +1165,9 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                         newCommands[index].target_device = e.target.value;
                         setFormData({ ...formData, commands: newCommands });
                       }}
-                      label="Target Device"
+                      label={t('subscriptions.targetDevice')}
                     >
-                      <MenuItem value={formData.device_id}>Same Device</MenuItem>
+                      <MenuItem value={formData.device_id}>{t('subscriptions.sameDevice', { defaultValue: 'Same Device' })}</MenuItem>
                       {devices.filter(d => d.client_id !== formData.device_id).map(device => (
                         <MenuItem key={device.client_id} value={device.client_id}>
                           {device.device_name || device.client_id}
@@ -1180,7 +1182,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                 {command.action !== 'none' && (
                   <TextField
                     fullWidth
-                    label={`Value ${index + 1}`}
+                    label={`${t('subscriptions.value')} ${index + 1}`}
                     value={command.value}
                     onChange={(e) => {
                       const newCommands = [...formData.commands];
@@ -1190,10 +1192,10 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                     placeholder={command.action === 'motor_speed' ? '0-100' : '0 or 1'}
                     helperText={
                       command.action === 'motor_speed' 
-                        ? 'Motor speed (0-100)' 
+                        ? t('subscriptions.motorSpeedHelper', { defaultValue: 'Motor speed (0-100)' })
                         : command.action === 'power_saving'
-                        ? 'Power saving mode (0 or 1)'
-                        : 'Output state (0 or 1)'
+                        ? t('subscriptions.powerSavingHelper', { defaultValue: 'Power saving mode (0 or 1)' })
+                        : t('subscriptions.outputStateHelper', { defaultValue: 'Output state (0 or 1)' })
                     }
                   />
                 )}
@@ -1222,7 +1224,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                   onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
                 />
               }
-              label="Activate subscription"
+              label={t('subscriptions.activateSubscription')}
             />
           </Grid>
         </Grid>
@@ -1232,13 +1234,13 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           setCreateDialogOpen(false);
           setDialogError(null);
           setError(null); // Clear main page error
-        }}>Cancel</Button>
+        }}>{t('common.cancel')}</Button>
         <Button 
           onClick={handleCreateSubscription} 
           variant="contained"
           disabled={loading || !formData.device_id || !formData.parameter_name}
         >
-          {loading ? <CircularProgress size={20} /> : 'Create Subscription'}
+          {loading ? <CircularProgress size={20} /> : t('subscriptions.createSubscription')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -1276,20 +1278,20 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
     >
       <DialogTitle sx={{ pb: 1 }}>
         <Typography variant="h5" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
-          Edit Subscription
+          {t('subscriptions.editSubscription')}
         </Typography>
         <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
-          Modify your existing subscription configuration
+          {t('subscriptions.modifySubscription', { defaultValue: 'Modify your existing subscription configuration' })}
         </Typography>
       </DialogTitle>
       <DialogContent ref={editDialogContentRef}>
         <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item xs={12}>
             <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-              Trigger Conditions
+              {t('subscriptions.triggerConditions')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Configure the conditions that will activate this subscription
+              {t('subscriptions.configureConditions')}
             </Typography>
             
             {/* Error Display */}
@@ -1316,11 +1318,11 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
-              <InputLabel>Device</InputLabel>
+              <InputLabel>{t('devices.title', { defaultValue: 'Device' })}</InputLabel>
               <Select
                 value={formData.device_id}
                 onChange={(e) => setFormData({ ...formData, device_id: e.target.value })}
-                label="Device"
+                label={t('devices.title', { defaultValue: 'Device' })}
               >
                 {devices.map(device => (
                   <MenuItem key={device.client_id} value={device.client_id}>
@@ -1333,15 +1335,15 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
-              <InputLabel>Parameter Type</InputLabel>
+              <InputLabel>{t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}</InputLabel>
               <Select
                 value={formData.parameter_type}
                 onChange={(e) => setFormData({ ...formData, parameter_type: e.target.value, parameter_name: '' })}
-                label="Parameter Type"
+                label={t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}
               >
                 {Object.entries(PARAMETER_TYPES).map(([key, config]: [string, any]) => (
                   <MenuItem key={key} value={key}>
-                    {config.label}
+                    {t(config.labelKey || 'subscriptions.status')}
                   </MenuItem>
                 ))}
               </Select>
@@ -1350,11 +1352,11 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
-              <InputLabel>Parameter</InputLabel>
+              <InputLabel>{t('subscriptions.parameter')}</InputLabel>
               <Select
                 value={formData.parameter_name}
                 onChange={(e) => setFormData({ ...formData, parameter_name: e.target.value })}
-                label="Parameter"
+                label={t('subscriptions.parameter')}
                 disabled={!formData.parameter_type}
               >
                 {getAvailableParameters(formData.device_id, formData.parameter_type).map(param => (
@@ -1368,15 +1370,15 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
-              <InputLabel>Condition</InputLabel>
+              <InputLabel>{t('subscriptions.condition')}</InputLabel>
               <Select
                 value={formData.condition_type}
                 onChange={(e) => setFormData({ ...formData, condition_type: e.target.value })}
-                label="Condition"
+                label={t('subscriptions.condition')}
               >
-                <MenuItem value="change">Any Change</MenuItem>
-                <MenuItem value="above">Above Threshold</MenuItem>
-                <MenuItem value="below">Below Threshold</MenuItem>
+                <MenuItem value="change">{t('subscriptions.anyChange')}</MenuItem>
+                <MenuItem value="above">{t('subscriptions.aboveThreshold')}</MenuItem>
+                <MenuItem value="below">{t('subscriptions.belowThreshold')}</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -1385,11 +1387,11 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Threshold Value"
+                label={t('subscriptions.threshold')}
                 type="number"
                 value={formData.threshold_value}
                 onChange={(e) => setFormData({ ...formData, threshold_value: e.target.value })}
-                placeholder="Enter threshold value"
+                placeholder={t('subscriptions.enterThreshold', { defaultValue: 'Enter threshold value' })}
               />
             </Grid>
           )}
@@ -1397,7 +1399,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Cooldown (seconds)"
+              label={t('subscriptions.cooldownSeconds')}
               value={formData.cooldown_ms ? Math.floor(formData.cooldown_ms / 1000) : ''}
               onChange={(e) => {
                 const inputValue = e.target.value;
@@ -1576,13 +1578,13 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
           setEditDialogOpen(false);
           setDialogError(null);
           setError(null); // Clear main page error
-        }}>Cancel</Button>
+        }}>{t('common.cancel')}</Button>
         <Button 
           onClick={handleUpdateSubscription} 
           variant="contained"
           disabled={loading || !formData.device_id || !formData.parameter_name}
         >
-          {loading ? <CircularProgress size={20} /> : 'Update Subscription'}
+          {loading ? <CircularProgress size={20} /> : t('subscriptions.editSubscription')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -1650,7 +1652,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}>
-              Subscriptions
+              {t('subscriptions.title')}
             </Typography>
             <Button
               variant="outlined"
@@ -1674,7 +1676,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                 }
               }}
             >
-              New Subscription
+              {t('subscriptions.createSubscription')}
             </Button>
           </Box>
         </Box>
@@ -1745,10 +1747,10 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
             <NotificationsIcon sx={{ fontSize: 40, color: 'primary.main' }} />
           </Box>
           <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-            No monitoring rules yet
+            {t('subscriptions.noMonitoringRules')}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
-            Create your first monitoring rule to get automated alerts and responses when device parameters change.
+            {t('subscriptions.createFirstRule')}
           </Typography>
           <Button
             variant="contained"
@@ -1768,7 +1770,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
               fontWeight: 600
             }}
           >
-            Create First Subscription
+            {t('subscriptions.createSubscription')}
           </Button>
         </Paper>
       ) : (

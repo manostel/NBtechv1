@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, Typography, Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, Grid, Divider } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { Visibility, VisibilityOff, Sync, AccessTime, PlayArrow, Info, Close, Build, Storage } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import BatteryIndicator from "../../../components/common/BatteryIndicator";
 import SignalIndicator from "../../../components/common/SignalIndicator";
 
@@ -23,7 +24,8 @@ interface Uptime {
 
 // Shared uptime calculation logic
 const useUptime = (status: string, deviceStartTimeInfo: DeviceStartTimeInfo | null) => {
-  const [currentUptimeDisplay, setCurrentUptimeDisplay] = useState('N/A');
+  const { t } = useTranslation();
+  const [currentUptimeDisplay, setCurrentUptimeDisplay] = useState(t('dashboard.notAvailable'));
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -32,7 +34,7 @@ const useUptime = (status: string, deviceStartTimeInfo: DeviceStartTimeInfo | nu
       const startupTime = new Date(deviceStartTimeInfo.timestamp);
 
       if (startupTime > new Date()) {
-        setCurrentUptimeDisplay('N/A (Future Timestamp)');
+        setCurrentUptimeDisplay(t('dashboard.notAvailableFutureTimestamp'));
         return;
       }
 
@@ -68,7 +70,7 @@ const useUptime = (status: string, deviceStartTimeInfo: DeviceStartTimeInfo | nu
       updateUptime();
       intervalId = setInterval(updateUptime, 1000);
     } else {
-      setCurrentUptimeDisplay('N/A');
+      setCurrentUptimeDisplay(t('dashboard.notAvailable'));
     }
 
     return () => {
@@ -76,7 +78,7 @@ const useUptime = (status: string, deviceStartTimeInfo: DeviceStartTimeInfo | nu
         clearInterval(intervalId);
       }
     };
-  }, [status, deviceStartTimeInfo?.timestamp]);
+  }, [status, deviceStartTimeInfo?.timestamp, t]);
 
   return currentUptimeDisplay;
 };
@@ -113,6 +115,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
   lastTimestamp, 
   currentUptimeDisplay 
 }) => {
+  const { t } = useTranslation();
   const [showClientId, setShowClientId] = useState(false);
 
   // Reset visibility when dialog closes
@@ -173,7 +176,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
         <Box display="flex" alignItems="center" gap={1}>
           <Info sx={{ fontSize: '1.5rem' }} />
           <Typography variant="h6" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-            Device Information
+            {t('dashboard.deviceInfo')}
           </Typography>
         </Box>
         <IconButton 
@@ -203,7 +206,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
                   }}
                 />
                 <Typography variant="body1" sx={{ fontWeight: 400, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                  Status: {status}
+                  {t('dashboard.statusLabel')}: {status}
                 </Typography>
               </Box>
             </Box>
@@ -212,7 +215,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
           <Grid item xs={12} sm={6}>
             <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 300, color: 'grey.300', fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                Device ID
+                {t('dashboard.deviceId')}
               </Typography>
               <IconButton
                 size="small"
@@ -238,7 +241,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
           </Grid>
           <Grid item xs={12} sm={6}>
             <Typography variant="subtitle2" sx={{ fontWeight: 300, mb: 1, color: 'grey.300', fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-              Battery & Signal
+              {t('dashboard.batteryAndSignal')}
             </Typography>
             <Box display="flex" alignItems="center" gap={2}>
               <BatteryIndicator value={batteryLevel} batteryState={batteryState} charging={charging} size="medium" />
@@ -247,14 +250,14 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
           </Grid>
           <Grid item xs={12}>
             <Typography variant="subtitle2" sx={{ fontWeight: 300, mb: 2, color: 'grey.300', fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-              Timing Information
+              {t('dashboard.timingInformation')}
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                   <PlayArrow sx={{ fontSize: '1.2rem' }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 400, fontSize: { xs: '0.9rem', sm: '0.95rem' }, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                    Startup Time
+                    {t('dashboard.startupTime')}
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
@@ -264,7 +267,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
                   borderRadius: 1
                 }}>
                   {deviceStartTimeInfo?.timestamp ? 
-                    (new Date(deviceStartTimeInfo.timestamp) > new Date() ? 'N/A' : 
+                    (new Date(deviceStartTimeInfo.timestamp) > new Date() ? t('dashboard.notAvailable') : 
                     new Date(deviceStartTimeInfo.timestamp).toLocaleString('en-GB', {
                       year: 'numeric',
                       month: '2-digit',
@@ -273,14 +276,14 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
                       minute: '2-digit',
                       second: '2-digit',
                       hour12: false
-                    })) : 'N/A'}
+                    })) : t('dashboard.notAvailable')}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={4}>
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                   <Sync sx={{ fontSize: '1.2rem', animation: 'spin 2s linear infinite', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 400, fontSize: { xs: '0.9rem', sm: '0.95rem' }, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                    Last Sync
+                    {t('dashboard.lastSync')}
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
@@ -291,7 +294,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
                 }}>
                   {lastTimestamp ? 
                     new Date(lastTimestamp).toLocaleString('en-GB', { hour12: false }) : 
-                    'N/A'
+                    t('dashboard.notAvailable')
                   }
                 </Typography>
               </Grid>
@@ -299,7 +302,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
                 <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                   <AccessTime sx={{ fontSize: '1.2rem' }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 400, fontSize: { xs: '0.9rem', sm: '0.95rem' }, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                    Uptime
+                    {t('dashboard.uptime')}
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ 
@@ -316,7 +319,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
           {deviceStartTimeInfo?.startup_data && (
             <Grid item xs={12}>
               <Typography variant="subtitle2" sx={{ fontWeight: 300, mb: 2, color: 'grey.300', fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                System Information
+                {t('dashboard.systemInformation')}
               </Typography>
               <Grid container spacing={2}>
                 {deviceStartTimeInfo.startup_data.firmware_version && (
@@ -324,7 +327,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
                     <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                       <Build sx={{ fontSize: '1.2rem' }} />
                       <Typography variant="subtitle2" sx={{ fontWeight: 400, fontSize: { xs: '0.9rem', sm: '0.95rem' }, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                        Firmware Version
+                        {t('dashboard.firmwareVersion')}
                       </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ 
@@ -342,7 +345,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
                     <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
                       <Storage sx={{ fontSize: '1.2rem' }} />
                       <Typography variant="subtitle2" sx={{ fontWeight: 300, fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                        Boot Reason
+                        {t('dashboard.bootReason')}
                       </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ 
@@ -362,7 +365,7 @@ const DeviceInfoDialog: React.FC<DeviceInfoDialogProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} sx={{ color: '#E0E0E0' }}>
-          Close
+          {t('common.close')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -600,6 +603,7 @@ export const DeviceTimingTile: React.FC<DeviceTimingTileProps> = ({
   onOpenDialog = () => {}
 }) => {
   const theme = useTheme();
+  const { t } = useTranslation();
   const currentUptimeDisplay = useUptime(status, deviceStartTimeInfo);
 
   const getStatusColor = (status: string) => {
@@ -615,10 +619,10 @@ export const DeviceTimingTile: React.FC<DeviceTimingTileProps> = ({
 
   // Format timestamp to fixed length: "29/10/2025, 14:53:20"
   const formatTimestamp = (timestamp: string | Date | null | undefined) => {
-    if (!timestamp) return 'N/A'.padEnd(20, ' ');
+    if (!timestamp) return t('dashboard.notAvailable').padEnd(20, ' ');
     try {
       const date = new Date(timestamp);
-      if (isNaN(date.getTime()) || date > new Date()) return 'N/A'.padEnd(20, ' ');
+      if (isNaN(date.getTime()) || date > new Date()) return t('dashboard.notAvailable').padEnd(20, ' ');
       return date.toLocaleString('en-GB', {
         year: 'numeric',
         month: '2-digit',
@@ -629,25 +633,25 @@ export const DeviceTimingTile: React.FC<DeviceTimingTileProps> = ({
         hour12: false
       }).padEnd(20, ' ');
     } catch {
-      return 'N/A'.padEnd(20, ' ');
+      return t('dashboard.notAvailable').padEnd(20, ' ');
     }
   };
 
   // Format uptime to fixed length: "15m 13s"
   const formatUptime = (uptime: string) => {
-    if (!uptime || uptime === 'N/A') return 'N/A'.padEnd(10, ' ');
+    if (!uptime || uptime === t('dashboard.notAvailable')) return t('dashboard.notAvailable').padEnd(10, ' ');
     return uptime.padEnd(10, ' ');
   };
 
   // Format firmware version to fixed length: "hermes_v2.0.0"
   const formatFirmware = (version?: string) => {
-    if (!version) return 'N/A'.padEnd(16, ' ');
+    if (!version) return t('dashboard.notAvailable').padEnd(16, ' ');
     return version.padEnd(16, ' ');
   };
 
   // Format boot reason to fixed length: "SOFTWARE"
   const formatBootReason = (reason?: string) => {
-    if (!reason) return 'N/A'.padEnd(12, ' ');
+    if (!reason) return t('dashboard.notAvailable').padEnd(12, ' ');
     return reason.padEnd(12, ' ');
   };
 

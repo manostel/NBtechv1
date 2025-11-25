@@ -1,9 +1,10 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { Helmet } from "react-helmet";
-import { Box, Button, TextField, Typography, Paper, Checkbox, FormControlLabel, CircularProgress, InputAdornment, IconButton, useTheme } from "@mui/material";
+import { Box, Button, TextField, Typography, Paper, Checkbox, FormControlLabel, CircularProgress, InputAdornment, IconButton, useTheme, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
-import { Visibility, VisibilityOff, Login as LoginIcon } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Login as LoginIcon, Language as LanguageIcon } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { SelectChangeEvent } from "@mui/material";
 import { User } from "../../../types";
 
 // Update the API URL to include /auth
@@ -14,15 +15,23 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [language, setLanguage] = useState<string>(() => i18n.language || 'en');
   const navigate = useNavigate();
   const theme = useTheme();
+
+  const handleLanguageChange = (e: SelectChangeEvent<string>) => {
+    const newLanguage = e.target.value;
+    setLanguage(newLanguage);
+    i18n.changeLanguage(newLanguage);
+    localStorage.setItem('i18nextLng', newLanguage);
+  };
 
   // Check for saved credentials on page load
   useEffect(() => {
@@ -111,6 +120,77 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         }
       }}
     >
+      {/* Language Selector - Top Right of Screen */}
+      <Box sx={{ 
+        position: 'fixed', 
+        top: 16, 
+        right: 16,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        zIndex: 1000
+      }}>
+        <LanguageIcon 
+          sx={{ 
+            fontSize: '1.2rem', 
+            color: theme.palette.text.primary,
+            opacity: 0.8
+          }} 
+        />
+        <FormControl 
+          size="small" 
+          sx={{ 
+            minWidth: 120,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+              backgroundColor: theme.palette.mode === 'dark' 
+                ? 'rgba(26, 31, 60, 0.8)' 
+                : 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(10px)',
+              '&:hover': {
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(26, 31, 60, 0.9)' 
+                  : 'rgba(255, 255, 255, 0.95)',
+              },
+              '&.Mui-focused': {
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(26, 31, 60, 0.95)' 
+                  : 'rgba(255, 255, 255, 1)',
+              }
+            },
+            '& .MuiSelect-select': {
+              py: 1,
+              fontSize: '0.875rem',
+              color: theme.palette.text.primary,
+            }
+          }}
+        >
+          <Select
+            value={language}
+            onChange={handleLanguageChange}
+            sx={{
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.2)' 
+                  : 'rgba(0, 0, 0, 0.2)',
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.3)' 
+                  : 'rgba(0, 0, 0, 0.3)',
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.mode === 'dark' 
+                  ? '#4caf50' 
+                  : '#1976d2',
+              }
+            }}
+          >
+            <MenuItem value="en">English</MenuItem>
+            <MenuItem value="el">Ελληνικά</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
       <Helmet>
         <title>Login | IoT Dashboard</title>
         <meta name="description" content="Login to your IoT Dashboard" />

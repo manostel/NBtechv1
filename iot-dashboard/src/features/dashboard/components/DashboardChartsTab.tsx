@@ -22,6 +22,7 @@ import SharedControls from './SharedControls';
 import { Fullscreen as FullscreenIcon, FullscreenExit as FullscreenExitIcon, TrendingUp as TrendingUpIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { MetricsConfig } from '../../../types';
+import { useTranslation } from 'react-i18next';
 
 ChartJS.register(
   CategoryScale,
@@ -60,6 +61,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
   onTimeRangeChange,
   onApply
 }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const chartRefs = useRef<{[key: string]: any}>({});
   const chartInstancesRef = useRef<{[key: string]: any}>({});
@@ -256,7 +258,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
         },
         title: {
           display: true,
-          text: 'Time',
+          text: t('dashboard.time'),
           font: {
             size: 12,
             weight: 'bold'
@@ -285,7 +287,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
         },
         title: {
           display: true,
-          text: 'Value',
+          text: t('dashboard.value'),
           font: {
             size: 12,
             weight: 'bold'
@@ -613,7 +615,7 @@ const DashboardChartsTab: React.FC<DashboardChartsTabProps> = ({
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent'
           }}>
-            Graphs
+            {t('tabs.graphs')}
           </Typography>
         </Box>
 

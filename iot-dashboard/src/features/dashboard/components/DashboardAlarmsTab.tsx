@@ -45,6 +45,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import notificationManager from '../../../services/NotificationManager';
 import { Device, MetricsConfig, Alarm } from '../../../types';
+import { useTranslation } from 'react-i18next';
 
 // API endpoints
 const MANAGE_ALARMS_API_URL = "https://ueqnh8082k.execute-api.eu-central-1.amazonaws.com/default/manage-alarms";
@@ -107,6 +108,7 @@ interface DashboardAlarmsTabProps {
 }
 
 const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metricsConfig = defaultMetricsConfig, onAlarmToggle }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [alarms, setAlarms] = useState<any[]>([]);
   const [triggeredAlarms, setTriggeredAlarms] = useState<any[]>([]);
@@ -140,25 +142,25 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
     switch (parameterConfig.type) {
       case 'numeric':
         return [
-          { value: 'above', label: 'Above Threshold' },
-          { value: 'below', label: 'Below Threshold' },
-          { value: 'equals', label: 'Equals Value' }
+          { value: 'above', label: t('alarms.aboveThreshold') },
+          { value: 'below', label: t('alarms.belowThreshold') },
+          { value: 'equals', label: t('alarms.equals') }
         ];
       case 'boolean':
         return [
-          { value: 'equals', label: 'Equals' },
-          { value: 'not_equals', label: 'Not Equals' },
-          { value: 'change', label: 'Any Change' }
+          { value: 'equals', label: t('alarms.equals') },
+          { value: 'not_equals', label: t('alarms.notEquals') },
+          { value: 'change', label: t('alarms.anyChange') }
         ];
       case 'status':
         return [
-          { value: 'equals', label: 'Equals' },
-          { value: 'not_equals', label: 'Not Equals' },
-          { value: 'change', label: 'Any Change' }
+          { value: 'equals', label: t('alarms.equals') },
+          { value: 'not_equals', label: t('alarms.notEquals') },
+          { value: 'change', label: t('alarms.anyChange') }
         ];
       default:
         return [
-          { value: 'change', label: 'Any Change' }
+          { value: 'change', label: t('alarms.anyChange') }
         ];
     }
   };
@@ -176,7 +178,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       case 'numeric':
         return (
           <TextField
-            label="Threshold Value"
+            label={t('alarms.thresholdValue')}
             type="number"
             value={newAlarm.threshold}
             onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
@@ -192,28 +194,28 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       case 'boolean':
         return (
           <FormControl fullWidth>
-            <InputLabel>Value</InputLabel>
+            <InputLabel>{t('alarms.value')}</InputLabel>
             <Select
               value={newAlarm.threshold}
               onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
-              label="Value"
+              label={t('alarms.value')}
             >
-              <MenuItem value="true">True</MenuItem>
-              <MenuItem value="false">False</MenuItem>
+              <MenuItem value="true">{t('alarms.true')}</MenuItem>
+              <MenuItem value="false">{t('alarms.false')}</MenuItem>
             </Select>
           </FormControl>
         );
       case 'status':
         return (
           <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
+            <InputLabel>{t('alarms.status')}</InputLabel>
             <Select
               value={newAlarm.threshold}
               onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
-              label="Status"
+              label={t('alarms.status')}
             >
-              <MenuItem value="Online">Online</MenuItem>
-              <MenuItem value="Offline">Offline</MenuItem>
+              <MenuItem value="Online">{t('alarms.online')}</MenuItem>
+              <MenuItem value="Offline">{t('alarms.offline')}</MenuItem>
             </Select>
           </FormControl>
         );
@@ -316,7 +318,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       setError(err.message);
       setSnackbar({
         open: true,
-        message: 'Failed to fetch alarms. Please try again.',
+        message: t('alarms.failedFetchAlarms'),
         severity: 'error'
       });
     } finally {
@@ -360,7 +362,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
         if (isMounted) {
           setSnackbar({
             open: true,
-            message: 'Failed to initialize alarms.',
+            message: t('alarms.failedInitializeAlarms'),
             severity: 'error'
           });
         }
@@ -386,7 +388,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
     if (!newAlarm.variable_name || (!newAlarm.threshold && newAlarm.condition !== 'change')) {
       setSnackbar({
         open: true,
-        message: 'Please fill in all required fields',
+        message: t('alarms.fillRequiredFields'),
         severity: 'error'
       });
       return;
@@ -442,7 +444,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       });
       setSnackbar({
         open: true,
-        message: 'Alarm created successfully',
+        message: t('alarms.alarmCreated'),
         severity: 'success'
       });
     } catch (err: any) {
@@ -450,7 +452,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       setError(err.message);
       setSnackbar({
         open: true,
-        message: 'Failed to create alarm',
+        message: t('alarms.failedCreateAlarm'),
         severity: 'error'
       });
     } finally {
@@ -467,7 +469,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
     if (!editingAlarm.variable_name || !editingAlarm.threshold) {
       setSnackbar({
         open: true,
-        message: 'Please fill in all required fields',
+        message: t('alarms.fillRequiredFields'),
         severity: 'error'
       });
       return;
@@ -532,7 +534,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       
       setSnackbar({
         open: true,
-        message: 'Alarm updated successfully',
+        message: t('alarms.alarmUpdated'),
         severity: 'success'
       });
       setEditAlarmDialog(false);
@@ -541,7 +543,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       console.error('Error updating alarm:', err);
       setSnackbar({
         open: true,
-        message: 'Failed to update alarm',
+        message: t('alarms.failedUpdateAlarm'),
         severity: 'error'
       });
     } finally {
@@ -574,14 +576,14 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
 
       setSnackbar({
         open: true,
-        message: 'Alarm deleted successfully',
+        message: t('alarms.alarmDeleted'),
         severity: 'success'
       });
     } catch (err: any) {
       setError(err.message);
       setSnackbar({
         open: true,
-        message: 'Failed to delete alarm',
+        message: t('alarms.failedDeleteAlarm'),
         severity: 'error'
       });
     } finally {
@@ -624,14 +626,14 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       }
       setSnackbar({
         open: true,
-        message: `Alarm ${currentEnabled ? 'disabled' : 'enabled'} successfully`,
+        message: t('alarms.alarmToggled', { state: currentEnabled ? t('alarms.disabled') : t('alarms.enabled') }),
         severity: 'success'
       });
     } catch (err: any) {
       setError(err.message);
       setSnackbar({
         open: true,
-        message: 'Failed to update alarm',
+        message: t('alarms.failedUpdateAlarm'),
         severity: 'error'
       });
     } finally {
@@ -772,8 +774,8 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
         onChange={(_, newValue) => setActiveTab(newValue)}
         sx={{ mb: 2, minHeight: 32, '& .MuiTab-root': { minHeight: 32, fontSize: '1rem', textTransform: 'none' } }}
       >
-        <Tab label="Triggered Alarms" />
-        <Tab label="Manage Alarms" />
+        <Tab label={t('alarms.triggeredAlarms')} />
+        <Tab label={t('alarms.allAlarms')} />
       </Tabs>
       {activeTab === 0 && (
         <Box>
@@ -823,7 +825,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}>
-              Triggered Alarms
+              {t('alarms.triggeredAlarms')}
             </Typography>
           </Box>
           
@@ -844,36 +846,36 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <FilterListIcon sx={{ mr: 0.5, color: 'text.secondary', fontSize: '0.9rem' }} />
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>
-                  Filter Triggered Alarms
+                  {t('alarms.filterTriggeredAlarms')}
                 </Typography>
               </Box>
               <Grid container spacing={0.5}>
                 <Grid item xs={6} sm={3} key="severity-filter">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.65rem' }}>Severity</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.severity')}</InputLabel>
                     <Select
                       value={triggeredFilters.severity}
                       onChange={(e) => setTriggeredFilters({ ...triggeredFilters, severity: e.target.value, parameterType: 'all', variable: 'all' })}
-                      label="Severity"
+                      label={t('alarms.severity')}
                       sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
-                      <MenuItem value="error" sx={{ fontSize: '0.7rem', py: 0.3 }}>Error</MenuItem>
-                      <MenuItem value="warning" sx={{ fontSize: '0.7rem', py: 0.3 }}>Warning</MenuItem>
-                      <MenuItem value="info" sx={{ fontSize: '0.7rem', py: 0.3 }}>Info</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      <MenuItem value="error" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.error')}</MenuItem>
+                      <MenuItem value="warning" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.warning')}</MenuItem>
+                      <MenuItem value="info" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.info')}</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
                 <Grid item xs={6} sm={3} key="parameter-type-filter-triggered">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.65rem' }}>Type</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.type')}</InputLabel>
                     <Select
                       value={triggeredFilters.parameterType}
                       onChange={(e) => setTriggeredFilters({ ...triggeredFilters, parameterType: e.target.value, variable: 'all' })}
-                      label="Type"
+                      label={t('alarms.type')}
                       sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
                       {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]: [string, any]) => (
                         <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -887,15 +889,15 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                 </Grid>
                 <Grid item xs={6} sm={3} key="variable-filter">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.65rem' }}>Variable</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.variable')}</InputLabel>
                     <Select
                       value={triggeredFilters.variable}
                       onChange={(e) => setTriggeredFilters({ ...triggeredFilters, variable: e.target.value })}
-                      label="Variable"
+                      label={t('alarms.variable')}
                       sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                       disabled={triggeredFilters.parameterType === 'all'}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
                       {getFilteredVariables(triggeredFilters.parameterType).map(([key, config]: [string, any]) => (
                         <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
                           {config.label}
@@ -906,14 +908,14 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                 </Grid>
                 <Grid item xs={6} sm={3} key="time-range-filter">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.65rem' }}>Time</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.time')}</InputLabel>
                     <Select
                       value={triggeredFilters.timeRange}
                       onChange={(e) => setTriggeredFilters({ ...triggeredFilters, timeRange: e.target.value })}
-                      label="Time"
+                      label={t('alarms.time')}
                       sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
                       <MenuItem value="last_hour" sx={{ fontSize: '0.7rem', py: 0.3 }}>1H</MenuItem>
                       <MenuItem value="last_6_hours" sx={{ fontSize: '0.7rem', py: 0.3 }}>6H</MenuItem>
                       <MenuItem value="last_24_hours" sx={{ fontSize: '0.7rem', py: 0.3 }}>24H</MenuItem>
@@ -936,7 +938,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                   }}
                   variant="outlined"
                 >
-                  Clear Filters
+                  {t('common.clear')}
                 </Button>
               </Box>
             </Box>
@@ -958,10 +960,10 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             }}>
               <WarningIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
               <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-                No Active Alarms
+                {t('alarms.noTriggeredAlarms')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                All systems are operating normally
+                {t('alarms.allSystemsNormal', { defaultValue: 'All systems are operating normally' })}
               </Typography>
             </Box>
           ) : (
@@ -1035,10 +1037,10 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                       
                       <Box sx={{ mb: 1.5 }}>
                         <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: '0.85rem' }}>
-                          Current Value: {formatCurrentValue(alarm)}
+                          {t('alarms.currentValue')}: {formatCurrentValue(alarm)}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
-                          Threshold: {alarm.condition} {alarm.threshold} {metricsConfig[alarm.variable_name]?.unit || ''}
+                          {t('alarms.threshold')}: {alarm.condition} {alarm.threshold} {metricsConfig[alarm.variable_name]?.unit || ''}
                         </Typography>
                       </Box>
                       
@@ -1056,7 +1058,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                           textTransform: 'uppercase',
                           letterSpacing: 0.5
                         }}>
-                          Last Triggered
+                          {t('alarms.lastTriggered')}
                         </Typography>
                         <Typography variant="body2" sx={{ 
                           color: 'text.primary',
@@ -1073,7 +1075,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                               second: '2-digit',
                               hour12: false
                             }) : 
-                            'Just triggered'
+                            t('alarms.justTriggered')
                           }
                         </Typography>
                       </Box>
@@ -1135,7 +1137,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent'
               }}>
-                Manage Alarms
+                {t('alarms.allAlarms')}
               </Typography>
               <Button
                 variant="outlined"
@@ -1154,7 +1156,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                   }
                 }}
               >
-                Add Alarm
+                {t('alarms.createAlarm')}
               </Button>
             </Box>
           </Box>
@@ -1176,36 +1178,36 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <FilterListIcon sx={{ mr: 0.5, color: 'text.secondary', fontSize: '0.9rem' }} />
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>
-                  Filter Alarms
+                  {t('alarms.filterAlarms')}
                 </Typography>
               </Box>
               <Grid container spacing={0.5}>
                 <Grid item xs={6} sm={3} key="severity-filter-manage">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.65rem' }}>Severity</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.severity')}</InputLabel>
                     <Select
                       value={filters.severity}
                       onChange={(e) => setFilters({ ...filters, severity: e.target.value, parameterType: 'all', variable: 'all' })}
-                      label="Severity"
+                      label={t('alarms.severity')}
                       sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
-                      <MenuItem value="error" sx={{ fontSize: '0.7rem', py: 0.3 }}>Error</MenuItem>
-                      <MenuItem value="warning" sx={{ fontSize: '0.7rem', py: 0.3 }}>Warning</MenuItem>
-                      <MenuItem value="info" sx={{ fontSize: '0.7rem', py: 0.3 }}>Info</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      <MenuItem value="error" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.error')}</MenuItem>
+                      <MenuItem value="warning" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.warning')}</MenuItem>
+                      <MenuItem value="info" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.info')}</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
                 <Grid item xs={6} sm={3} key="parameter-type-filter-manage">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.65rem' }}>Type</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.type')}</InputLabel>
                     <Select
                       value={filters.parameterType}
                       onChange={(e) => setFilters({ ...filters, parameterType: e.target.value, variable: 'all' })}
-                      label="Type"
+                      label={t('alarms.type')}
                       sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
                       {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]: [string, any]) => (
                         <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -1219,15 +1221,15 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                 </Grid>
                 <Grid item xs={6} sm={3} key="variable-filter-manage">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.65rem' }}>Variable</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.variable')}</InputLabel>
                     <Select
                       value={filters.variable}
                       onChange={(e) => setFilters({ ...filters, variable: e.target.value })}
-                      label="Variable"
+                      label={t('alarms.variable')}
                       sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                       disabled={filters.parameterType === 'all'}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
                       {getFilteredVariables(filters.parameterType).map(([key, config]: [string, any]) => (
                         <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
                           {config.label}
@@ -1238,16 +1240,16 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                 </Grid>
                 <Grid item xs={6} sm={3} key="status-filter-manage">
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ fontSize: '0.65rem' }}>Status</InputLabel>
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.status')}</InputLabel>
                     <Select
                       value={filters.status}
                       onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                      label="Status"
+                      label={t('alarms.status')}
                       sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
                     >
-                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>All</MenuItem>
-                      <MenuItem value="enabled" sx={{ fontSize: '0.7rem', py: 0.3 }}>Enabled</MenuItem>
-                      <MenuItem value="disabled" sx={{ fontSize: '0.7rem', py: 0.3 }}>Disabled</MenuItem>
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      <MenuItem value="enabled" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.enabled')}</MenuItem>
+                      <MenuItem value="disabled" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.disabled')}</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -1266,7 +1268,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                   }}
                   variant="outlined"
                 >
-                  Clear Filters
+                  {t('common.clear')}
                 </Button>
               </Box>
             </Box>
@@ -1288,10 +1290,10 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             }}>
               <NotificationsIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
               <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-                No Alarms Configured
+                {t('alarms.noAlarms')}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Set up alarms to monitor your device parameters
+                {t('alarms.setupAlarms', { defaultValue: 'Set up alarms to monitor your device parameters' })}
               </Typography>
               <Button
                 variant="contained"
@@ -1299,7 +1301,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                 onClick={() => setNewAlarmDialog(true)}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               >
-                Create First Alarm
+                {t('alarms.createAlarm')}
               </Button>
             </Box>
           ) : (
@@ -1307,11 +1309,11 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
               {/* Filter Summary */}
               <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography variant="body2" color="text.secondary">
-                  Showing {getFilteredAlarms(alarms).length} of {alarms.length} alarms
+                  {t('alarms.showingAlarms', { count: getFilteredAlarms(alarms).length, total: alarms.length })}
                 </Typography>
                 {(filters.severity !== 'all' || filters.status !== 'all' || filters.variable !== 'all') && (
                   <Chip
-                    label="Filtered"
+                    label={t('alarms.filtered')}
                     size="small"
                     color="primary"
                     variant="outlined"
@@ -1442,7 +1444,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                           disabled={loadingAlarmId === alarm.alarm_id}
                           sx={{ textTransform: 'none', fontWeight: 500 }}
                         >
-                          Delete
+                          {t('common.delete')}
                         </Button>
                       </Box>
                       <Button
@@ -1453,7 +1455,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                         disabled={loadingAlarmId === alarm.alarm_id}
                         sx={{ textTransform: 'none', fontWeight: 500 }}
                       >
-                        {loadingAlarmId === alarm.alarm_id ? 'Processing...' : (alarm.enabled ? 'Disable' : 'Enable')}
+                        {loadingAlarmId === alarm.alarm_id ? t('common.loading') : (alarm.enabled ? t('alarms.disabled') : t('alarms.enabled'))}
                       </Button>
                     </CardActions>
                   </Card>
@@ -1491,15 +1493,15 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
           }
         }}
       >
-        <DialogTitle sx={{ color: '#E0E0E0' }}>Add New Alarm</DialogTitle>
+        <DialogTitle sx={{ color: '#E0E0E0' }}>{t('alarms.createAlarm')}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
             <FormControl fullWidth>
-              <InputLabel>Parameter Type</InputLabel>
+              <InputLabel>{t('alarms.parameterType')}</InputLabel>
               <Select
                 value={newAlarm.parameter_type || 'metrics'}
                 onChange={(e) => setNewAlarm({ ...newAlarm, parameter_type: e.target.value, variable_name: '' })}
-                label="Parameter Type"
+                label={t('alarms.parameterType')}
               >
                 {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]: [string, any]) => (
                   <MenuItem key={key} value={key}>
@@ -1513,11 +1515,11 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             </FormControl>
 
             <FormControl fullWidth>
-              <InputLabel>Parameter</InputLabel>
+              <InputLabel>{t('alarms.parameter')}</InputLabel>
               <Select
                 value={newAlarm.variable_name}
                 onChange={(e) => setNewAlarm({ ...newAlarm, variable_name: e.target.value })}
-                label="Parameter"
+                label={t('alarms.parameter')}
                 disabled={!newAlarm.parameter_type}
               >
                 {newAlarm.parameter_type && ALARM_PARAMETER_TYPES[newAlarm.parameter_type] && 
@@ -1531,11 +1533,11 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             </FormControl>
 
             <FormControl fullWidth>
-              <InputLabel>Condition</InputLabel>
+              <InputLabel>{t('alarms.condition')}</InputLabel>
               <Select
                 value={newAlarm.condition}
                 onChange={(e) => setNewAlarm({ ...newAlarm, condition: e.target.value })}
-                label="Condition"
+                label={t('alarms.condition')}
               >
                 {getAvailableConditions(newAlarm.parameter_type, newAlarm.variable_name).map(condition => (
                   <MenuItem key={condition.value} value={condition.value}>
@@ -1546,22 +1548,22 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             </FormControl>
 
             <FormControl fullWidth>
-              <InputLabel>Severity</InputLabel>
+              <InputLabel>{t('alarms.severity')}</InputLabel>
               <Select
                 value={newAlarm.severity}
                 onChange={(e) => setNewAlarm({ ...newAlarm, severity: e.target.value })}
-                label="Severity"
+                label={t('alarms.severity')}
               >
-                <MenuItem value="info">Info</MenuItem>
-                <MenuItem value="warning">Warning</MenuItem>
-                <MenuItem value="error">Error</MenuItem>
+                <MenuItem value="info">{t('alarms.info')}</MenuItem>
+                <MenuItem value="warning">{t('alarms.warning')}</MenuItem>
+                <MenuItem value="error">{t('alarms.error')}</MenuItem>
               </Select>
             </FormControl>
 
             {getThresholdInput(newAlarm.parameter_type, newAlarm.variable_name, newAlarm.condition)}
 
             <TextField
-              label="Description"
+              label={t('alarms.description')}
               value={newAlarm.description}
               onChange={(e) => setNewAlarm({ ...newAlarm, description: e.target.value })}
               fullWidth
@@ -1576,13 +1578,13 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                   onChange={(e) => setNewAlarm({ ...newAlarm, enabled: e.target.checked })}
                 />
               }
-              label="Enabled"
+              label={t('alarms.enabled')}
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setNewAlarmDialog(false)}>Cancel</Button>
-          <Button onClick={handleAddAlarm} variant="contained">Add Alarm</Button>
+          <Button onClick={() => setNewAlarmDialog(false)}>{t('common.cancel')}</Button>
+          <Button onClick={handleAddAlarm} variant="contained">{t('alarms.createAlarm')}</Button>
         </DialogActions>
       </Dialog>
 
@@ -1612,15 +1614,15 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
           }
         }}
       >
-        <DialogTitle sx={{ color: '#E0E0E0' }}>Edit Alarm</DialogTitle>
+        <DialogTitle sx={{ color: '#E0E0E0' }}>{t('alarms.editAlarm')}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <FormControl fullWidth>
-              <InputLabel>Variable</InputLabel>
+              <InputLabel>{t('alarms.variableName')}</InputLabel>
               <Select
                 value={editingAlarm?.variable_name || ''}
                 onChange={(e) => setEditingAlarm({ ...editingAlarm, variable_name: e.target.value })}
-                label="Variable"
+                label={t('alarms.variableName')}
               >
                 {Object.entries(metricsConfig).map(([key, config]) => (
                   <MenuItem key={key} value={key}>
@@ -1631,33 +1633,33 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             </FormControl>
 
             <FormControl fullWidth>
-              <InputLabel>Condition</InputLabel>
+              <InputLabel>{t('alarms.condition')}</InputLabel>
               <Select
                 value={editingAlarm?.condition || 'above'}
                 onChange={(e) => setEditingAlarm({ ...editingAlarm, condition: e.target.value })}
-                label="Condition"
+                label={t('alarms.condition')}
               >
-                <MenuItem value="above">Above</MenuItem>
-                <MenuItem value="below">Below</MenuItem>
-                <MenuItem value="equals">Equals</MenuItem>
+                <MenuItem value="above">{t('alarms.above')}</MenuItem>
+                <MenuItem value="below">{t('alarms.below')}</MenuItem>
+                <MenuItem value="equals">{t('alarms.equals')}</MenuItem>
               </Select>
             </FormControl>
 
             <FormControl fullWidth>
-              <InputLabel>Severity</InputLabel>
+              <InputLabel>{t('alarms.severity')}</InputLabel>
               <Select
                 value={editingAlarm?.severity || 'warning'}
                 onChange={(e) => setEditingAlarm({ ...editingAlarm, severity: e.target.value })}
-                label="Severity"
+                label={t('alarms.severity')}
               >
-                <MenuItem value="info">Info</MenuItem>
-                <MenuItem value="warning">Warning</MenuItem>
-                <MenuItem value="error">Error</MenuItem>
+                <MenuItem value="info">{t('alarms.info')}</MenuItem>
+                <MenuItem value="warning">{t('alarms.warning')}</MenuItem>
+                <MenuItem value="error">{t('alarms.error')}</MenuItem>
               </Select>
             </FormControl>
 
             <TextField
-              label="Threshold"
+              label={t('alarms.threshold')}
               type="number"
               value={editingAlarm?.threshold || ''}
               onChange={(e) => setEditingAlarm({ ...editingAlarm, threshold: e.target.value })}
@@ -1671,7 +1673,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
             />
 
             <TextField
-              label="Description"
+              label={t('alarms.description')}
               value={editingAlarm?.description || ''}
               onChange={(e) => setEditingAlarm({ ...editingAlarm, description: e.target.value })}
               fullWidth
@@ -1686,18 +1688,18 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
                   onChange={(e) => setEditingAlarm({ ...editingAlarm, enabled: e.target.checked })}
                 />
               }
-              label="Enabled"
+              label={t('alarms.enabled')}
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditAlarmDialog(false)}>Cancel</Button>
+          <Button onClick={() => setEditAlarmDialog(false)}>{t('common.cancel')}</Button>
           <Button 
             onClick={handleUpdateAlarm} 
             variant="contained"
             disabled={loadingAlarmId === editingAlarm?.alarm_id}
           >
-            {loadingAlarmId === editingAlarm?.alarm_id ? 'Updating...' : 'Update Alarm'}
+            {loadingAlarmId === editingAlarm?.alarm_id ? t('common.loading') : t('alarms.editAlarm')}
           </Button>
         </DialogActions>
       </Dialog>

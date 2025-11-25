@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material';
 import DashboardCommands from './DashboardCommands';
 import { Settings as SettingsIcon } from '@mui/icons-material';
 import { Device, MetricsConfig } from '../../../types';
+import { useTranslation } from 'react-i18next';
 
 interface DashboardCommandsTabProps {
   device: Device;
@@ -27,6 +28,7 @@ const DashboardCommandsTab: React.FC<DashboardCommandsTabProps> = ({
   metricsData,
   fetchDeviceState
 }) => {
+  const { t } = useTranslation();
   return (
     <Box sx={{ py: 0, px: 0.5 }}>
       <Box sx={{ 
@@ -75,7 +77,7 @@ const DashboardCommandsTab: React.FC<DashboardCommandsTabProps> = ({
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent'
         }}>
-          Commands
+          {t('commands.title')}
         </Typography>
       </Box>
       <DashboardCommands 

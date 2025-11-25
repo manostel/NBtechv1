@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Grid, Typography, Paper, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
 import { Error as ErrorIcon, Warning as WarningIcon, Info as InfoIcon, ShowChart as ShowChartIcon } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import OverviewTiles from './OverviewTiles';
 import OverviewChart from './OverviewChart';
 import VariableSelector from './VariableSelector';
@@ -13,6 +14,8 @@ interface TriggeredAlarmsProps {
 }
 
 const TriggeredAlarms: React.FC<TriggeredAlarmsProps> = ({ triggeredAlarms, metricsConfig }) => {
+  const { t } = useTranslation();
+  
   if (!triggeredAlarms || triggeredAlarms.length === 0) {
     return null;
   }
@@ -31,14 +34,14 @@ const TriggeredAlarms: React.FC<TriggeredAlarmsProps> = ({ triggeredAlarms, metr
   };
 
   const getSeverityText = (severity?: string) => {
-    if (!severity) return 'Info';
+    if (!severity) return t('filters.info');
     return severity.charAt(0).toUpperCase() + severity.slice(1);
   };
 
   return (
     <Paper sx={{ mt: 3, p: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Active Alarms
+        {t('dashboard.activeAlarms')}
       </Typography>
       <List>
         {triggeredAlarms.map(alarm => (
@@ -55,7 +58,7 @@ const TriggeredAlarms: React.FC<TriggeredAlarmsProps> = ({ triggeredAlarms, metr
               secondary={
                 <Box>
                   <Typography component="span" variant="body2" color="text.primary">
-                    Current value: {alarm.current_value}{metricsConfig[alarm.variable_name]?.unit || ''}
+                    {t('dashboard.currentValue')}: {alarm.current_value}{metricsConfig[alarm.variable_name]?.unit || ''}
                   </Typography>
                   <Typography 
                     component="span" 
@@ -106,10 +109,12 @@ const DashboardOverviewTab: React.FC<DashboardOverviewTabProps> = ({
   device,
   user
 }) => {
+  const { t } = useTranslation();
+  
   if (!metricsData || !metricsConfig) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography>Loading metrics...</Typography>
+        <Typography>{t('dashboard.loadingMetrics')}</Typography>
       </Box>
     );
   }
@@ -196,7 +201,7 @@ const DashboardOverviewTab: React.FC<DashboardOverviewTabProps> = ({
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}>
-              Live Metrics
+              {t('dashboard.liveMetrics')}
             </Typography>
           </Box>
           <VariableSelector
@@ -271,7 +276,7 @@ const DashboardOverviewTab: React.FC<DashboardOverviewTabProps> = ({
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent'
           }}>
-            Data Visualization
+            {t('dashboard.dataVisualization')}
           </Typography>
         </Box>
 
