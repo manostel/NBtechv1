@@ -934,6 +934,7 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
         return (
           <DashboardSchedulerTab
             device={device!}
+            user={user}
           />
         );
       default:

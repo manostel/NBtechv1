@@ -27,7 +27,11 @@ import {
   ToggleButtonGroup,
   Divider,
   InputAdornment,
-  alpha
+  alpha,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  Slider
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -42,60 +46,55 @@ import {
   Settings as SettingsIcon,
   Timer as TimerIcon,
   CheckCircle as CheckCircleIcon,
-  AccessTime as AccessTimeIcon
+  AccessTime as AccessTimeIcon,
+  CalendarMonth as CalendarMonthIcon,
+  CalendarToday as CalendarTodayIcon,
+  PowerSettingsNew as PowerSettingsNewIcon,
+  Speed as SpeedIcon,
+  ToggleOn as ToggleOnIcon,
+  ToggleOff as ToggleOffIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
-import { Device } from '../../../types';
+import { Device, User } from '../../../types';
+
+const SCHEDULER_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/manage-scheduler";
 
 interface ScheduledTask {
-  id: string;
+  task_id: string;
+  user_email: string;
   name: string;
   command: string;
+  device_id: string;
   target: string; // e.g., 'output1', 'motor_speed'
   value: string | number;
   type: 'one_time' | 'recurring';
   schedule: string; // ISO date for one_time, cron expression for recurring
   enabled: boolean;
-  lastRun?: string;
-  nextRun?: string;
+  last_run?: number;
+  next_run_timestamp?: number;
+  created_at: number;
 }
 
 interface DashboardSchedulerTabProps {
   device: Device;
+  user?: User;
 }
 
-const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device }) => {
+type RecurrenceType = 'every_minute' | 'hourly' | 'daily' | 'weekly' | 'monthly';
+
+const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device, user }) => {
   const { t } = useTranslation();
   const theme = useTheme();
   
-  // Mock data for now
-  const [schedules, setSchedules] = useState<ScheduledTask[]>([
-    {
-      id: '1',
-      name: 'Morning Lights On',
-      command: 'set_output',
-      target: 'output1',
-      value: 'ON',
-      type: 'recurring',
-      schedule: '0 8 * * *',
-      enabled: true,
-      nextRun: '2025-11-26T08:00:00'
-    },
-    {
-      id: '2',
-      name: 'Evening Shutdown',
-      command: 'set_output',
-      target: 'all_outputs',
-      value: 'OFF',
-      type: 'recurring',
-      schedule: '0 22 * * *',
-      enabled: true,
-      nextRun: '2025-11-25T22:00:00'
-    }
-  ]);
-
+  const [schedules, setSchedules] = useState<ScheduledTask[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Form data state
   const [formData, setFormData] = useState<Partial<ScheduledTask>>({
     name: '',
     command: 'set_output',
@@ -103,12 +102,17 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
     value: '',
     type: 'one_time',
     schedule: '',
-    enabled: true
+    enabled: true,
+    device_id: device.client_id
   });
 
-  // Recurring schedule state
+  // Enhanced Recurring Schedule State
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('daily');
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState<string>('12:00');
+  const [selectedMinute, setSelectedMinute] = useState<number>(0);
+  const [selectedMonthDay, setSelectedMonthDay] = useState<number>(1);
 
   const DAYS_OF_WEEK = [
     { value: '1', label: t('scheduler.days.mon') },
@@ -120,62 +124,148 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
     { value: '0', label: t('scheduler.days.sun') },
   ];
 
+  // Fetch tasks on mount
+  useEffect(() => {
+    if (user?.email) {
+      fetchTasks();
+    }
+  }, [user]);
+
+  const fetchTasks = async () => {
+    if (!user?.email) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(SCHEDULER_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          action: 'get_tasks',
+          user_email: user.email
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setSchedules(data.tasks || []);
+      } else {
+        throw new Error(data.error || 'Failed to fetch tasks');
+      }
+    } catch (err: any) {
+      console.error('Error fetching tasks:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Parse cron expression to state
   const parseCronToState = (cron: string) => {
     try {
       const parts = cron.split(' ');
-      if (parts.length >= 5) {
-        // Time: minute hour
-        const minute = parts[0].padStart(2, '0');
-        const hour = parts[1].padStart(2, '0');
-        setSelectedTime(`${hour}:${minute}`);
+      if (parts.length < 5) throw new Error('Invalid cron format');
 
-        // Days: part 4 (0-6)
-        const days = parts[4];
-        if (days === '*') {
-          setSelectedDays(['0', '1', '2', '3', '4', '5', '6']);
-        } else {
-          setSelectedDays(days.split(','));
-        }
+      const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+
+      // 1. Check for "Every X minutes" -> "*/15 * * * *"
+      if (minute.startsWith('*/') && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+        setRecurrenceType('every_minute');
+        setRecurrenceInterval(parseInt(minute.split('/')[1]));
+        return;
       }
+
+      // 2. Check for "Every X hours" -> "0 */2 * * *" or "15 */1 * * *"
+      if (hour.startsWith('*/') && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+        setRecurrenceType('hourly');
+        setRecurrenceInterval(parseInt(hour.split('/')[1]));
+        setSelectedMinute(parseInt(minute));
+        return;
+      }
+
+      // 3. Check for Weekly (specific days) -> "30 14 * * 1,3"
+      if (dayOfWeek !== '*' && dayOfMonth === '*') {
+        setRecurrenceType('weekly');
+        setSelectedTime(`${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`);
+        setSelectedDays(dayOfWeek.split(','));
+        return;
+      }
+
+      // 4. Check for Monthly (specific day of month) -> "30 14 1 * *"
+      if (dayOfMonth !== '*' && dayOfWeek === '*') {
+        setRecurrenceType('monthly');
+        setSelectedTime(`${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`);
+        setSelectedMonthDay(parseInt(dayOfMonth));
+        return;
+      }
+
+      // 5. Default to Daily -> "30 14 * * *"
+      setRecurrenceType('daily');
+      setSelectedTime(`${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`);
+      
     } catch (e) {
       console.error('Error parsing cron:', e);
       // Fallback defaults
+      setRecurrenceType('daily');
       setSelectedTime('12:00');
       setSelectedDays([]);
     }
   };
 
   // Generate cron expression from state
-  const generateCronFromState = (time: string, days: string[]) => {
-    if (!time || days.length === 0) return '';
-    
-    const [hour, minute] = time.split(':');
-    const daysString = days.length === 7 ? '*' : days.sort().join(',');
-    
-    // Minute Hour DayOfMonth Month DayOfWeek
-    // Using * for DayOfMonth and Month to mean "every"
-    // Note: In cron, minute comes first, but leading zeros usually don't matter for value but valid format
-    return `${parseInt(minute)} ${parseInt(hour)} * * ${daysString}`;
+  const generateCronFromState = () => {
+    switch (recurrenceType) {
+      case 'every_minute':
+        // Every X minutes
+        return `*/${recurrenceInterval} * * * *`;
+      
+      case 'hourly':
+        // At minute X past every Y hours
+        return `${selectedMinute} */${recurrenceInterval} * * *`;
+      
+      case 'daily':
+        // Every day at HH:mm
+        const [dHour, dMinute] = selectedTime.split(':');
+        return `${parseInt(dMinute)} ${parseInt(dHour)} * * *`;
+      
+      case 'weekly':
+        // Specific days at HH:mm
+        if (selectedDays.length === 0) return '';
+        const [wHour, wMinute] = selectedTime.split(':');
+        const daysString = selectedDays.length === 7 ? '*' : selectedDays.sort().join(',');
+        return `${parseInt(wMinute)} ${parseInt(wHour)} * * ${daysString}`;
+      
+      case 'monthly':
+        // Specific day of month at HH:mm
+        const [mHour, mMinute] = selectedTime.split(':');
+        return `${parseInt(mMinute)} ${parseInt(mHour)} ${selectedMonthDay} * *`;
+        
+      default:
+        return '';
+    }
   };
 
   // Update formData.schedule when recurring state changes
   useEffect(() => {
     if (formData.type === 'recurring' && openDialog) {
-      const cron = generateCronFromState(selectedTime, selectedDays);
+      const cron = generateCronFromState();
       setFormData(prev => ({ ...prev, schedule: cron }));
     }
-  }, [selectedDays, selectedTime, formData.type, openDialog]);
+  }, [recurrenceType, recurrenceInterval, selectedDays, selectedTime, selectedMinute, selectedMonthDay, formData.type, openDialog]);
 
   const handleOpenDialog = (task?: ScheduledTask) => {
     if (task) {
-      setEditingId(task.id);
+      setEditingId(task.task_id);
       setFormData({ ...task });
       
       if (task.type === 'recurring') {
         parseCronToState(task.schedule);
       } else {
-        // Reset defaults for recurring if switching types
+        // Reset defaults for recurring
+        setRecurrenceType('daily');
         setSelectedTime('12:00');
         setSelectedDays([]);
       }
@@ -185,12 +275,14 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
         name: '',
         command: 'set_output',
         target: 'output1',
-        value: '',
+        value: 'ON',
         type: 'one_time',
         schedule: '',
-        enabled: true
+        enabled: true,
+        device_id: device.client_id
       });
       // Reset defaults
+      setRecurrenceType('daily');
       setSelectedTime('12:00');
       setSelectedDays([]);
     }
@@ -202,44 +294,169 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
     setEditingId(null);
   };
 
-  const handleSave = () => {
-    if (editingId) {
-      setSchedules(prev => prev.map(s => s.id === editingId ? { ...s, ...formData } as ScheduledTask : s));
-    } else {
-      const newTask: ScheduledTask = {
-        id: Date.now().toString(),
-        ...formData as ScheduledTask
-      };
-      setSchedules(prev => [...prev, newTask]);
+  const handleSave = async () => {
+    if (!user?.email) return;
+
+    // Validation
+    if (!formData.name || !formData.schedule) {
+      alert('Please fill in all required fields');
+      return;
     }
-    handleCloseDialog();
+
+    // Construct the correct command payload
+    let finalCommand = formData.command;
+    let finalValue = formData.value;
+
+    if (formData.command === 'set_output') {
+      // Example: TOGGLE_1_ON
+      if (formData.target === 'output1') {
+        finalCommand = formData.value === 'ON' ? 'TOGGLE_1_ON' : 'TOGGLE_1_OFF';
+      } else if (formData.target === 'output2') {
+        finalCommand = formData.value === 'ON' ? 'TOGGLE_2_ON' : 'TOGGLE_2_OFF';
+      }
+      // Clear value as it's encoded in command
+      finalValue = ''; 
+    } else if (formData.command === 'set_motor') {
+      finalCommand = 'SET_SPEED';
+      // Value is the speed number
+    }
+
+    setLoading(true);
+    try {
+      const action = editingId ? 'update_task' : 'create_task';
+      const payload = {
+        action,
+        user_email: user.email,
+        task_id: editingId,
+        task: {
+          ...formData,
+          command: finalCommand,
+          value: finalValue,
+          device_id: device.client_id
+        }
+      };
+
+      const response = await fetch(SCHEDULER_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (response.ok && (data.success || data.statusCode === 200)) {
+        setSuccessMessage(editingId ? 'Task updated successfully' : 'Task created successfully');
+        handleCloseDialog();
+        fetchTasks();
+      } else {
+        throw new Error(data.error || 'Operation failed');
+      }
+    } catch (err: any) {
+      console.error('Error saving task:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setSchedules(prev => prev.filter(s => s.id !== id));
+  const handleDelete = async (taskId: string) => {
+    if (!user?.email || !window.confirm(t('common.confirmDelete'))) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(SCHEDULER_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          action: 'delete_task',
+          user_email: user.email,
+          task_id: taskId
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && (data.success || data.statusCode === 200)) {
+        setSuccessMessage('Task deleted successfully');
+        fetchTasks();
+      } else {
+        throw new Error(data.error || 'Delete failed');
+      }
+    } catch (err: any) {
+      console.error('Error deleting task:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleToggle = (id: string) => {
-    setSchedules(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
+  const handleToggle = async (taskId: string, currentStatus: boolean) => {
+    if (!user?.email) return;
+
+    // Optimistic update
+    setSchedules(prev => prev.map(s => s.task_id === taskId ? { ...s, enabled: !currentStatus } : s));
+
+    try {
+      const response = await fetch(SCHEDULER_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          action: 'toggle_task',
+          user_email: user.email,
+          task_id: taskId,
+          enabled: !currentStatus
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || (!data.success && data.statusCode !== 200)) {
+        // Revert on failure
+        setSchedules(prev => prev.map(s => s.task_id === taskId ? { ...s, enabled: currentStatus } : s));
+        throw new Error(data.error || 'Toggle failed');
+      }
+    } catch (err: any) {
+      console.error('Error toggling task:', err);
+      setError(err.message);
+      // Revert on error
+      setSchedules(prev => prev.map(s => s.task_id === taskId ? { ...s, enabled: currentStatus } : s));
+    }
   };
 
   const formatScheduleDisplay = (type: string, schedule: string) => {
     if (type === 'one_time') {
-      return new Date(schedule).toLocaleString();
+      try {
+        return new Date(schedule).toLocaleString();
+      } catch (e) {
+        return schedule;
+      }
     }
     
+    // Parse logic to show friendly text based on our improved cron handling
     try {
       const parts = schedule.split(' ');
       if (parts.length >= 5) {
-        const minute = parts[0].padStart(2, '0');
-        const hour = parts[1].padStart(2, '0');
-        const days = parts[4];
+        const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+
+        // Every X minutes
+        if (minute.startsWith('*/') && hour === '*') {
+           return `Every ${minute.split('/')[1]} minutes`;
+        }
         
-        let daysDisplay = '';
-        if (days === '*') {
-          daysDisplay = t('scheduler.everyDay');
-        } else {
-          const dayMap: {[key: string]: string} = {
+        // Every X hours
+        if (hour.startsWith('*/')) {
+           return `At :${minute.padStart(2,'0')} past every ${hour.split('/')[1]} hour(s)`;
+        }
+        
+        // Weekly
+        if (dayOfWeek !== '*' && dayOfMonth === '*') {
+           const dayMap: {[key: string]: string} = {
             '0': t('scheduler.days.sun'),
             '1': t('scheduler.days.mon'),
             '2': t('scheduler.days.tue'),
@@ -248,11 +465,19 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
             '5': t('scheduler.days.fri'),
             '6': t('scheduler.days.sat'),
           };
-          
-          daysDisplay = days.split(',').map(d => dayMap[d]).join(', ');
+          const daysDisplay = dayOfWeek.split(',').map(d => dayMap[d]).join(', ');
+          return `${daysDisplay} @ ${hour.padStart(2,'0')}:${minute.padStart(2,'0')}`;
         }
         
-        return `${daysDisplay} @ ${hour}:${minute}`;
+        // Monthly
+        if (dayOfMonth !== '*' && dayOfWeek === '*') {
+           return `Day ${dayOfMonth} of month @ ${hour.padStart(2,'0')}:${minute.padStart(2,'0')}`;
+        }
+
+        // Daily (default fallback)
+        if (dayOfWeek === '*' && dayOfMonth === '*' && hour !== '*' && minute !== '*') {
+           return `Daily @ ${hour.padStart(2,'0')}:${minute.padStart(2,'0')}`;
+        }
       }
     } catch (e) {
       return schedule;
@@ -267,6 +492,18 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
 
   return (
     <Box sx={{ p: 1 }}>
+      {/* Success/Error Snackbars */}
+      <Snackbar open={!!successMessage} autoHideDuration={6000} onClose={() => setSuccessMessage(null)}>
+        <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+
       {/* Header Section */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -341,7 +578,11 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
         </Box>
       </Box>
 
-      {schedules.length === 0 ? (
+      {loading && schedules.length === 0 ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : schedules.length === 0 ? (
         <Paper 
           sx={{ 
             p: 6, 
@@ -393,7 +634,7 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
       ) : (
         <Grid container spacing={2}>
           {schedules.map((task) => (
-            <Grid item xs={12} md={6} lg={4} key={task.id}>
+            <Grid item xs={12} md={6} lg={4} key={task.task_id}>
               <Card sx={{ 
                 height: '100%',
                 display: 'flex',
@@ -462,7 +703,7 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
                   <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                     <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                       <PlayArrowIcon fontSize="small" /> 
-                      {t('scheduler.command')}: <Box component="span" sx={{ color: 'text.primary', fontWeight: 500 }}>{task.command} ({task.target}: {task.value})</Box>
+                      {t('scheduler.command')}: <Box component="span" sx={{ color: 'text.primary', fontWeight: 500 }}>{task.command} {task.value ? `(${task.value})` : ''}</Box>
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                       <ScheduleIcon fontSize="small" /> 
@@ -470,7 +711,7 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
                     </Typography>
                     
                     {/* Next Run Info */}
-                    {task.nextRun && (
+                    {task.next_run_timestamp && (
                       <Box sx={{ 
                         mt: 'auto',
                         pt: 2, 
@@ -490,7 +731,7 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
                           color: 'success.main',
                           fontWeight: 500
                         }}>
-                          {new Date(task.nextRun).toLocaleString()}
+                          {new Date(task.next_run_timestamp * 1000).toLocaleString()}
                         </Typography>
                       </Box>
                     )}
@@ -512,7 +753,7 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
                       size="small"
                       color="error"
                       startIcon={<DeleteIcon />}
-                      onClick={() => handleDelete(task.id)}
+                      onClick={() => handleDelete(task.task_id)}
                       sx={{ textTransform: 'none', fontWeight: 500 }}
                     >
                       {t('common.delete')}
@@ -522,7 +763,7 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
                     size="small"
                     variant={task.enabled ? 'outlined' : 'contained'}
                     startIcon={task.enabled ? <NotificationsOffIcon /> : <NotificationsActiveIcon />}
-                    onClick={() => handleToggle(task.id)}
+                    onClick={() => handleToggle(task.task_id, task.enabled)}
                     sx={{ textTransform: 'none', fontWeight: 500 }}
                   >
                     {task.enabled ? 'Disable' : 'Enable'}
@@ -643,31 +884,80 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
                       <Select
                         value={formData.command}
                         label={t('scheduler.commandType')}
-                        onChange={(e) => setFormData({ ...formData, command: e.target.value })}
+                        onChange={(e) => {
+                          const newCommand = e.target.value;
+                          // Reset related fields when switching command types
+                          setFormData({
+                            ...formData, 
+                            command: newCommand,
+                            target: newCommand === 'set_output' ? 'output1' : '',
+                            value: newCommand === 'set_output' ? 'ON' : ''
+                          });
+                        }}
+                        startAdornment={
+                          <InputAdornment position="start">
+                            {formData.command === 'set_output' ? <PowerSettingsNewIcon fontSize="small" /> : <SpeedIcon fontSize="small" />}
+                          </InputAdornment>
+                        }
                       >
                         <MenuItem value="set_output">{t('scheduler.setOutput')}</MenuItem>
                         <MenuItem value="set_motor">{t('scheduler.setMotor')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      label={t('scheduler.target')}
-                      fullWidth
-                      value={formData.target}
-                      onChange={(e) => setFormData({ ...formData, target: e.target.value })}
-                      helperText="e.g., output1, motor"
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      label={t('scheduler.value')}
-                      fullWidth
-                      value={formData.value}
-                      onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                      helperText="e.g., ON, OFF, 50"
-                    />
-                  </Grid>
+
+                  {formData.command === 'set_output' && (
+                    <>
+                      <Grid item xs={12} md={4}>
+                        <FormControl fullWidth>
+                          <InputLabel>{t('scheduler.target')}</InputLabel>
+                          <Select
+                            value={formData.target}
+                            label={t('scheduler.target')}
+                            onChange={(e) => setFormData({ ...formData, target: e.target.value })}
+                          >
+                            <MenuItem value="output1">Output 1</MenuItem>
+                            <MenuItem value="output2">Output 2</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <FormControl fullWidth>
+                          <InputLabel>{t('scheduler.value')}</InputLabel>
+                          <Select
+                            value={formData.value}
+                            label={t('scheduler.value')}
+                            onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                            startAdornment={
+                              <InputAdornment position="start">
+                                {formData.value === 'ON' ? <ToggleOnIcon color="success" /> : <ToggleOffIcon color="error" />}
+                              </InputAdornment>
+                            }
+                          >
+                            <MenuItem value="ON">ON</MenuItem>
+                            <MenuItem value="OFF">OFF</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                    </>
+                  )}
+
+                  {formData.command === 'set_motor' && (
+                    <Grid item xs={12} md={8}>
+                      <TextField
+                        label="Motor Speed (0-100)"
+                        fullWidth
+                        type="number"
+                        value={formData.value}
+                        onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                        InputProps={{
+                          inputProps: { min: 0, max: 100 },
+                          endAdornment: <InputAdornment position="end">%</InputAdornment>
+                        }}
+                        helperText="Enter speed percentage"
+                      />
+                    </Grid>
+                  )}
                 </Grid>
               </Paper>
             </Grid>
@@ -697,87 +987,139 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
                   </Grid>
                 ) : (
                   <Grid container spacing={3}>
-                    <Grid item xs={12}>
-                      <Typography variant="subtitle2" gutterBottom sx={{ color: 'text.secondary', mb: 1.5 }}>
-                        {t('scheduler.selectDays')}
-                      </Typography>
-                      <ToggleButtonGroup
-                        value={selectedDays}
-                        onChange={handleDaysChange}
-                        aria-label="days of week"
-                        size="medium"
-                        fullWidth
-                        sx={{ 
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: 1,
-                          '& .MuiToggleButton-root': {
-                            flex: 1,
-                            border: '1px solid !important',
-                            borderRadius: '8px !important',
-                            py: 1,
-                            px: 0.5,
-                            minWidth: 40,
-                            borderColor: (theme) => alpha(theme.palette.divider, 0.5),
-                            '&.Mui-selected': {
-                              backgroundColor: 'primary.main',
-                              color: 'primary.contrastText',
-                              borderColor: 'primary.main',
-                              '&:hover': {
-                                backgroundColor: 'primary.dark',
+                    <Grid item xs={12} md={4}>
+                      <FormControl fullWidth>
+                        <InputLabel>Frequency</InputLabel>
+                        <Select
+                          value={recurrenceType}
+                          label="Frequency"
+                          onChange={(e) => setRecurrenceType(e.target.value as RecurrenceType)}
+                        >
+                           <MenuItem value="every_minute">Every Minute(s)</MenuItem>
+                           <MenuItem value="hourly">Hourly</MenuItem>
+                           <MenuItem value="daily">Daily</MenuItem>
+                           <MenuItem value="weekly">Weekly</MenuItem>
+                           <MenuItem value="monthly">Monthly</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    {/* Dynamic Fields based on Recurrence Type */}
+                    <Grid item xs={12} md={8}>
+                      {recurrenceType === 'every_minute' && (
+                        <TextField
+                          type="number"
+                          label="Minutes Interval"
+                          value={recurrenceInterval}
+                          onChange={(e) => setRecurrenceInterval(Math.max(1, parseInt(e.target.value)))}
+                          fullWidth
+                          helperText="Runs every X minutes"
+                          InputProps={{
+                             inputProps: { min: 1 }
+                          }}
+                        />
+                      )}
+
+                      {recurrenceType === 'hourly' && (
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                           <TextField
+                            type="number"
+                            label="Hours Interval"
+                            value={recurrenceInterval}
+                            onChange={(e) => setRecurrenceInterval(Math.max(1, parseInt(e.target.value)))}
+                            fullWidth
+                            helperText="Every X hours"
+                            InputProps={{ inputProps: { min: 1 } }}
+                          />
+                          <TextField
+                            type="number"
+                            label="Minute offset"
+                            value={selectedMinute}
+                            onChange={(e) => setSelectedMinute(Math.min(59, Math.max(0, parseInt(e.target.value))))}
+                            fullWidth
+                            helperText="At minute (0-59)"
+                            InputProps={{ inputProps: { min: 0, max: 59 } }}
+                          />
+                        </Box>
+                      )}
+
+                      {(recurrenceType === 'daily' || recurrenceType === 'weekly' || recurrenceType === 'monthly') && (
+                         <TextField
+                          type="time"
+                          label="At Time"
+                          fullWidth
+                          InputLabelProps={{ shrink: true }}
+                          value={selectedTime}
+                          onChange={(e) => setSelectedTime(e.target.value)}
+                        />
+                      )}
+                    </Grid>
+
+                    {/* Weekly Days Selector */}
+                    {recurrenceType === 'weekly' && (
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle2" gutterBottom sx={{ color: 'text.secondary', mb: 1.5 }}>
+                          {t('scheduler.selectDays')}
+                        </Typography>
+                        <ToggleButtonGroup
+                          value={selectedDays}
+                          onChange={handleDaysChange}
+                          aria-label="days of week"
+                          size="medium"
+                          fullWidth
+                          sx={{ 
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 1,
+                            '& .MuiToggleButton-root': {
+                              flex: 1,
+                              border: '1px solid !important',
+                              borderRadius: '8px !important',
+                              py: 1,
+                              px: 0.5,
+                              minWidth: 40,
+                              borderColor: (theme) => alpha(theme.palette.divider, 0.5),
+                              '&.Mui-selected': {
+                                backgroundColor: 'primary.main',
+                                color: 'primary.contrastText',
+                                borderColor: 'primary.main',
+                                '&:hover': {
+                                  backgroundColor: 'primary.dark',
+                                }
                               }
                             }
-                          }
-                        }}
-                      >
-                        {DAYS_OF_WEEK.map((day) => (
-                          <ToggleButton key={day.value} value={day.value}>
-                            {day.label}
-                          </ToggleButton>
-                        ))}
-                      </ToggleButtonGroup>
-                      
-                      <Box sx={{ display: 'flex', gap: 1, mt: 2, justifyContent: 'center' }}>
-                        <Button 
-                          variant="outlined"
-                          size="small" 
-                          onClick={() => setSelectedDays(['1', '2', '3', '4', '5', '6', '0'])}
-                          sx={{ borderRadius: 4, textTransform: 'none' }}
+                          }}
                         >
-                          {t('scheduler.everyDay')}
-                        </Button>
-                        <Button 
-                          variant="outlined"
-                          size="small" 
-                          onClick={() => setSelectedDays(['1', '2', '3', '4', '5'])}
-                          sx={{ borderRadius: 4, textTransform: 'none' }}
-                        >
-                          {t('scheduler.weekdays')}
-                        </Button>
-                        <Button 
-                          variant="outlined"
-                          size="small" 
-                          onClick={() => setSelectedDays(['6', '0'])}
-                          sx={{ borderRadius: 4, textTransform: 'none' }}
-                        >
-                          {t('scheduler.weekends')}
-                        </Button>
-                      </Box>
-                    </Grid>
-                    
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        type="time"
-                        label={t('scheduler.selectTime')}
-                        fullWidth
-                        InputLabelProps={{ shrink: true }}
-                        value={selectedTime}
-                        onChange={(e) => setSelectedTime(e.target.value)}
-                        sx={{ 
-                          '& input': { fontSize: '1.2rem', fontWeight: 500, letterSpacing: 1 }
-                        }}
-                      />
-                    </Grid>
+                          {DAYS_OF_WEEK.map((day) => (
+                            <ToggleButton key={day.value} value={day.value}>
+                              {day.label}
+                            </ToggleButton>
+                          ))}
+                        </ToggleButtonGroup>
+                      </Grid>
+                    )}
+
+                    {/* Monthly Day Selector */}
+                    {recurrenceType === 'monthly' && (
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle2" gutterBottom>Day of Month</Typography>
+                        <Slider
+                          value={selectedMonthDay}
+                          onChange={(_, val) => setSelectedMonthDay(val as number)}
+                          min={1}
+                          max={31}
+                          valueLabelDisplay="auto"
+                          marks={[
+                            { value: 1, label: '1st' },
+                            { value: 15, label: '15th' },
+                            { value: 31, label: '31st' },
+                          ]}
+                        />
+                        <Typography align="center" sx={{ mt: 1 }}>
+                           On the {selectedMonthDay}{selectedMonthDay === 1 ? 'st' : selectedMonthDay === 2 ? 'nd' : selectedMonthDay === 3 ? 'rd' : 'th'} day
+                        </Typography>
+                      </Grid>
+                    )}
                   </Grid>
                 )}
               </Paper>
@@ -826,7 +1168,8 @@ const DashboardSchedulerTab: React.FC<DashboardSchedulerTabProps> = ({ device })
             variant="contained" 
             color="primary"
             size="large"
-            startIcon={<CheckCircleIcon />}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
+            disabled={loading}
             sx={{ 
               px: 4,
               borderRadius: 2,
