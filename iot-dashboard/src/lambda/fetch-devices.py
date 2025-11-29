@@ -223,6 +223,26 @@ def lambda_handler(event, context):
             device_item = create_device_item(body)
             devices_table.put_item(Item=device_item)
             
+            # Auto-create 'status' subscription for the owner
+            try:
+                import time
+                subscriptions_table = dynamodb.Table('IoT_DeviceSubscriptions')
+                subscriptions_table.put_item(
+                    Item={
+                        'user_email': body['user_email'],
+                        'device_id': body['client_id'],
+                        'subscription_id': f"{body['user_email']}_{body['client_id']}_status_auto_{int(time.time())}",
+                        'parameter_name': 'status',
+                        'condition_type': 'change',
+                        'enabled': True,
+                        'notification_method': 'push',
+                        'created_at': int(time.time())
+                    }
+                )
+            except Exception as sub_error:
+                debug_logs.append(f"Error creating auto-subscription: {str(sub_error)}")
+                # Don't fail the device creation, just log it
+            
             return cors_response(200, {
                 'message': 'Device added successfully',
                 'device': device_item
