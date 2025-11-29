@@ -2,6 +2,7 @@ import json
 import boto3
 import logging
 import time
+import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from boto3.dynamodb.conditions import Key, Attr
@@ -204,6 +205,46 @@ def execute_command(task):
         logger.error(f"Exec error: {e}")
         return False
 
+def send_sns_notification(task, success):
+    """
+    Invoke sns-notification Lambda to send push notification
+    """
+    try:
+        lambda_client = boto3.client('lambda')
+        
+        task_name = task.get('name', 'Scheduled Task')
+        device_id = task.get('device_id', 'Unknown')
+        command = task.get('command', 'Unknown')
+        status = "success" if success else "failed"
+        
+        message = f"Task '{task_name}' {status}: Executed {command} on {device_id}"
+        subject = f"Scheduler {status.title()}: {device_id}"
+        
+        payload = {
+            "action": "send_notification",
+            "message": message,
+            "subject": subject,
+            "type": "scheduler_trigger",
+            "data": {
+                "task_id": task.get('task_id'),
+                "device_id": device_id,
+                "status": status,
+                "task_name": task_name
+            }
+        }
+        
+        target_function = os.environ.get('SNS_NOTIFICATION_LAMBDA', 'sns-notification')
+        
+        lambda_client.invoke(
+            FunctionName=target_function,
+            InvocationType='Event',
+            Payload=json.dumps(payload)
+        )
+        logger.info(f"Invoked SNS notification for task {task.get('task_id')}")
+        
+    except Exception as e:
+        logger.error(f"Error sending SNS notification: {e}")
+
 def process_scheduled_tasks():
     now_ts = int(time.time())
     try:
@@ -215,6 +256,9 @@ def process_scheduled_tasks():
         tasks = response.get('Items', [])
         for task in tasks:
             success = execute_command(task)
+            
+            # Send Push Notification
+            send_sns_notification(task, success)
             
             user_email = task['user_email']
             task_id = task['task_id']

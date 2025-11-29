@@ -169,12 +169,16 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
       }}
       PaperProps={{
         sx: {
-          width: { xs: '100%', sm: 400, md: 500 },
+          width: { xs: 'calc(100vw - 32px)', sm: 400, md: 500 },
+          height: { xs: 'calc(100% - 32px)', sm: '100%' },
+          margin: { xs: '16px', sm: 0 },
+          borderRadius: { xs: '16px', sm: 0 },
           background: theme.palette.mode === 'dark'
             ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)'
             : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.98) 50%, rgba(255, 255, 255, 0.95) 100%)',
           backdropFilter: 'blur(20px)',
           zIndex: 1300, // Ensure it's above other content
+          border: { xs: `1px solid ${theme.palette.divider}`, sm: 'none' },
         },
       }}
     >
@@ -287,16 +291,56 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
           </Box>
         </Box>
 
-        {/* Tabs */}
-        <Tabs
-          value={activeTab}
-          onChange={(_, newValue) => setActiveTab(newValue)}
-          sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}
+        {/* Filter Carousel (Chips) */}
+        <Box
+          sx={{
+            p: 1.5,
+            display: 'flex',
+            gap: 1,
+            overflowX: 'auto',
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            '&::-webkit-scrollbar': { display: 'none' },
+            scrollbarWidth: 'none', // Firefox
+            msOverflowStyle: 'none', // IE/Edge
+          }}
         >
-          <Tab label={`${t('notifications.all')} (${notifications.length})`} />
-          <Tab label={<Badge badgeContent={unreadCount} color="error">{t('notifications.unread')}</Badge>} />
-          <Tab label={`${t('notifications.read')} (${readNotifications.length})`} />
-        </Tabs>
+          <Chip
+            label={`${t('notifications.all')} ${notifications.length > 0 ? `(${notifications.length})` : ''}`}
+            onClick={() => setActiveTab(0)}
+            color={activeTab === 0 ? 'primary' : 'default'}
+            variant={activeTab === 0 ? 'filled' : 'outlined'}
+            clickable
+            sx={{ fontWeight: activeTab === 0 ? 600 : 400 }}
+          />
+          <Badge 
+            badgeContent={unreadCount} 
+            color="error" 
+            sx={{ 
+              '& .MuiBadge-badge': { 
+                right: 8, 
+                top: 4,
+                zIndex: 1 
+              } 
+            }}
+          >
+            <Chip
+              label={t('notifications.unread')}
+              onClick={() => setActiveTab(1)}
+              color={activeTab === 1 ? 'primary' : 'default'}
+              variant={activeTab === 1 ? 'filled' : 'outlined'}
+              clickable
+              sx={{ fontWeight: activeTab === 1 ? 600 : 400 }}
+            />
+          </Badge>
+          <Chip
+            label={`${t('notifications.read')} ${readNotifications.length > 0 ? `(${readNotifications.length})` : ''}`}
+            onClick={() => setActiveTab(2)}
+            color={activeTab === 2 ? 'primary' : 'default'}
+            variant={activeTab === 2 ? 'filled' : 'outlined'}
+            clickable
+            sx={{ fontWeight: activeTab === 2 ? 600 : 400 }}
+          />
+        </Box>
 
         {/* Notification List */}
         <Box sx={{ flex: 1, overflow: 'auto' }}>
@@ -318,6 +362,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
                 <React.Fragment key={notification.id}>
                   <ListItem
                     sx={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
                       bgcolor: notification.read
                         ? 'transparent'
                         : theme.palette.mode === 'dark'
@@ -329,6 +375,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
                           ? 'rgba(255, 255, 255, 0.08)'
                           : 'rgba(0, 0, 0, 0.04)',
                       },
+                      pr: 1, // Add right padding
                     }}
                     onClick={() => {
                       if (!notification.read) {
@@ -338,10 +385,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
                       }
                     }}
                   >
-                    <ListItemIcon>{getSeverityIcon(notification.severity)}</ListItemIcon>
+                    <ListItemIcon sx={{ mt: 0.5 }}>{getSeverityIcon(notification.severity)}</ListItemIcon>
                     <ListItemText
+                      sx={{ 
+                        mr: 1, // Margin to separate from actions
+                        my: 0, // Reset vertical margin
+                      }}
                       primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: notification.read ? 400 : 600 }}>
                             {notification.title}
                           </Typography>
@@ -356,10 +407,22 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
                       }
                       secondary={
                         <Box>
-                          <Typography variant="body2" color="text.secondary" component="div">
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary" 
+                            component="div"
+                            sx={{ 
+                              wordBreak: 'break-word', // Prevent overflow
+                              display: '-webkit-box',
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              mb: 0.5
+                            }}
+                          >
                             {notification.message}
                           </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                             <Typography variant="caption" color="text.secondary" component="span">
                               {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
                             </Typography>
@@ -373,56 +436,59 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ open, onClose, 
                       }
                       secondaryTypographyProps={{ component: 'div' }}
                     />
-                    <ListItemSecondaryAction>
-                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                        {notification.deviceId && (
-                          <>
+                    
+                    {/* Actions Area - Moved from ListItemSecondaryAction */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      gap: 0.5, 
+                      alignItems: 'center',
+                      mt: 0.5,
+                      flexShrink: 0 // Prevent shrinking
+                    }}>
+                      {notification.deviceId && (
+                        <>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onAction) {
+                                onAction('view_device', notification);
+                              }
+                            }}
+                            title={t('notifications.viewDevice')}
+                            sx={{ color: 'primary.main' }}
+                          >
+                            <DashboardIcon fontSize="small" />
+                          </IconButton>
+                          {(notification.type === 'alarm' || notification.channel === 'alarm') && (
                             <IconButton
-                              edge="end"
                               size="small"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (onAction) {
-                                  onAction('view_device', notification);
+                                  onAction('view_alarms', notification);
                                 }
                               }}
-                              title={t('notifications.viewDevice')}
-                              sx={{ color: 'primary.main' }}
+                              title={t('notifications.viewAlarms')}
+                              sx={{ color: 'warning.main' }}
                             >
-                              <DashboardIcon fontSize="small" />
+                              <WarningIcon fontSize="small" />
                             </IconButton>
-                            {(notification.type === 'alarm' || notification.channel === 'alarm') && (
-                              <IconButton
-                                edge="end"
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onAction) {
-                                    onAction('view_alarms', notification);
-                                  }
-                                }}
-                                title={t('notifications.viewAlarms')}
-                                sx={{ color: 'warning.main' }}
-                              >
-                                <WarningIcon fontSize="small" />
-                              </IconButton>
-                            )}
-                          </>
-                        )}
-                        <IconButton
-                          edge="end"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            dismiss(notification.id);
-                            // Also update NotificationManager
-                            notificationManager.dismiss(notification.id);
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </ListItemSecondaryAction>
+                          )}
+                        </>
+                      )}
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dismiss(notification.id);
+                          // Also update NotificationManager
+                          notificationManager.dismiss(notification.id);
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </ListItem>
                   <Divider />
                 </React.Fragment>

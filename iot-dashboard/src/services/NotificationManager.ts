@@ -123,7 +123,7 @@ class NotificationManager extends EventEmitter {
     notificationExpirationHours: 24,
     retryAttempts: 3,
     retryDelay: 1000,
-    enableAWSSNS: false,
+    enableAWSSNS: true,
     snsApiUrl: 'https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/sns-notification', // Must be configured
   };
 
@@ -408,6 +408,10 @@ class NotificationManager extends EventEmitter {
           }
 
           // Send AWS SNS push notification
+          // DISABLED: Backend (Lambda) now handles push notifications independently.
+          // This prevents double-notifications and CORS errors.
+          
+          /*
           // Only for high-priority notifications or when configured to do so
           // Check explicit override or global config combined with priority/visibility
           const shouldSendSNS = notification.enableAWSSNS || 
@@ -419,6 +423,7 @@ class NotificationManager extends EventEmitter {
           if (shouldSendSNS) {
             await this.sendAWSPushNotification(notification);
           }
+          */
 
           // Add to history
           this.addToHistory(notification);

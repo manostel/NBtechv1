@@ -1071,13 +1071,20 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
 
   useEffect(() => {
     const initializeNotifications = async () => {
+      // Initialize local/web notifications
       const notificationsEnabled = await NotificationService.initialize();
       if (!notificationsEnabled) {
+        console.log('Local notifications not enabled');
+      }
+
+      // Initialize Native Push Notifications (Capacitor)
+      if (user?.email) {
+        await PushNotificationService.initialize(user.email);
       }
     };
 
     initializeNotifications();
-  }, []);
+  }, [user?.email]);
 
   // Block rendering until core data is ready
   if (isLoading || !variablesLoaded || !metricsData) {

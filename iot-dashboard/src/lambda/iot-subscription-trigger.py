@@ -1,5 +1,6 @@
 import json
 import boto3
+import os
 import logging
 from datetime import datetime, timezone, timedelta
 from boto3.dynamodb.conditions import Key
@@ -51,10 +52,6 @@ def lambda_handler(event, context):
             return {'statusCode': 400, 'body': 'Invalid event data: No device data'}
         
         # Determine message type (data or command)
-        # Topics can be: 
-        # - NBtechv1/{device_id}/data (main data topic)
-        # - NBtechv1/{device_id}/data/+ (with subtopic like metrics, status)
-        # - NBtechv1/{device_id}/cmd (command topic)
         if topic.startswith('NBtechv1/') and '/data' in topic:
             message_type = 'data'
         elif topic.startswith('NBtechv1/') and '/cmd' in topic:
@@ -65,7 +62,16 @@ def lambda_handler(event, context):
         logger.info(f"Processing {message_type} message for device: {device_id}")
         logger.info(f"Full topic path: {topic}")
         
-        # Check for subscription triggers (synchronous version)
+        # 1. Check for Input/Output State Changes (Independent of subscriptions)
+        # This ensures we get notified about I/O changes even without specific subscriptions
+        check_io_state_changes(device_id, device_data)
+        
+        # 2. Check for Legacy Alarms (IoT_DeviceAlarms table)
+        # This ensures "Alarms Tab" logic works independently
+        check_legacy_alarms(device_id, device_data)
+        
+        # 3. Check for Subscription Triggers (IoT_DeviceSubscriptions table)
+        # This is the new, flexible rule engine
         triggered_count = check_and_trigger_subscriptions_sync(device_id, device_data, message_type)
         
         logger.info(f"Triggered {triggered_count} subscriptions for device {device_id}")
@@ -85,6 +91,138 @@ def lambda_handler(event, context):
             'statusCode': 500,
             'body': json.dumps({'error': str(e)})
         }
+
+def check_io_state_changes(device_id, device_data):
+    """
+    Check for Input/Output state changes by comparing with stored state.
+    Sends notification if state changed.
+    """
+    try:
+        # Define IO parameters to monitor
+        io_params = ['out1_state', 'out2_state', 'in1_state', 'in2_state']
+        
+        # Check if any IO params are present in current data
+        present_params = [p for p in io_params if p in device_data]
+        if not present_params:
+            return
+            
+        # Get last known state from IoT_DeviceData table
+        device_data_table = dynamodb.Table('IoT_DeviceData')
+        response = device_data_table.query(
+            KeyConditionExpression=Key('client_id').eq(device_id),
+            Limit=1,
+            ScanIndexForward=False
+        )
+        
+        if not response.get('Items'):
+            return
+            
+        last_state = response['Items'][0]
+        
+        for param in present_params:
+            current_val = device_data[param]
+            last_val = last_state.get(param)
+            
+            # Normalize for comparison (0/1, True/False)
+            curr_norm = 1 if current_val in [1, '1', True, 'true', 'on', 'ON'] else 0
+            last_norm = 1 if last_val in [1, '1', True, 'true', 'on', 'ON'] else 0
+            
+            if curr_norm != last_norm:
+                # State Changed!
+                io_type = "Output" if "out" in param else "Input"
+                io_num = "1" if "1" in param else "2"
+                state_str = "ON" if curr_norm == 1 else "OFF"
+                
+                message = f"{io_type} {io_num} changed to {state_str}"
+                
+                logger.info(f"IO State Change detected for {device_id}: {param} {last_norm}->{curr_norm}")
+                
+                # Construct notification payload
+                notification = {
+                    'message': message,
+                    'parameter_name': param,
+                    'device_id': device_id,
+                    'subscription_id': 'io_change', # Virtual ID
+                    'current_value': state_str
+                }
+                
+                # Send Push
+                send_sns_push_notification_sync(notification)
+                
+    except Exception as e:
+        logger.error(f"Error checking IO state changes: {e}")
+
+def check_legacy_alarms(device_id, device_data):
+    """
+    Check "Alarms Tab" rules (IoT_DeviceAlarms table).
+    This ensures alarms work independently of the dashboard.
+    """
+    try:
+        alarms_table = dynamodb.Table('IoT_DeviceAlarms')
+        
+        # Get all alarms for this device
+        response = alarms_table.query(
+            KeyConditionExpression=Key('client_id').eq(device_id)
+        )
+        
+        alarms = response.get('Items', [])
+        if not alarms:
+            return
+
+        for alarm in alarms:
+            if not alarm.get('enabled', True) and not alarm.get('is_active', True):
+                continue
+                
+            variable = alarm.get('variable_name')
+            if variable not in device_data:
+                continue
+                
+            current_val = device_data[variable]
+            threshold = float(alarm['threshold'])
+            condition = alarm['condition']
+            
+            # Convert Decimal/String to float
+            if isinstance(current_val, Decimal): current_val = float(current_val)
+            elif isinstance(current_val, str): 
+                try: current_val = float(current_val)
+                except: continue
+            
+            should_trigger = False
+            if condition == 'above' and current_val > threshold:
+                should_trigger = True
+            elif condition == 'below' and current_val < threshold:
+                should_trigger = True
+                
+            if should_trigger:
+                # Check cooldown (basic check using last_triggered)
+                last_trig = alarm.get('last_triggered')
+                if last_trig:
+                    # Simple 1-minute cooldown
+                    last_time = datetime.fromisoformat(last_trig.replace('Z', '+00:00'))
+                    if (datetime.now(timezone.utc) - last_time).total_seconds() < 60:
+                        continue
+
+                logger.info(f"Legacy Alarm triggered for {device_id}: {variable} {condition} {threshold}")
+                
+                # Update last_triggered
+                alarms_table.update_item(
+                    Key={'client_id': device_id, 'alarm_id': alarm['alarm_id']},
+                    UpdateExpression="SET last_triggered = :now",
+                    ExpressionAttributeValues={':now': datetime.now(timezone.utc).isoformat()}
+                )
+                
+                # Send Push
+                notification = {
+                    'message': f"ALARM: {variable} is {current_val} ({condition} {threshold})",
+                    'parameter_name': variable,
+                    'device_id': device_id,
+                    'subscription_id': alarm['alarm_id'],
+                    'current_value': current_val
+                }
+                send_sns_push_notification_sync(notification)
+                
+    except Exception as e:
+        logger.error(f"Error checking legacy alarms: {e}")
 
 def extract_device_id(event):
     """Extract device ID from IoT Core event"""
@@ -795,8 +933,12 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
             logger.warning(f"Could not store notification (table may not exist): {table_error}")
         
         # Send email if configured
-        if subscription['notification_method'] in ['email', 'both']:
+        if subscription.get('notification_method') in ['email', 'both']:
             send_email_notification_sync(notification)
+            
+        # Send Push Notification (SNS) - Independent of Dashboard
+        # We send high priority push for all subscription triggers
+        send_sns_push_notification_sync(notification)
         
         # Execute command actions if configured
         if subscription.get('commands'):
@@ -869,6 +1011,50 @@ def format_notification_message(subscription, current_value, message_type):
         return f"{parameter_name} {type_context} ({current_value}) is not equal to {threshold_value}"
     else:
         return f"{parameter_name} {type_context} value changed to {current_value}"
+
+def send_sns_push_notification_sync(notification):
+    """
+    Send SNS Push Notification by invoking the centralized sns-notification Lambda.
+    This ensures consistent payload formatting and decoupling.
+    """
+    try:
+        import boto3
+        import json
+        
+        lambda_client = boto3.client('lambda')
+        
+        # Construct the payload for the sns-notification lambda
+        # It expects: { action, message, subject, type, data... }
+        payload = {
+            "action": "send_notification",
+            "message": notification['message'],
+            "subject": f"Alert: {notification['parameter_name']} - {notification['device_id']}",
+            "type": "subscription_trigger",
+            # We can pass additional data that sns-notification will put into the 'data' field
+            "data": {
+                "subscription_id": notification['subscription_id'],
+                "device_id": notification['device_id'],
+                "parameter": notification['parameter_name'],
+                "value": str(notification['current_value'])
+            }
+        }
+        
+        # The name/ARN of your SNS notification lambda
+        # Ideally, get this from env var: os.environ.get('SNS_LAMBDA_ARN')
+        # For now, we'll use the function name assuming it's in the same region/account
+        target_function = os.environ.get('SNS_NOTIFICATION_LAMBDA', 'sns-notification')
+        
+        # Invoke asynchronously (Event) so we don't wait for the push to finish
+        lambda_client.invoke(
+            FunctionName=target_function,
+            InvocationType='Event', 
+            Payload=json.dumps(payload)
+        )
+        
+        logger.info(f"Invoked {target_function} for notification")
+        
+    except Exception as e:
+        logger.error(f"Error invoking SNS lambda: {e}")
 
 def send_email_notification_sync(notification):
     """Send email notification (synchronous version)"""
