@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -21,12 +21,20 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SpeedIcon from '@mui/icons-material/Speed';
 import BatterySaverIcon from '@mui/icons-material/BatterySaver';
 import PowerIcon from '@mui/icons-material/Power';
+// WebSocket status icons (for future use)
+// import WifiIcon from '@mui/icons-material/Wifi';
+// import WifiOffIcon from '@mui/icons-material/WifiOff';
 import { Device } from '../../../types';
 import { useTranslation } from 'react-i18next';
 import notificationManager from '../../../services/NotificationManager';
 
 const COMMAND_API_URL = 'https://61dd7wovqk.execute-api.eu-central-1.amazonaws.com/default/send-command';
-// const STATUS_API_URL = 'https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/data-dashboard-state';
+// Device Shadow state API (source of truth for device state - no fallback)
+const SHADOW_STATE_API_URL = 'https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/fetch-device-shadow-state';
+// Device Shadow update API (direct shadow updates - professional approach)
+const SHADOW_UPDATE_API_URL = 'https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/update-device-shadow';
+// WebSocket URL for real-time updates
+const WEBSOCKET_URL = 'wss://2e3uhs3ur2.execute-api.eu-central-1.amazonaws.com/production';
 
 interface DashboardCommandsProps {
   device: Device;
@@ -44,7 +52,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
   device, 
   deviceState, 
   // onCommandSend, // Not used in the original component, it defines its own sendCommand
-  fetchDeviceState,
+  // fetchDeviceState, // Not used - we use fetchDeviceStateFromShadow instead
   setSnackbar
 }) => {
   const { t } = useTranslation();
@@ -56,12 +64,152 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
   // @ts-ignore
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  // Pending states for individual toggles
+  const [output1Pending, setOutput1Pending] = useState(false);
+  const [output2Pending, setOutput2Pending] = useState(false);
+  const [powerSavingPending, setPowerSavingPending] = useState(false);
+  
+  // Refs to track pending state in WebSocket callback (avoid stale closures)
+  const output1PendingRef = useRef(false);
+  const output2PendingRef = useRef(false);
+  const powerSavingPendingRef = useRef(false);
+  const output1ExpectedRef = useRef(false);
+  const output2ExpectedRef = useRef(false);
+  const powerSavingExpectedRef = useRef(false);
   const [commandFeedback, setCommandFeedback] = useState({
     show: false,
     message: '',
     loading: false
   });
   const [restartDialogOpen, setRestartDialogOpen] = useState(false);
+  
+  // WebSocket state
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+
+  // WebSocket connection handler
+  const connectWebSocket = useCallback(() => {
+    if (!device?.client_id || WEBSOCKET_URL.includes('YOUR_API_ID')) {
+      console.log('⚠️ WebSocket not configured or no device');
+      return;
+    }
+
+    // Clean up existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+
+    try {
+      const url = `${WEBSOCKET_URL}?client_id=${device.client_id}`;
+      console.log('🔌 Connecting WebSocket:', url);
+      
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('✅ WebSocket connected');
+        setWsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log('📨 WebSocket message:', message);
+
+          if (message.type === 'SHADOW_UPDATE' && message.client_id === device.client_id) {
+            const reported = message.reported;
+            const newOut1 = reported.out1_state === 1;
+            const newOut2 = reported.out2_state === 1;
+            const newPowerSaving = reported.power_saving === 1;
+            
+            // Update OUT1: if pending, only accept if matches expected
+            if (!output1PendingRef.current) {
+              setOutput1State(newOut1);
+            } else if (newOut1 === output1ExpectedRef.current) {
+              // Confirmed! Now update the state
+              setOutput1State(newOut1);
+              setOutput1Pending(false);
+              output1PendingRef.current = false;
+              console.log('✅ OUT1 confirmed');
+            } else {
+              console.log('⏳ Ignoring stale OUT1 update');
+            }
+            
+            // Update OUT2
+            if (!output2PendingRef.current) {
+              setOutput2State(newOut2);
+            } else if (newOut2 === output2ExpectedRef.current) {
+              // Confirmed! Now update the state
+              setOutput2State(newOut2);
+              setOutput2Pending(false);
+              output2PendingRef.current = false;
+              console.log('✅ OUT2 confirmed');
+            } else {
+              console.log('⏳ Ignoring stale OUT2 update');
+            }
+            
+            // Update motor speed (always update)
+            setMotorSpeed(reported.motor_speed?.toString() || '0');
+            
+            // Update power saving
+            if (!powerSavingPendingRef.current) {
+              setPowerSavingMode(newPowerSaving);
+            } else if (newPowerSaving === powerSavingExpectedRef.current) {
+              // Confirmed! Now update the state
+              setPowerSavingMode(newPowerSaving);
+              setPowerSavingPending(false);
+              powerSavingPendingRef.current = false;
+              console.log('✅ Power saving confirmed');
+            } else {
+              console.log('⏳ Ignoring stale power saving update');
+            }
+            
+            setIsVerifying(false);
+            setCommandFeedback({ show: false, message: '', loading: false });
+            
+            console.log('✅ State updated via WebSocket');
+          }
+        } catch (e) {
+          console.error('❌ Error parsing WebSocket message:', e);
+        }
+      };
+
+      ws.onerror = (event) => {
+        console.error('❌ WebSocket error:', event);
+      };
+
+      ws.onclose = (event) => {
+        console.log('🔌 WebSocket closed:', event.code);
+        setWsConnected(false);
+        wsRef.current = null;
+
+        // Reconnect after 5 seconds
+        if (event.code !== 1000) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log('🔄 Reconnecting WebSocket...');
+            connectWebSocket();
+          }, 5000);
+        }
+      };
+    } catch (e) {
+      console.error('❌ Error creating WebSocket:', e);
+    }
+  }, [device?.client_id]);
+
+  // Connect WebSocket on mount
+  useEffect(() => {
+    connectWebSocket();
+    
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close(1000, 'Component unmount');
+      }
+    };
+  }, [connectWebSocket]);
 
   useEffect(() => {
     if (deviceState) {
@@ -97,45 +245,153 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
   };
   */
 
+  // Fetch device state from Device Shadow (source of truth - no fallback)
+  const fetchDeviceStateFromShadow = async () => {
+    try {
+      if (!device || !device.client_id) {
+        throw new Error('No device or client_id available');
+      }
+
+      const response = await fetch(SHADOW_STATE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.state) {
+        // Map shadow state format to frontend format
+        return {
+          client_id: result.state.client_id,
+          timestamp: result.state.timestamp,
+          out1_state: result.state.out1_state,
+          out2_state: result.state.out2_state,
+          motor_speed: result.state.motor_speed,
+          power_saving: result.state.power_saving,
+          in1_state: result.state.in1_state,
+          in2_state: result.state.in2_state,
+          charging: result.state.charging,
+          connection_status: result.state.connection_status
+        };
+      }
+      
+      console.warn('⚠️ Shadow response did not contain state');
+      return null;
+    } catch (error: any) {
+      console.error('❌ Error fetching device state from Shadow:', error);
+      setError(error.message || 'Failed to fetch device state from Shadow');
+      return null;
+    }
+  };
+
+  // Professional: Update Device Shadow desired state directly
+  // Device is subscribed to delta topics, so it will process immediately
+  const updateShadowDesiredState = async (desiredState: Record<string, any>) => {
+    try {
+      if (!device || !device.client_id) {
+        throw new Error('No device or client_id available');
+      }
+
+      const response = await fetch(SHADOW_UPDATE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: device.client_id,
+          desired_state: desiredState
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Return current state if available
+      if (result.currentState) {
+        return {
+          success: true,
+          currentState: result.currentState,
+          desiredState: result.desiredState
+        };
+      }
+
+      return { success: true, desiredState: result.desiredState };
+    } catch (error: any) {
+      console.error('Error updating shadow desired state:', error);
+      throw error;
+    }
+  };
+
   const sendCommand = async (command: string, params = {}) => {
     try {
       if (!device || !device.client_id) {
         throw new Error('No device or client_id available');
       }
 
-      const payload = {
-        client_id: device.client_id,
-        command: command,
-        ...params
-      };
-
-
-      const response = await fetch(COMMAND_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send command');
+      // Professional: Map commands to shadow desired state and update directly
+      // Device is subscribed to delta topics, so it processes immediately
+      let desiredState: Record<string, any> = {};
+      
+      if (command === "TOGGLE_1_ON") {
+        desiredState = { OUT1: 1 };
+      } else if (command === "TOGGLE_1_OFF") {
+        desiredState = { OUT1: 0 };
+      } else if (command === "TOGGLE_2_ON") {
+        desiredState = { OUT2: 1 };
+      } else if (command === "TOGGLE_2_OFF") {
+        desiredState = { OUT2: 0 };
+      } else if (command === "SET_SPEED") {
+        const speed = (params as any).speed || parseInt(motorSpeed);
+        if (isNaN(speed) || speed < 0 || speed > 255) {
+          throw new Error('Speed must be between 0 and 255');
+        }
+        desiredState = { motor_speed: speed };
+      } else if (command === "POWER_SAVING_ON") {
+        desiredState = { power_saving: 1 };
+      } else if (command === "POWER_SAVING_OFF") {
+        desiredState = { power_saving: 0 };
+      } else if (command === "RESTART") {
+        // RESTART is a special action command - use MQTT topic (not state)
+        const payload = {
+          client_id: device.client_id,
+          command: command,
+          ...params
+        };
+        const response = await fetch(COMMAND_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to send command');
+        }
+        return { success: true };
+      } else {
+        throw new Error(`Unknown command: ${command}`);
       }
 
-      // The API might return a success response without a body
-      if (response.status === 200) {
-        return { success: true }; // Return a success object
-      }
-
-      // If there is a response body, try to parse it
-      const result = await response.json();
-      if (result && result.success) {
-        return result;
-      }
-
-      throw new Error(result?.error || 'Failed to send command');
+      // Update shadow desired state directly (professional approach)
+      return await updateShadowDesiredState(desiredState);
     } catch (error) {
       console.error('Error sending command:', error);
       throw error;
@@ -143,116 +399,105 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
   };
 
   const handleSwitchChange = async (led: number, isOn: boolean) => {
-    setIsLoading(true);
+    // NO optimistic update - keep current state, just show pending indicator
+    // State changes only when WebSocket confirms
+    if (led === 1) {
+      setOutput1Pending(true);
+      output1PendingRef.current = true;
+      output1ExpectedRef.current = isOn;
+    } else {
+      setOutput2Pending(true);
+      output2PendingRef.current = true;
+      output2ExpectedRef.current = isOn;
+    }
+    
     const oldState = led === 1 ? output1State : output2State;
     
     try {
       const command = isOn ? `TOGGLE_${led}_ON` : `TOGGLE_${led}_OFF`;
       
-      // Send the command directly using the internal sendCommand function
+      // Send the command
       await sendCommand(command);
-
+      console.log('📡 Command sent - waiting for WebSocket real-time update');
       
-      // Wait for 5 seconds to allow the device to process the command
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // First verification
-      // const latestState = await fetchDeviceState();
-      await fetchDeviceState();
-      
-      // Additional verification after 10 seconds
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      const finalState = await fetchDeviceState();
-      
-      // Update the UI with the final state
-      if (finalState) {
-        const newOutput1State = finalState.out1_state === 1;
-        const newOutput2State = finalState.out2_state === 1;
-        
-        // Check if output state actually changed and notify
-        if (led === 1 && newOutput1State !== oldState) {
-          await notificationManager.notifyOutputChange(
-            device,
-            1,
-            oldState,
-            newOutput1State,
-            'manual'
-          );
-        } else if (led === 2 && newOutput2State !== oldState) {
-          await notificationManager.notifyOutputChange(
-            device,
-            2,
-            oldState,
-            newOutput2State,
-            'manual'
-          );
+      // Timeout: if WebSocket doesn't update in 30 seconds, rollback
+      setTimeout(() => {
+        if ((led === 1 && output1PendingRef.current) || (led === 2 && output2PendingRef.current)) {
+          console.warn('⚠️ WebSocket update timeout - rolling back');
+          if (led === 1) {
+            setOutput1State(oldState);
+            setOutput1Pending(false);
+            output1PendingRef.current = false;
+          } else {
+            setOutput2State(oldState);
+            setOutput2Pending(false);
+            output2PendingRef.current = false;
+          }
+          setSnackbar({
+            open: true,
+            message: 'Device did not respond in time',
+            severity: 'warning'
+          });
         }
-        
-        setOutput1State(newOutput1State);
-        setOutput2State(newOutput2State);
-        setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
-        setPowerSavingMode(finalState.power_saving === 1);
-      }
-      /*
-      setSnackbar({
-        open: true,
-        message: t('commands.ledStateUpdated', { led }),
-        severity: 'success'
-      });
-      */
+      }, 40000);
+      
     } catch (error: any) {
       console.error('Error in handleSwitchChange:', error);
+      // Rollback on error
+      if (led === 1) {
+        setOutput1State(oldState);
+        setOutput1Pending(false);
+        output1PendingRef.current = false;
+      } else {
+        setOutput2State(oldState);
+        setOutput2Pending(false);
+        output2PendingRef.current = false;
+      }
       setSnackbar({
         open: true,
         message: error.message || t('commands.failedUpdateSwitch'),
         severity: 'error'
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handlePowerSavingChange = async (isOn: boolean) => {
-    setIsLoading(true);
+    const oldState = powerSavingMode;
+    
+    // NO optimistic update - keep current state, just show pending indicator
+    setPowerSavingPending(true);
+    powerSavingPendingRef.current = true;
+    powerSavingExpectedRef.current = isOn;
+    
     try {
       const command = isOn ? 'POWER_SAVING_ON' : 'POWER_SAVING_OFF';
-      
-      // Send the command directly using the internal sendCommand function
       await sendCommand(command);
-
+      console.log('📡 Power saving command sent - waiting for WebSocket update');
       
-      // Wait for 5 seconds to allow the device to process the command
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Timeout: rollback if no response
+      setTimeout(() => {
+        if (powerSavingPendingRef.current) {
+          setPowerSavingMode(oldState);
+          setPowerSavingPending(false);
+          powerSavingPendingRef.current = false;
+          setSnackbar({
+            open: true,
+            message: 'Device did not respond in time',
+            severity: 'warning'
+          });
+        }
+      }, 40000);
       
-      // First verification
-      // const latestState = await fetchDeviceState();
-      await fetchDeviceState();
-      
-      // Additional verification after 10 seconds
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      const finalState = await fetchDeviceState();
-      
-      // Update the UI with the final state
-      if (finalState) {
-        setOutput1State(finalState.out1_state === 1); // Ensure Output states are updated
-        setOutput2State(finalState.out2_state === 1); // Ensure Output states are updated
-        setMotorSpeed(finalState.motor_speed?.toString() || "0"); // Ensure motor speed is also updated
-        setPowerSavingMode(finalState.power_saving === 1);
-      }
-      setSnackbar({
-        open: true,
-        message: t('commands.powerSavingUpdated', { state: isOn ? 'ON' : 'OFF' }),
-        severity: 'success'
-      });
     } catch (error: any) {
       console.error('Error in handlePowerSavingChange:', error);
+      setPowerSavingMode(oldState); // Rollback
+      setPowerSavingPending(false);
+      powerSavingPendingRef.current = false;
       setSnackbar({
         open: true,
         message: error.message || t('commands.failedUpdatePowerSaving'),
         severity: 'error'
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -274,70 +519,43 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
         throw new Error(t('commands.speedRangeError'));
       }
 
-      // Send the command directly using the internal sendCommand function
       await sendCommand('SET_SPEED', { speed });
-
-      // Wait for 5 seconds to allow the device to process the command
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log('📡 Speed command sent - waiting for WebSocket update');
       
-      // First verification
-      // const latestState = await fetchDeviceState();
-      await fetchDeviceState();
+      // Timeout fallback
+      setTimeout(() => {
+        if (isVerifying) {
+          setIsVerifying(false);
+          setCommandFeedback({
+            show: true,
+            message: 'Device did not respond in time',
+            loading: false
+          });
+        }
+      }, 40000);
       
-      // Additional verification after 10 seconds
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      const finalState = await fetchDeviceState();
-      
-      if (finalState) {
-        setMotorSpeed(finalState.motor_speed?.toString() || "0");
-        setCommandFeedback({
-          show: true,
-          message: t('commands.speedUpdated'),
-          loading: false
-        });
-      }
     } catch (error: any) {
       console.error('Error in handleSpeedSubmit:', error);
       setError(error.message);
+      setIsVerifying(false);
       setCommandFeedback({
         show: true,
         message: error.message || t('commands.failedUpdateSpeed'),
         loading: false
       });
-    } finally {
-      setIsVerifying(false);
     }
   };
 
   const handleRestart = async () => {
     setIsLoading(true);
     try {
-      // Send the command directly using the internal sendCommand function
       await sendCommand('RESTART');
-
       setSnackbar({
         open: true,
         message: t('commands.restartCommandSent'),
         severity: 'success'
       });
-
-      // Wait for 5 seconds to allow the device to process the command
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // First verification
-      // const latestState = await fetchDeviceState();
-      await fetchDeviceState();
-      
-      // Additional verification after 10 seconds
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      const finalState = await fetchDeviceState();
-      
-      if (finalState) {
-        setOutput1State(finalState.out1_state === 1);
-        setOutput2State(finalState.out2_state === 1);
-        setMotorSpeed(finalState.motor_speed?.toString() || "0");
-        setPowerSavingMode(finalState.power_saving === 1);
-      }
+      // WebSocket will update state when device comes back online
     } catch (error: any) {
       console.error('Error in handleRestart:', error);
       setSnackbar({
@@ -443,26 +661,38 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                     </Typography>
                     <Chip 
                       size="small" 
-                      label={output1State ? t('devices.on') : t('devices.off')} 
+                      label={output1Pending ? '' : (output1State ? t('devices.on') : t('devices.off'))} 
+                      icon={output1Pending ? <CircularProgress size={12} color="inherit" /> : undefined}
                       variant="outlined"
-                      color={output1State ? 'success' : 'default'}
-                      sx={{ fontSize: '0.75rem', height: '20px' }}
+                      color={output1Pending ? 'warning' : (output1State ? 'success' : 'default')}
+                      sx={{ fontSize: '0.75rem', height: '20px', minWidth: output1Pending ? '40px' : 'auto' }}
                     />
                   </Box>
                   <Switch
                     checked={output1State}
                     onChange={(e) => handleSwitchChange(1, e.target.checked)}
+                    disabled={output1Pending}
                     inputProps={{ 'aria-label': 'Output 1 switch' }}
                     size="small"
                     sx={{
+                      // Disable slide animation when pending - snap instantly
                       '& .MuiSwitch-switchBase': {
                         borderRadius: '16px',
+                        transition: output1Pending ? 'none' : undefined,
                       },
                       '& .MuiSwitch-thumb': {
                         borderRadius: '16px',
+                        transition: output1Pending ? 'none' : undefined,
+                        animation: output1Pending ? 'pulse 1s infinite' : 'none',
                       },
                       '& .MuiSwitch-track': {
                         borderRadius: '16px',
+                        transition: output1Pending ? 'none' : undefined,
+                        animation: output1Pending ? 'pulse 1s infinite' : 'none',
+                      },
+                      '@keyframes pulse': {
+                        '0%, 100%': { opacity: 0.5 },
+                        '50%': { opacity: 1 },
                       },
                     }}
                   />
@@ -485,26 +715,38 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                     </Typography>
                     <Chip 
                       size="small" 
-                      label={output2State ? t('devices.on') : t('devices.off')} 
+                      label={output2Pending ? '' : (output2State ? t('devices.on') : t('devices.off'))} 
+                      icon={output2Pending ? <CircularProgress size={12} color="inherit" /> : undefined}
                       variant="outlined"
-                      color={output2State ? 'success' : 'default'}
-                      sx={{ fontSize: '0.75rem', height: '20px' }}
+                      color={output2Pending ? 'warning' : (output2State ? 'success' : 'default')}
+                      sx={{ fontSize: '0.75rem', height: '20px', minWidth: output2Pending ? '40px' : 'auto' }}
                     />
                   </Box>
                   <Switch
                     checked={output2State}
                     onChange={(e) => handleSwitchChange(2, e.target.checked)}
+                    disabled={output2Pending}
                     inputProps={{ 'aria-label': 'Output 2 switch' }}
                     size="small"
                     sx={{
+                      // Disable slide animation when pending - snap instantly
                       '& .MuiSwitch-switchBase': {
                         borderRadius: '16px',
+                        transition: output2Pending ? 'none' : undefined,
                       },
                       '& .MuiSwitch-thumb': {
                         borderRadius: '16px',
+                        transition: output2Pending ? 'none' : undefined,
+                        animation: output2Pending ? 'pulse 1s infinite' : 'none',
                       },
                       '& .MuiSwitch-track': {
                         borderRadius: '16px',
+                        transition: output2Pending ? 'none' : undefined,
+                        animation: output2Pending ? 'pulse 1s infinite' : 'none',
+                      },
+                      '@keyframes pulse': {
+                        '0%, 100%': { opacity: 0.5 },
+                        '50%': { opacity: 1 },
                       },
                     }}
                   />
@@ -672,12 +914,23 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
               <Switch
                 checked={powerSavingMode}
                 onChange={(e) => handlePowerSavingChange(e.target.checked)}
+                disabled={powerSavingPending}
                 inputProps={{ 'aria-label': 'Power Saving Mode switch' }}
                 size="small"
                 sx={{
                   '& .MuiSwitch-switchBase': { borderRadius: '16px' },
-                  '& .MuiSwitch-thumb': { borderRadius: '16px' },
-                  '& .MuiSwitch-track': { borderRadius: '16px' },
+                  '& .MuiSwitch-thumb': { 
+                    borderRadius: '16px',
+                    animation: powerSavingPending ? 'pulse 1s infinite' : 'none',
+                  },
+                  '& .MuiSwitch-track': { 
+                    borderRadius: '16px',
+                    animation: powerSavingPending ? 'pulse 1s infinite' : 'none',
+                  },
+                  '@keyframes pulse': {
+                    '0%, 100%': { opacity: 0.5 },
+                    '50%': { opacity: 1 },
+                  },
                 }}
               />
             </Box>

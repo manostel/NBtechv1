@@ -1,0 +1,172 @@
+{
+  "fetch-device-shadow-state": {
+    "description": "Test event for fetch-device-shadow-state Lambda (via API Gateway)",
+    "event": {
+      "httpMethod": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Origin": "https://your-frontend-domain.com"
+      },
+      "body": "{\"client_id\": \"sim7080_updated\"}"
+    },
+    "direct_invoke": {
+      "description": "For direct Lambda invocation (not via API Gateway)",
+      "client_id": "sim7080_updated"
+    }
+  },
+  "update-device-shadow": {
+    "description": "Test event for update-device-shadow Lambda (via API Gateway)",
+    "event": {
+      "httpMethod": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Origin": "https://your-frontend-domain.com"
+      },
+      "body": "{\"client_id\": \"sim7080_updated\", \"desired_state\": {\"OUT1\": 1}}"
+    },
+    "direct_invoke": {
+      "description": "For direct Lambda invocation (not via API Gateway)",
+      "client_id": "sim7080_updated",
+      "desired_state": {
+        "OUT1": 1
+      }
+    },
+    "examples": {
+      "toggle_out1_on": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"desired_state\": {\"OUT1\": 1}}"
+      },
+      "toggle_out1_off": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"desired_state\": {\"OUT1\": 0}}"
+      },
+      "toggle_out2_on": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"desired_state\": {\"OUT2\": 1}}"
+      },
+      "set_motor_speed": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"desired_state\": {\"motor_speed\": 150}}"
+      },
+      "power_saving_on": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"desired_state\": {\"power_saving\": 1}}"
+      },
+      "multiple_states": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"desired_state\": {\"OUT1\": 1, \"OUT2\": 0, \"motor_speed\": 200, \"power_saving\": 0}}"
+      }
+    }
+  },
+  "send-command": {
+    "description": "Test event for send-command Lambda (via API Gateway)",
+    "event": {
+      "httpMethod": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Origin": "https://your-frontend-domain.com"
+      },
+      "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"TOGGLE_1_ON\"}"
+    },
+    "direct_invoke": {
+      "description": "For direct Lambda invocation (not via API Gateway)",
+      "client_id": "sim7080_updated",
+      "command": "TOGGLE_1_ON"
+    },
+    "examples": {
+      "toggle_1_on": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"TOGGLE_1_ON\"}"
+      },
+      "toggle_1_off": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"TOGGLE_1_OFF\"}"
+      },
+      "toggle_2_on": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"TOGGLE_2_ON\"}"
+      },
+      "toggle_2_off": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"TOGGLE_2_OFF\"}"
+      },
+      "set_speed": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"SET_SPEED\", \"speed\": 150}"
+      },
+      "power_saving_on": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"POWER_SAVING_ON\"}"
+      },
+      "power_saving_off": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"POWER_SAVING_OFF\"}"
+      },
+      "restart": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"RESTART\"}"
+      },
+      "get_state": {
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"client_id\": \"sim7080_updated\", \"command\": \"GET_STATE\"}"
+      }
+    }
+  },
+  "cors_preflight": {
+    "description": "CORS preflight request (OPTIONS)",
+    "event": {
+      "httpMethod": "OPTIONS",
+      "headers": {
+        "Origin": "https://your-frontend-domain.com",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type"
+      }
+    }
+  }
+}
+
