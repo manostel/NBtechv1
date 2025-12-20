@@ -420,22 +420,42 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       await sendCommand(command);
       console.log('📡 Command sent - waiting for WebSocket real-time update');
       
-      // Timeout: if WebSocket doesn't update in 30 seconds, rollback
-      setTimeout(() => {
+      // Timeout: if WebSocket doesn't update in 40 seconds, fetch actual state from shadow
+      setTimeout(async () => {
         if ((led === 1 && output1PendingRef.current) || (led === 2 && output2PendingRef.current)) {
-          console.warn('⚠️ WebSocket update timeout - rolling back');
-          if (led === 1) {
-            setOutput1State(oldState);
-            setOutput1Pending(false);
-            output1PendingRef.current = false;
+          console.warn('⚠️ WebSocket update timeout - fetching actual state from shadow');
+          
+          // Fetch actual state from shadow instead of assuming rollback
+          const actualState = await fetchDeviceStateFromShadow();
+          
+          if (actualState) {
+            if (led === 1) {
+              setOutput1State(actualState.out1_state === 1);
+              setOutput1Pending(false);
+              output1PendingRef.current = false;
+            } else {
+              setOutput2State(actualState.out2_state === 1);
+              setOutput2Pending(false);
+              output2PendingRef.current = false;
+            }
+            console.log('✅ Updated state from shadow after timeout');
           } else {
-            setOutput2State(oldState);
-            setOutput2Pending(false);
-            output2PendingRef.current = false;
+            // Fallback: rollback if fetch failed
+            console.warn('⚠️ Failed to fetch shadow state, rolling back');
+            if (led === 1) {
+              setOutput1State(oldState);
+              setOutput1Pending(false);
+              output1PendingRef.current = false;
+            } else {
+              setOutput2State(oldState);
+              setOutput2Pending(false);
+              output2PendingRef.current = false;
+            }
           }
+          
           setSnackbar({
             open: true,
-            message: 'Device did not respond in time',
+            message: 'Device did not respond in time - state synced from shadow',
             severity: 'warning'
           });
         }
@@ -474,15 +494,30 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       await sendCommand(command);
       console.log('📡 Power saving command sent - waiting for WebSocket update');
       
-      // Timeout: rollback if no response
-      setTimeout(() => {
+      // Timeout: fetch actual state from shadow if no response
+      setTimeout(async () => {
         if (powerSavingPendingRef.current) {
-          setPowerSavingMode(oldState);
-          setPowerSavingPending(false);
-          powerSavingPendingRef.current = false;
+          console.warn('⚠️ Power saving WebSocket update timeout - fetching actual state from shadow');
+          
+          // Fetch actual state from shadow instead of assuming rollback
+          const actualState = await fetchDeviceStateFromShadow();
+          
+          if (actualState) {
+            setPowerSavingMode(actualState.power_saving === 1);
+            setPowerSavingPending(false);
+            powerSavingPendingRef.current = false;
+            console.log('✅ Updated power saving state from shadow after timeout');
+          } else {
+            // Fallback: rollback if fetch failed
+            console.warn('⚠️ Failed to fetch shadow state, rolling back');
+            setPowerSavingMode(oldState);
+            setPowerSavingPending(false);
+            powerSavingPendingRef.current = false;
+          }
+          
           setSnackbar({
             open: true,
-            message: 'Device did not respond in time',
+            message: 'Device did not respond in time - state synced from shadow',
             severity: 'warning'
           });
         }
