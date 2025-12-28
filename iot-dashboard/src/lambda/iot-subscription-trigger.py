@@ -994,11 +994,17 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
             'read': False
         }
         
+        logger.info(f"📝 Creating notification: subscription_id={subscription['subscription_id']}, user={subscription['user_email']}, device={subscription['device_id']}, parameter={parameter_name}, value={current_value_normalized}")
+        
         # Store notification (if table exists)
         try:
             notifications_table.put_item(Item=notification)
+            logger.info(f"✅ Stored notification {notification['notification_id']} for user {subscription['user_email']} in IoT_SubscriptionNotifications table")
         except Exception as table_error:
-            logger.warning(f"Could not store notification (table may not exist): {table_error}")
+            logger.error(f"❌ Could not store notification: {table_error}")
+            logger.error(f"   Notification data: user_email={subscription['user_email']}, notification_id={notification['notification_id']}")
+            import traceback
+            logger.error(f"   Traceback: {traceback.format_exc()}")
         
         # Execute command actions if configured
         commands_executed = False

@@ -671,14 +671,34 @@ def lambda_handler(event, context):
             try:
                 notifications_table = dynamodb.Table('IoT_SubscriptionNotifications')
                 
-                # Query notifications for this user
-                response = notifications_table.query(
-                    KeyConditionExpression=Key('user_email').eq(user_email),
-                    ScanIndexForward=False,  # Most recent first
-                    Limit=body.get('limit', 50)  # Default 50, can be overridden
-                )
+                notifications = []
                 
-                notifications = response.get('Items', [])
+                # Try query first (if user_email is partition key)
+                try:
+                    response = notifications_table.query(
+                        KeyConditionExpression=Key('user_email').eq(user_email),
+                        ScanIndexForward=False,  # Most recent first
+                        Limit=body.get('limit', 50)
+                    )
+                    notifications = response.get('Items', [])
+                    logger.info(f"✅ Query successful: Found {len(notifications)} notifications for {user_email}")
+                except Exception as query_error:
+                    # If query fails, try scan with filter (if notification_id is the primary key)
+                    logger.warning(f"Query failed (table might have different key structure): {query_error}")
+                    logger.info("Trying scan with filter...")
+                    
+                    response = notifications_table.scan(
+                        FilterExpression='user_email = :email',
+                        ExpressionAttributeValues={':email': user_email},
+                        Limit=body.get('limit', 50)
+                    )
+                    notifications = response.get('Items', [])
+                    
+                    # Sort by timestamp descending (most recent first)
+                    notifications.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+                    notifications = notifications[:body.get('limit', 50)]
+                    
+                    logger.info(f"✅ Scan successful: Found {len(notifications)} notifications for {user_email}")
                 
                 # Convert Decimal to float for JSON serialization
                 for notification in notifications:
@@ -695,6 +715,8 @@ def lambda_handler(event, context):
                 })
             except Exception as e:
                 logger.error(f"Error fetching notifications: {str(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 return cors_response(500, {
                     'error': f"Error fetching notifications: {str(e)}",
                     'success': False
