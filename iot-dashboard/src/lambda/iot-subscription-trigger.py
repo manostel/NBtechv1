@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
+from botocore.exceptions import ClientError
 
 # Configure logging
 logger = logging.getLogger()
@@ -100,8 +101,17 @@ def get_device_shadow(device_id):
         response = iot_data_client.get_thing_shadow(thingName=device_id)
         shadow_document = json.loads(response['payload'].read())
         return shadow_document
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+        if error_code == 'ForbiddenException':
+            logger.error(f"Permission denied accessing shadow for {device_id}. Lambda needs iot:GetThingShadow permission. Error: {e}")
+        elif error_code == 'ResourceNotFoundException':
+            logger.warning(f"Shadow not found for device {device_id}: {e}")
+        else:
+            logger.error(f"Error getting shadow for {device_id} (Error Code: {error_code}): {e}")
+        return None
     except Exception as e:
-        logger.error(f"Error getting shadow for {device_id}: {e}")
+        logger.error(f"Unexpected error getting shadow for {device_id}: {e}")
         return None
 
 def check_io_state_changes(device_id, device_data):
@@ -447,26 +457,42 @@ async def get_device_subscriptions(device_id):
         logger.error(f"Error getting subscriptions for {device_id}: {e}")
         return []
 
-def extract_parameter_value(device_data, parameter_name, device_id=None):
+def extract_parameter_value(device_data, parameter_name, device_id=None, parameter_type=None):
     """
     Extract parameter value from device data, handling nested and direct parameters.
-    NOW READS FROM SHADOW for input/output states, TELEMETRY for metrics.
+    NOW READS FROM SHADOW for state parameters, TELEMETRY for metrics.
     """
     try:
-        # Determine if this is a state parameter (from shadow) or metric (from telemetry)
-        # Shadow has flat structure: IN1, IN2, OUT1, OUT2, charging, motor_speed, power_saving
-        state_params = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+        # Use parameter_type from subscription if available, otherwise infer from parameter name
+        if parameter_type is None:
+            # Determine if this is a state parameter (from shadow) or metric (from telemetry)
+            state_params = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+            parameter_type = 'state' if parameter_name in state_params else 'metrics'
         
-        if parameter_name in state_params and device_id:
-            # Read from shadow for device states
+        # Read from shadow for state parameters
+        if parameter_type == 'state' and device_id:
             shadow_document = get_device_shadow(device_id)
             if shadow_document and 'state' in shadow_document:
                 shadow_state = shadow_document['state'].get('reported', {})
-                return shadow_state.get(parameter_name)
+                value = shadow_state.get(parameter_name)
+                if value is not None:
+                    logger.info(f"Found {parameter_name} in shadow: {value}")
+                    return value
+                else:
+                    logger.warning(f"Parameter {parameter_name} not found in shadow state. Available keys: {list(shadow_state.keys())}")
+            else:
+                logger.warning(f"Could not retrieve shadow for {device_id} or shadow has no state")
         
         # Fall back to device_data (telemetry) for metrics
-        # Metrics: battery, temperature, humidity, signal_quality, pressure
-        return device_data.get(parameter_name)
+        if parameter_type == 'metrics':
+            value = device_data.get(parameter_name)
+            if value is not None:
+                logger.info(f"Found {parameter_name} in device_data: {value}")
+                return value
+            else:
+                logger.warning(f"Parameter {parameter_name} not found in device_data. Available keys: {list(device_data.keys())}")
+        
+        return None
     except Exception as e:
         logger.error(f"Error extracting parameter {parameter_name}: {e}")
         return None
@@ -496,8 +522,12 @@ def check_single_subscription_sync(subscription, device_data, message_type):
         logger.info(f"Checking subscription {subscription_id} for parameter: {parameter_name}, device: {device_id}")
         logger.info(f"Device data keys: {list(device_data.keys()) if isinstance(device_data, dict) else 'not a dict'}")
         
+        # Get parameter_type from subscription (should be 'metrics' or 'state')
+        parameter_type = subscription.get('parameter_type', None)
+        logger.info(f"Subscription parameter_type: {parameter_type}")
+        
         # Extract parameter value (will read from shadow for states, telemetry for metrics)
-        current_value = extract_parameter_value(device_data, parameter_name, device_id=device_id)
+        current_value = extract_parameter_value(device_data, parameter_name, device_id=device_id, parameter_type=parameter_type)
         
         if current_value is None:
             logger.warning(f"Parameter {parameter_name} not found in device data")
@@ -940,6 +970,15 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
             except (ValueError, TypeError):
                 pass  # Keep as string if can't convert
         
+        # Build base notification message
+        base_message = format_notification_message(subscription, current_value_normalized, message_type)
+        
+        # Check if commands will be executed
+        active_commands = []
+        if subscription.get('commands'):
+            active_commands = [cmd for cmd in subscription.get('commands', []) 
+                             if cmd.get('action') and cmd.get('action') != 'none']
+        
         notification = {
             'user_email': subscription['user_email'],
             'notification_id': f"{subscription['subscription_id']}_{int(datetime.now().timestamp())}",
@@ -950,7 +989,7 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
             'condition_type': subscription['condition_type'],
             'threshold_value': threshold_value_for_notification,
             'message_type': message_type,
-            'message': format_notification_message(subscription, current_value_normalized, message_type),
+            'message': base_message,
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'read': False
         }
@@ -961,6 +1000,26 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
         except Exception as table_error:
             logger.warning(f"Could not store notification (table may not exist): {table_error}")
         
+        # Execute command actions if configured
+        commands_executed = False
+        if active_commands:
+            commands_executed = execute_multiple_commands_sync(subscription)
+            if commands_executed:
+                # Enhance notification message with command info
+                command_summary = ', '.join([f"{cmd['action']}={cmd.get('value', '')}" 
+                                           for cmd in active_commands])
+                notification['message'] = f"{base_message} | Commands executed: {command_summary}"
+                # Update stored notification with enhanced message
+                try:
+                    notifications_table.update_item(
+                        Key={'notification_id': notification['notification_id']},
+                        UpdateExpression='SET #msg = :msg',
+                        ExpressionAttributeNames={'#msg': 'message'},
+                        ExpressionAttributeValues={':msg': notification['message']}
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not update notification message: {e}")
+        
         # Send email if configured
         if subscription.get('notification_method') in ['email', 'both']:
             send_email_notification_sync(notification)
@@ -968,10 +1027,6 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
         # Send Push Notification (SNS) - Independent of Dashboard
         # We send high priority push for all subscription triggers
         send_sns_push_notification_sync(notification)
-        
-        # Execute command actions if configured
-        if subscription.get('commands'):
-            execute_multiple_commands_sync(subscription)
         
         logger.info(f"Subscription triggered: {subscription['subscription_id']} - {parameter_name} = {current_value_normalized}")
         
@@ -1145,17 +1200,8 @@ def execute_multiple_commands_sync(subscription):
             logger.info("No valid commands to execute")
             return True
         
-        # Get current shadow to merge with desired state
-        try:
-            response = iot_data_client.get_thing_shadow(thingName=device_id)
-            shadow_document = json.loads(response['payload'].read())
-            current_desired = shadow_document.get('state', {}).get('desired', {})
-        except Exception as e:
-            logger.warning(f"Could not get current shadow for {device_id}: {e}, starting fresh")
-            current_desired = {}
-        
-        # Build desired state by merging all commands
-        desired_state = dict(current_desired)  # Copy current desired state
+        # Build desired state with only the fields we're changing (delta update)
+        desired_state = {}
         
         # Execute each command by updating desired state
         for command in active_commands:
@@ -1171,30 +1217,56 @@ def execute_multiple_commands_sync(subscription):
             # Map command actions to shadow fields
             if command_action == 'out1':
                 desired_state['OUT1'] = 1 if command_value == '1' else 0
+                logger.info(f"Command: Setting OUT1 = {desired_state['OUT1']}")
             elif command_action == 'out2':
                 desired_state['OUT2'] = 1 if command_value == '1' else 0
+                logger.info(f"Command: Setting OUT2 = {desired_state['OUT2']}")
             elif command_action == 'motor_speed':
                 desired_state['motor_speed'] = int(command_value)
+                logger.info(f"Command: Setting motor_speed = {desired_state['motor_speed']}")
             elif command_action == 'power_saving':
                 desired_state['power_saving'] = 1 if command_value == '1' else 0
+                logger.info(f"Command: Setting power_saving = {desired_state['power_saving']}")
             else:
                 logger.warning(f"Unknown command action: {command_action}")
         
-        # Update shadow with new desired state
+        if not desired_state:
+            logger.warning("No valid commands to execute after processing")
+            return True
+        
+        # Update shadow with only the fields we're changing (delta update)
+        # This ensures AWS IoT sends a delta update to the device
         shadow_update = {
             "state": {
                 "desired": desired_state
             }
         }
         
-        iot_data_client.update_thing_shadow(
-            thingName=device_id,
-            payload=json.dumps(shadow_update)
-        )
+        logger.info(f"📤 Updating shadow for {device_id} with delta: {json.dumps(desired_state)}")
         
-        logger.info(f"✅ Updated shadow for {device_id}: {json.dumps(desired_state)}")
-        logger.info(f"Executed {len(active_commands)} commands for device {device_id}")
-        return True
+        try:
+            response = iot_data_client.update_thing_shadow(
+                thingName=device_id,
+                payload=json.dumps(shadow_update)
+            )
+            
+            # Log the response version to confirm update
+            if response.get('version'):
+                logger.info(f"✅ Shadow updated successfully (version: {response['version']})")
+            
+            logger.info(f"✅ Updated shadow desired state for {device_id}: {json.dumps(desired_state)}")
+            logger.info(f"Executed {len(active_commands)} commands for device {device_id}")
+            logger.info(f"💡 Device should receive delta update and apply: {json.dumps(desired_state)}")
+            return True
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            if error_code == 'ForbiddenException':
+                logger.error(f"Permission denied updating shadow for {device_id}. Lambda needs iot:UpdateThingShadow permission. Error: {e}")
+            elif error_code == 'ResourceNotFoundException':
+                logger.warning(f"Shadow not found for device {device_id}: {e}")
+            else:
+                logger.error(f"Error updating shadow for {device_id} (Error Code: {error_code}): {e}")
+            return False
         
     except Exception as e:
         logger.error(f"Error executing multiple commands: {e}")

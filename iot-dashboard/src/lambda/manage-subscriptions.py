@@ -47,7 +47,7 @@ def validate_subscription_data(subscription_data):
             return False, f"Missing required field: {field}"
     
     # Validate parameter types
-    valid_parameter_types = ['inputs', 'outputs', 'metrics', 'variables']
+    valid_parameter_types = ['metrics', 'state']
     if subscription_data['parameter_type'] not in valid_parameter_types:
         return False, f"Invalid parameter_type. Must be one of: {', '.join(valid_parameter_types)}"
     
@@ -127,7 +127,16 @@ def get_available_parameters(device_id, parameter_type):
     try:
         logger.info(f"Getting parameters for device {device_id}, type {parameter_type}")
         
-        # Try to get actual device data first
+        # Standard parameters for each type (always available)
+        standard_parameters = {
+            'metrics': ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure'],
+            'state': ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+        }
+        
+        # Start with standard parameters
+        available_params = set(standard_parameters.get(parameter_type, []))
+        
+        # Try to get actual device data to discover additional parameters
         try:
             response = device_data_table.query(
                 KeyConditionExpression=Key('client_id').eq(device_id),
@@ -139,51 +148,43 @@ def get_available_parameters(device_id, parameter_type):
                 latest_item = response['Items'][0]
                 logger.info(f"Found device data: {json.dumps(latest_item, default=decimal_default)}")
                 
-                # Extract parameters from the actual data structure
-                available_params = []
-                
                 # Check for parameters in latest_data or direct fields
                 data_source = latest_item.get('latest_data', latest_item)
                 
-                # Define parameter categories
+                # Discover additional parameters from device data
                 if parameter_type == 'metrics':
                     metric_fields = ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure']
-                    available_params = [field for field in metric_fields if field in data_source]
-                elif parameter_type == 'variables':
-                    variable_fields = ['motor_speed', 'power_saving', 'status']
-                    available_params = [field for field in variable_fields if field in data_source]
-                elif parameter_type == 'inputs':
+                    discovered = [field for field in metric_fields if field in data_source]
+                    available_params.update(discovered)
+                elif parameter_type == 'state':
+                    # State includes inputs, outputs, and variables
                     # Look for input fields (IN1, IN2, etc.)
-                    available_params = [field for field in data_source.keys() if field.startswith('IN')]
-                elif parameter_type == 'outputs':
+                    input_fields = [field for field in data_source.keys() if field.startswith('IN')]
                     # Look for output fields (OUT1, OUT2, etc.)
-                    available_params = [field for field in data_source.keys() if field.startswith('OUT')]
-                elif parameter_type == 'status':
-                    available_params = ['status'] if 'status' in data_source else []
+                    output_fields = [field for field in data_source.keys() if field.startswith('OUT')]
+                    # Look for variable fields
+                    variable_fields = ['motor_speed', 'power_saving', 'charging']
+                    discovered_vars = [field for field in variable_fields if field in data_source]
+                    discovered = input_fields + output_fields + discovered_vars
+                    available_params.update(discovered)
                 
-                logger.info(f"Dynamic parameters found for {parameter_type}: {available_params}")
-                
-                # If we found parameters dynamically, return them
-                if available_params:
-                    return available_params
+                logger.info(f"Dynamic parameters found for {parameter_type}: {discovered}")
                     
         except Exception as e:
-            logger.warning(f"Error querying device data: {e}")
+            logger.warning(f"Error querying device data: {e}, using standard parameters only")
         
-        # Fallback to known parameters if dynamic discovery fails
-        logger.info(f"Using fallback parameters for {parameter_type}")
-        known_parameters = {
-            'inputs': ['inputs.IN1', 'inputs.IN2'],
-            'outputs': ['outputs.OUT1', 'outputs.OUT2', 'outputs.speed', 'outputs.charging', 'outputs.power_saving'],
-            'metrics': ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure'],
-            'variables': ['motor_speed', 'power_saving'],
-            'status': ['status']
-        }
-        
-        return known_parameters.get(parameter_type, [])
+        # Return sorted list of available parameters
+        result = sorted(list(available_params))
+        logger.info(f"Final available parameters for {parameter_type}: {result}")
+        return result
     except Exception as e:
         logger.error(f"Error getting available parameters: {str(e)}")
-        return []
+        # Return standard parameters as fallback even on error
+        standard_parameters = {
+            'metrics': ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure'],
+            'state': ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+        }
+        return standard_parameters.get(parameter_type, [])
 
 def create_subscription(user_email, subscription_data):
     """Create a new subscription"""

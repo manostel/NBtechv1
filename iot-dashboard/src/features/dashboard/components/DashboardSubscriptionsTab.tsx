@@ -63,31 +63,32 @@ import { useTranslation } from 'react-i18next';
 const SUBSCRIPTIONS_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/manage-subscriptions";
 const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 
-// Parameter type configurations - will be translated in component
-// Two-group subscription parameter types: Metrics (telemetry) and State (shadow reported)
+// Parameter type configurations - matching alarms UI structure
 const PARAMETER_TYPES: any = {
   metrics: {
-    labelKey: 'subscriptions.metrics',
+    label: 'Metrics (Sensors)',
+    description: 'Sensor readings from telemetry',
     icon: <TrendingUpIcon />,
     parameters: {
-      'battery': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
-      'temperature': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
-      'humidity': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
-      'signal_quality': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
-      'pressure': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] }
+      battery: { label: 'Battery', unit: '%', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      temperature: { label: 'Temperature', unit: '°C', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      humidity: { label: 'Humidity', unit: '%', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      pressure: { label: 'Pressure', unit: 'hPa', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      signal_quality: { label: 'Signal Quality', unit: '%', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] }
     }
   },
   state: {
-    labelKey: 'subscriptions.state',
+    label: 'State (Device)',
+    description: 'Device state from shadow reported',
     icon: <DeviceIcon />,
     parameters: {
-      'IN1': { allowedConditions: ['change', 'equals', 'not_equals'] },
-      'IN2': { allowedConditions: ['change', 'equals', 'not_equals'] },
-      'OUT1': { allowedConditions: ['change', 'equals', 'not_equals'] },
-      'OUT2': { allowedConditions: ['change', 'equals', 'not_equals'] },
-      'charging': { allowedConditions: ['change', 'equals', 'not_equals'] },
-      'motor_speed': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
-      'power_saving': { allowedConditions: ['change', 'equals', 'not_equals'] }
+      'IN1': { label: 'Input 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'IN2': { label: 'Input 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'OUT1': { label: 'Output 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'OUT2': { label: 'Output 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'motor_speed': { label: 'Motor Speed', unit: '%', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      'charging': { label: 'Charging Status', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'power_saving': { label: 'Power Saving', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] }
     }
   }
 };
@@ -113,6 +114,51 @@ const getConditionTypes = (t: any, parameterType?: string, parameterName?: strin
   const allConditions = ALL_CONDITION_TYPES(t);
   
   return allowedConditions.map((conditionKey: string) => allConditions[conditionKey]).filter(Boolean);
+};
+
+// Get threshold input based on parameter type (matching alarms UI)
+const getThresholdInput = (parameterType: string, parameterName: string, condition: string, value: string, onChange: (value: string) => void) => {
+  if (!parameterType || !parameterName || condition === 'change') {
+    return null; // No threshold needed for 'change' condition
+  }
+
+  const parameterConfig = PARAMETER_TYPES[parameterType]?.parameters?.[parameterName];
+  if (!parameterConfig) return null;
+
+  switch (parameterConfig.type) {
+    case 'numeric':
+      return (
+        <TextField
+          label="Threshold Value"
+          type="number"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          fullWidth
+          InputProps={{
+            endAdornment: parameterConfig.unit ? 
+              <Typography variant="body2" color="text.secondary">
+                {parameterConfig.unit}
+              </Typography> : null
+          }}
+        />
+      );
+    case 'boolean':
+      return (
+        <FormControl fullWidth>
+          <InputLabel>Value (0 or 1)</InputLabel>
+          <Select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            label="Value (0 or 1)"
+          >
+            <MenuItem value="1">ON (1)</MenuItem>
+            <MenuItem value="0">OFF (0)</MenuItem>
+          </Select>
+        </FormControl>
+      );
+    default:
+      return null;
+  }
 };
 
 // Notification methods - will be translated in component
@@ -354,14 +400,16 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
       const hasOutputCommands = formData.commands.some(cmd => 
         cmd.action === 'out1' || cmd.action === 'out2'
       );
-      const isMonitoringOutputs = formData.parameter_type === 'outputs';
+      const isMonitoringOutputs = formData.parameter_type === 'state' && formData.parameter_name?.startsWith('OUT');
       const hasOutputCommandsOnSameDevice = formData.commands.some(cmd => 
         (cmd.action === 'out1' || cmd.action === 'out2') && cmd.target_device === formData.device_id
       );
       
       // Check if there are existing subscriptions monitoring outputs on this device
       const existingOutputSubscriptions = subscriptions.filter(sub => 
-        sub.device_id === formData.device_id && sub.parameter_type === 'outputs'
+        sub.device_id === formData.device_id && 
+        sub.parameter_type === 'state' && 
+        sub.parameter_name?.startsWith('OUT')
       );
       
       if (isMonitoringOutputs && hasOutputCommandsOnSameDevice && existingOutputSubscriptions.length > 0) {
@@ -637,22 +685,28 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
 
   const getParameterIcon = (parameterType: string, parameterName: string) => {
     const iconMap: any = {
-      'inputs.IN1': <InputIcon />,
-      'inputs.IN2': <InputIcon />,
-      'outputs.OUT1': <OutputIcon />,
-      'outputs.OUT2': <OutputIcon />,
-      'outputs.speed': <SpeedIcon />,
-      'outputs.charging': <BatteryIcon />,
-      'outputs.power_saving': <PowerIcon />,
+      'IN1': <InputIcon />,
+      'IN2': <InputIcon />,
+      'OUT1': <OutputIcon />,
+      'OUT2': <OutputIcon />,
+      'charging': <BatteryIcon />,
+      'motor_speed': <SpeedIcon />,
+      'power_saving': <PowerIcon />,
       'temperature': <TemperatureIcon />,
       'humidity': <HumidityIcon />,
       'battery': <BatteryIcon />,
       'signal_quality': <SignalIcon />,
-      'motor_speed': <SpeedIcon />,
-      'power_saving': <PowerIcon />,
+      'pressure': <DeviceIcon />,
       'status': <DeviceIcon />
     };
-    return iconMap[parameterName] || <SettingsIcon />;
+    // Use parameter name directly, or fallback to type-based icon
+    if (iconMap[parameterName]) {
+      return iconMap[parameterName];
+    }
+    // Fallback to type-based icon
+    if (parameterType === 'metrics') return <TrendingUpIcon />;
+    if (parameterType === 'state') return <DeviceIcon />;
+    return <SettingsIcon />;
   };
 
   const getDeviceName = (deviceId: string) => {
@@ -744,7 +798,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                   {getDeviceName(subscription.device_id)}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
-                  {t(PARAMETER_TYPES[subscription.parameter_type]?.labelKey || 'subscriptions.status')} • {subscription.parameter_name}
+                  {PARAMETER_TYPES[subscription.parameter_type]?.label || 'State'} • {PARAMETER_TYPES[subscription.parameter_type]?.parameters[subscription.parameter_name]?.label || subscription.parameter_name}
                 </Typography>
               </Box>
             </Box>
@@ -924,248 +978,182 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
         }
       }}
     >
-      <DialogTitle sx={{ pb: 1 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
-          {t('subscriptions.createSubscription')}
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
-          {t('subscriptions.setupMonitoring', { defaultValue: 'Set up automated monitoring and responses for your device' })}
-        </Typography>
-      </DialogTitle>
+      <DialogTitle sx={{ color: '#E0E0E0' }}>{t('subscriptions.createSubscription')}</DialogTitle>
       <DialogContent ref={createDialogContentRef}>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid item xs={12}>
-        <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-          {t('subscriptions.triggerConditions')}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {t('subscriptions.configureConditions')}
-        </Typography>
-        
-        {/* Error Display */}
-        {dialogError && (
-          <Alert 
-            severity="error" 
-            variant="filled"
-            sx={{ 
-              mb: 2,
-              borderRadius: 3,
-              fontSize: '0.95rem',
-              lineHeight: 1.6,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-              '& .MuiAlert-icon': {
-                fontSize: '1.5rem'
-              }
-            }}
-            onClose={() => setDialogError(null)}
-          >
-            {dialogError}
-          </Alert>
-        )}
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>Device</InputLabel>
-              <Select
-                value={formData.device_id}
-                onChange={(e) => setFormData({ ...formData, device_id: e.target.value })}
-                label="Device"
-              >
-                {devices.map((device) => (
-                  <MenuItem key={device.client_id} value={device.client_id}>
-                    {device.device_name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>{t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}</InputLabel>
-              <Select
-                value={formData.parameter_type}
-                onChange={(e) => setFormData({ ...formData, parameter_type: e.target.value, parameter_name: '' })}
-                label={t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}
-              >
-                {Object.entries(PARAMETER_TYPES).map(([key, config]: [string, any]) => (
-                  <MenuItem key={key} value={key}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      {config.icon}
-                      <Typography sx={{ ml: 1 }}>{t(config.labelKey || 'subscriptions.status')}</Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>{t('subscriptions.parameter')}</InputLabel>
-              <Select
-                value={formData.parameter_name}
-                onChange={(e) => setFormData({ ...formData, parameter_name: e.target.value })}
-                label={t('subscriptions.parameter')}
-                disabled={!formData.parameter_type}
-              >
-                {formData.parameter_type && Object.keys(PARAMETER_TYPES[formData.parameter_type]?.parameters || {}).map((param: string) => (
-                  <MenuItem key={param} value={param}>
-                    {param}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>{t('subscriptions.condition')}</InputLabel>
-              <Select
-                value={formData.condition_type}
-                onChange={(e) => setFormData({ ...formData, condition_type: e.target.value })}
-                label={t('subscriptions.condition')}
-              >
-                {getConditionTypes(t, formData.parameter_type, formData.parameter_name).map((condition) => (
-                  <MenuItem key={condition.value} value={condition.value}>
-                    <Box>
-                      <Typography>{condition.label}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {condition.description}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          {(formData.condition_type === 'above' || formData.condition_type === 'below' || 
-            formData.condition_type === 'equals' || formData.condition_type === 'not_equals') && (
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label={t('subscriptions.threshold')}
-                value={formData.threshold_value}
-                onChange={(e) => setFormData({ ...formData, threshold_value: e.target.value })}
-                type="number"
-                helperText={t('subscriptions.enterThreshold', { defaultValue: 'Enter the threshold value for this condition' })}
-              />
-            </Grid>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          {/* Error Display */}
+          {dialogError && (
+            <Alert 
+              severity="error" 
+              onClose={() => setDialogError(null)}
+            >
+              {dialogError}
+            </Alert>
           )}
 
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label={t('subscriptions.cooldownSeconds')}
-              value={formData.cooldown_ms ? Math.floor(formData.cooldown_ms / 1000) : ''}
-              onChange={(e) => {
-                const inputValue = e.target.value;
-                // Allow empty string while typing
-                if (inputValue === '') {
-                  setFormData({ ...formData, cooldown_ms: 0 });
-                  return;
-                }
-                // Parse as integer and convert to milliseconds
-                const secs = Math.max(0, parseInt(inputValue, 10));
-                if (!isNaN(secs)) {
-                  setFormData({ ...formData, cooldown_ms: secs * 1000 });
-                }
-              }}
-              type="number"
-              inputProps={{ min: 0 }}
-              helperText={t('subscriptions.cooldownHelper')}
-            />
-          </Grid>
+          <FormControl fullWidth>
+            <InputLabel>Device</InputLabel>
+            <Select
+              value={formData.device_id}
+              onChange={(e) => setFormData({ ...formData, device_id: e.target.value })}
+              label="Device"
+            >
+              {devices.map((device) => (
+                <MenuItem key={device.client_id} value={device.client_id}>
+                  {device.device_name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label={t('subscriptions.customTolerance')}
-              value={formData.tolerance_percent}
-              onChange={(e) => {
-                // Only allow integers
-                const value = e.target.value;
-                if (value === '' || /^\d+$/.test(value)) {
-                  setFormData({ ...formData, tolerance_percent: value });
-                }
-              }}
-              type="number"
-              inputProps={{ min: 0, max: 100, step: 1 }}
-              helperText={t('subscriptions.toleranceHelper')}
-              placeholder={t('subscriptions.autoDefault', { defaultValue: 'Auto (default)' })}
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>{t('subscriptions.notificationMethod')}</InputLabel>
-              <Select
-                value={formData.notification_method}
-                onChange={(e) => setFormData({ ...formData, notification_method: e.target.value })}
-                label={t('subscriptions.notificationMethod')}
-              >
-                {getNotificationMethods(t).map((method) => (
-                  <MenuItem key={method.value} value={method.value}>
-                    <Box>
-                      <Typography>{method.label}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {method.description}
-                      </Typography>
-                    </Box>
+          <FormControl fullWidth>
+            <InputLabel>{t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}</InputLabel>
+            <Select
+              value={formData.parameter_type || 'metrics'}
+              onChange={(e) => setFormData({ ...formData, parameter_type: e.target.value, parameter_name: '' })}
+              label={t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}
+            >
+              {Object.entries(PARAMETER_TYPES).map(([key, config]: [string, any]) => (
+                <MenuItem key={key} value={key}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {config.icon}
+                    {config.label}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel>{t('subscriptions.parameter')}</InputLabel>
+            <Select
+              value={formData.parameter_name}
+              onChange={(e) => setFormData({ ...formData, parameter_name: e.target.value })}
+              label={t('subscriptions.parameter')}
+              disabled={!formData.parameter_type}
+            >
+              {formData.parameter_type && PARAMETER_TYPES[formData.parameter_type] && 
+                Object.entries(PARAMETER_TYPES[formData.parameter_type].parameters).map(([key, config]: [string, any]) => (
+                  <MenuItem key={key} value={key}>
+                    {config.label}
                   </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+                ))
+              }
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel>{t('subscriptions.condition')}</InputLabel>
+            <Select
+              value={formData.condition_type}
+              onChange={(e) => setFormData({ ...formData, condition_type: e.target.value })}
+              label={t('subscriptions.condition')}
+            >
+              {getConditionTypes(t, formData.parameter_type, formData.parameter_name).map((condition) => (
+                <MenuItem key={condition.value} value={condition.value}>
+                  {condition.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {getThresholdInput(
+            formData.parameter_type,
+            formData.parameter_name,
+            formData.condition_type,
+            formData.threshold_value || '',
+            (value) => setFormData({ ...formData, threshold_value: value })
+          )}
+
+          <TextField
+            label={t('subscriptions.cooldownSeconds')}
+            value={formData.cooldown_ms ? Math.floor(formData.cooldown_ms / 1000) : ''}
+            onChange={(e) => {
+              const inputValue = e.target.value;
+              if (inputValue === '') {
+                setFormData({ ...formData, cooldown_ms: 0 });
+                return;
+              }
+              const secs = Math.max(0, parseInt(inputValue, 10));
+              if (!isNaN(secs)) {
+                setFormData({ ...formData, cooldown_ms: secs * 1000 });
+              }
+            }}
+            type="number"
+            inputProps={{ min: 0 }}
+            helperText={t('subscriptions.cooldownHelper')}
+            fullWidth
+          />
+
+          <TextField
+            label={t('subscriptions.customTolerance')}
+            value={formData.tolerance_percent}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === '' || /^\d+$/.test(value)) {
+                setFormData({ ...formData, tolerance_percent: value });
+              }
+            }}
+            type="number"
+            inputProps={{ min: 0, max: 100, step: 1 }}
+            helperText={t('subscriptions.toleranceHelper')}
+            placeholder={t('subscriptions.autoDefault', { defaultValue: 'Auto (default)' })}
+            fullWidth
+          />
           
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label={t('subscriptions.description')}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              multiline
-              rows={2}
-              helperText={t('subscriptions.ruleDescription', { defaultValue: 'Provide a descriptive name for this monitoring rule' })}
-            />
-          </Grid>
+          <FormControl fullWidth>
+            <InputLabel>{t('subscriptions.notificationMethod')}</InputLabel>
+            <Select
+              value={formData.notification_method}
+              onChange={(e) => setFormData({ ...formData, notification_method: e.target.value })}
+              label={t('subscriptions.notificationMethod')}
+            >
+              {getNotificationMethods(t).map((method) => (
+                <MenuItem key={method.value} value={method.value}>
+                  {method.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           
-          <Grid item xs={12}>
-            <Typography variant="h6" gutterBottom sx={{ mt: 3, mb: 1 }}>
-              {t('subscriptions.automatedResponses')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {t('subscriptions.configureResponses')}
-            </Typography>
-          </Grid>
+          <TextField
+            label={t('subscriptions.description')}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            multiline
+            rows={2}
+            fullWidth
+          />
+
+          <Divider sx={{ my: 1 }} />
+          
+          <Typography variant="h6" gutterBottom>
+            {t('subscriptions.automatedResponses')}
+          </Typography>
           
           {(formData.commands || []).map((command, index) => (
-            <React.Fragment key={index}>
-              <Grid item xs={12} sm={3}>
-                <FormControl fullWidth>
-                  <InputLabel>{t('subscriptions.action')} {index + 1}</InputLabel>
-                  <Select
-                    value={command.action}
-                    onChange={(e) => {
-                      const newCommands = [...formData.commands];
-                      newCommands[index].action = e.target.value;
-                      setFormData({ ...formData, commands: newCommands });
-                    }}
-                    label={`${t('subscriptions.action')} ${index + 1}`}
-                  >
-                    <MenuItem value="none">{t('subscriptions.noCommand', { defaultValue: 'No Command' })}</MenuItem>
-                    <MenuItem value="out1">{t('subscriptions.setOut1', { defaultValue: 'Set OUT1' })}</MenuItem>
-                    <MenuItem value="out2">{t('subscriptions.setOut2', { defaultValue: 'Set OUT2' })}</MenuItem>
-                    <MenuItem value="motor_speed">{t('subscriptions.setMotorSpeed', { defaultValue: 'Set Motor Speed' })}</MenuItem>
-                    <MenuItem value="power_saving">{t('subscriptions.setPowerSaving', { defaultValue: 'Set Power Saving' })}</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+            <Box key={index} sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+              <FormControl fullWidth>
+                <InputLabel>{t('subscriptions.action')} {index + 1}</InputLabel>
+                <Select
+                  value={command.action}
+                  onChange={(e) => {
+                    const newCommands = [...formData.commands];
+                    newCommands[index].action = e.target.value;
+                    setFormData({ ...formData, commands: newCommands });
+                  }}
+                  label={`${t('subscriptions.action')} ${index + 1}`}
+                >
+                  <MenuItem value="none">{t('subscriptions.noCommand', { defaultValue: 'No Command' })}</MenuItem>
+                  <MenuItem value="out1">{t('subscriptions.setOut1', { defaultValue: 'Set OUT1' })}</MenuItem>
+                  <MenuItem value="out2">{t('subscriptions.setOut2', { defaultValue: 'Set OUT2' })}</MenuItem>
+                  <MenuItem value="motor_speed">{t('subscriptions.setMotorSpeed', { defaultValue: 'Set Motor Speed' })}</MenuItem>
+                  <MenuItem value="power_saving">{t('subscriptions.setPowerSaving', { defaultValue: 'Set Power Saving' })}</MenuItem>
+                </Select>
+              </FormControl>
               
-              <Grid item xs={12} sm={3}>
-                {command.action !== 'none' && (
+              {command.action !== 'none' && (
+                <>
                   <FormControl fullWidth>
                     <InputLabel>{t('subscriptions.targetDevice')}</InputLabel>
                     <Select
@@ -1185,14 +1173,9 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                       ))}
                     </Select>
                   </FormControl>
-                )}
-              </Grid>
-              
-              <Grid item xs={12} sm={3}>
-                {command.action !== 'none' && (
+                  
                   <TextField
-                    fullWidth
-                    label={`${t('subscriptions.value')} ${index + 1}`}
+                    label={t('subscriptions.value')}
                     value={command.value}
                     onChange={(e) => {
                       const newCommands = [...formData.commands];
@@ -1200,44 +1183,23 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                       setFormData({ ...formData, commands: newCommands });
                     }}
                     placeholder={command.action === 'motor_speed' ? '0-100' : '0 or 1'}
-                    helperText={
-                      command.action === 'motor_speed' 
-                        ? t('subscriptions.motorSpeedHelper', { defaultValue: 'Motor speed (0-100)' })
-                        : command.action === 'power_saving'
-                        ? t('subscriptions.powerSavingHelper', { defaultValue: 'Power saving mode (0 or 1)' })
-                        : t('subscriptions.outputStateHelper', { defaultValue: 'Output state (0 or 1)' })
-                    }
+                    fullWidth
                   />
-                )}
-              </Grid>
-              
-              <Grid item xs={12} sm={3}>
-                {command.action !== 'none' && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-                    <Chip
-                      label={`${command.action} = ${command.value} → ${getDeviceName(command.target_device)}`}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                    />
-                  </Box>
-                )}
-              </Grid>
-            </React.Fragment>
+                </>
+              )}
+            </Box>
           ))}
           
-          <Grid item xs={12}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.enabled}
-                  onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                />
-              }
-              label={t('subscriptions.activateSubscription')}
-            />
-          </Grid>
-        </Grid>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={formData.enabled}
+                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+              />
+            }
+            label={t('subscriptions.activateSubscription')}
+          />
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={() => {
@@ -1287,9 +1249,9 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600, color: '#E0E0E0' }}>
+        <Box component="span" sx={{ fontWeight: 600, color: '#E0E0E0', fontSize: '1.5rem', display: 'block', mb: 0.5 }}>
           {t('subscriptions.editSubscription')}
-        </Typography>
+        </Box>
         <Typography variant="body2" sx={{ color: 'rgba(224, 224, 224, 0.7)' }}>
           {t('subscriptions.modifySubscription', { defaultValue: 'Modify your existing subscription configuration' })}
         </Typography>
@@ -1353,7 +1315,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
               >
                 {Object.entries(PARAMETER_TYPES).map(([key, config]: [string, any]) => (
                   <MenuItem key={key} value={key}>
-                    {t(config.labelKey || 'subscriptions.status')}
+                    {config.label}
                   </MenuItem>
                 ))}
               </Select>
