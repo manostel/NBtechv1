@@ -36,6 +36,7 @@ import {
   ShowChart as ShowChartIcon,
   Map as MapIcon,
   Bluetooth as BluetoothIcon,
+  LocationOn as LocationOnIcon,
 } from '@mui/icons-material';
 import BatteryIndicator from "../../../components/common/BatteryIndicator";
 import SignalIndicator from "../../../components/common/SignalIndicator";
@@ -48,6 +49,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 // @ts-ignore
 import BluetoothControl from './BluetoothControl';
+import { LocationPicker } from './LocationPicker';
 import { useGlobalTimer } from '../../../hooks/useGlobalTimer';
 import useNotificationStore from '../../../stores/notificationStore';
 import { Device, User, DeviceData } from '../../../types';
@@ -55,14 +57,18 @@ import HeaderActions from '../../../components/common/HeaderActions';
 import UserEmailDisplay from '../../../components/common/UserEmailDisplay';
 import { useTranslation } from 'react-i18next';
 
+// API Endpoints
 const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 const DEVICE_DATA_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-data";
 const DEVICE_PREFERENCES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-preferences";
 const GPS_DATA_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices-gps";
 const DEVICE_STATE_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/data-dashboard-state";
+const SHADOW_STATE_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/fetch-device-shadow-state";
 const BATTERY_STATE_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-battery-state";
+
+// Configuration
 const INACTIVE_TIMEOUT_MINUTES = 7; // Device is considered offline after 7 minutes of inactivity
-const DEVICE_DATA_UPDATE_INTERVAL = 2 * 60 * 1000; // 2 minutes in milliseconds
+const GPS_DATA_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes (GPS only - WebSocket handles device data/states)
 
 interface DevicesPageProps {
   user: User;
@@ -365,9 +371,22 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
 
   const deviceLocations = useMemo(() => {
     return devices.reduce((acc: any, device: Device) => {
+      // Priority 1: Use GPS data if available (real-time)
       const gpsInfo = gpsData[device.client_id];
       if (gpsInfo && gpsInfo.latitude && gpsInfo.longitude) {
-        acc[device.client_id] = [gpsInfo.latitude, gpsInfo.longitude];
+        acc[device.client_id] = {
+          position: [gpsInfo.latitude, gpsInfo.longitude],
+          source: 'gps',
+          timestamp: gpsInfo.timestamp
+        };
+      }
+      // Priority 2: Fall back to fixed location if no GPS
+      else if (device.fixed_latitude && device.fixed_longitude) {
+        acc[device.client_id] = {
+          position: [device.fixed_latitude, device.fixed_longitude],
+          source: 'fixed',
+          timestamp: device.location_set_at
+        };
       }
       return acc;
     }, {});
@@ -378,10 +397,12 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
     if (locations.length === 0) return [37.7461, 22.2372] as [number, number];
 
     // @ts-ignore
-    const sumLat = locations.reduce((sum: number, [lat]: number[]) => sum + lat, 0);
+    const positions = locations.map((loc: any) => loc.position);
     // @ts-ignore
-    const sumLng = locations.reduce((sum: number, [_, lng]: number[]) => sum + lng, 0);
-    return [sumLat / locations.length, sumLng / locations.length] as [number, number];
+    const sumLat = positions.reduce((sum: number, [lat]: number[]) => sum + lat, 0);
+    // @ts-ignore
+    const sumLng = positions.reduce((sum: number, [_, lng]: number[]) => sum + lng, 0);
+    return [sumLat / positions.length, sumLng / positions.length] as [number, number];
   }, [deviceLocations]);
 
   const calculateZoom = useMemo(() => {
@@ -389,9 +410,11 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
     if (locations.length <= 1) return 9;
 
     // @ts-ignore
-    const lats = locations.map(([lat]) => lat);
+    const positions = locations.map((loc: any) => loc.position);
     // @ts-ignore
-    const lngs = locations.map(([_, lng]) => lng);
+    const lats = positions.map(([lat]) => lat);
+    // @ts-ignore
+    const lngs = positions.map(([_, lng]) => lng);
     const latSpread = Math.max(...lats) - Math.min(...lats);
     const lngSpread = Math.max(...lngs) - Math.min(...lngs);
     const maxSpread = Math.max(latSpread, lngSpread);
@@ -409,18 +432,39 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
       : theme.palette.mode === 'dark' ? '#ef5350' : '#F44336';
   };
 
-  const createCustomIcon = (color: string) => {
+  const createCustomIcon = (color: string, isFixedLocation: boolean = false) => {
     const borderColor = theme.palette.mode === 'dark' ? '#424242' : 'white';
     const shadowColor = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)';
+    const fixedLocationColor = '#FF9800'; // Orange for fixed locations
+    const borderWidth = isFixedLocation ? '3px' : '2px';
+    const borderStyle = isFixedLocation ? 'dashed' : 'solid';
+    
+    // Icon dimensions: 32px wide, ~42px tall (circle 18px + triangle 24px)
+    // Anchor point should be at the bottom tip of the triangle (center x, bottom y)
+    const iconWidth = 32;
+    const iconHeight = 42; // Total visual height
+    const anchorX = iconWidth / 2; // Center horizontally
+    const anchorY = iconHeight; // Bottom tip of triangle
     
     return L.divIcon({
       className: 'custom-icon',
       html: `<div style="
         position: relative;
-        width: 32px;
-        height: 32px;
-        transform: translate(-50%, -50%);
+        width: ${iconWidth}px;
+        height: ${iconHeight}px;
       ">
+        ${isFixedLocation ? `<div style="
+          position: absolute;
+          top: -4px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-bottom: 8px solid ${fixedLocationColor};
+          z-index: 3;
+        "></div>` : ''}
         <div style="
           position: absolute;
           top: 0;
@@ -429,7 +473,7 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
           width: 18px;
           height: 18px;
           background: ${color};
-          border: 2px solid ${borderColor};
+          border: ${borderWidth} ${borderStyle} ${isFixedLocation ? fixedLocationColor : borderColor};
           border-radius: 50%;
           z-index: 2;
         "></div>
@@ -446,8 +490,9 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
           z-index: 1;
         "></div>
       </div>`,
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
+      iconSize: [iconWidth, iconHeight],
+      iconAnchor: [anchorX, anchorY], // Bottom center - where triangle tip points
+      popupAnchor: [0, -anchorY], // Popup appears above the marker
     });
   };
 
@@ -529,15 +574,17 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
           const latestData = deviceInfo?.latest_data || {};
           
           const deviceLocation = deviceLocations[device.client_id];
-          if (!deviceLocation || !Array.isArray(deviceLocation) || deviceLocation.length !== 2) {
+          if (!deviceLocation || !deviceLocation.position) {
             return null;
           }
+
+          const isFixedLocation = deviceLocation.source === 'fixed';
 
           return (
             <Marker
               key={device.client_id}
-              position={deviceLocation}
-              icon={createCustomIcon(getMarkerColor(device))}
+              position={deviceLocation.position}
+              icon={createCustomIcon(getMarkerColor(device), isFixedLocation)}
               eventHandlers={{
                 click: () => setSelectedDevice(device),
               }}
@@ -566,20 +613,41 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                     background: theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)'
                   }
                 }}>
-                  <Typography 
-                    variant="h6" 
-                    gutterBottom
-                    sx={{
-                      fontWeight: 600,
-                      letterSpacing: '0.2px',
-                      background: 'linear-gradient(45deg, #4caf50, #2196f3)',
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent'
-                    }}
-                  >
-                    {device.device_name}
-                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography 
+                      variant="h6" 
+                      sx={{
+                        fontWeight: 600,
+                        letterSpacing: '0.2px',
+                        background: 'linear-gradient(45deg, #4caf50, #2196f3)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent'
+                      }}
+                    >
+                      {device.device_name}
+                    </Typography>
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      px: 1,
+                      py: 0.25,
+                      borderRadius: '12px',
+                      bgcolor: isFixedLocation 
+                        ? (theme.palette.mode === 'dark' ? 'rgba(255, 152, 0, 0.2)' : 'rgba(255, 152, 0, 0.1)')
+                        : (theme.palette.mode === 'dark' ? 'rgba(33, 150, 243, 0.2)' : 'rgba(33, 150, 243, 0.1)'),
+                      border: `1px solid ${isFixedLocation ? '#FF9800' : '#2196F3'}40`
+                    }}>
+                      <Typography variant="caption" sx={{ 
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        color: isFixedLocation ? '#FF9800' : '#2196F3'
+                      }}>
+                        {isFixedLocation ? '📍 Fixed' : '🛰️ GPS'}
+                      </Typography>
+                    </Box>
+                  </Box>
                   
                   <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
                     <BatteryIndicator 
@@ -731,6 +799,40 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                     );
                   })()}
 
+                  <Box sx={{ 
+                    mt: 1, 
+                    pt: 1, 
+                    borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.5
+                  }}>
+                    <Typography variant="caption" sx={{ 
+                      color: theme.palette.text.secondary,
+                      fontSize: '0.65rem',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Location
+                    </Typography>
+                    <Typography variant="caption" sx={{ 
+                      color: theme.palette.text.primary,
+                      fontSize: '0.7rem',
+                      fontFamily: 'monospace'
+                    }}>
+                      {deviceLocation.position[0].toFixed(6)}, {deviceLocation.position[1].toFixed(6)}
+                    </Typography>
+                    {deviceLocation.timestamp && (
+                      <Typography variant="caption" sx={{ 
+                        color: theme.palette.text.secondary,
+                        fontSize: '0.65rem'
+                      }}>
+                        {isFixedLocation ? 'Set' : 'Updated'}: {new Date(deviceLocation.timestamp).toLocaleString()}
+                      </Typography>
+                    )}
+                  </Box>
+
                   <Button 
                     variant="outlined" 
                     size="small" 
@@ -840,6 +942,9 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [selectedDeviceForBluetooth, setSelectedDeviceForBluetooth] = useState<Device | null>(null);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [deviceForLocation, setDeviceForLocation] = useState<Device | null>(null);
+  // Removed WebSocket - using simple polling instead for reliability
 
   // Update device status when deviceData changes
   useEffect(() => {
@@ -860,7 +965,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
             setIsLoading(true);
             await fetchDevices();
             await fetchGPSData();
-            fetchDeviceStates().catch(() => {});
+            await fetchDeviceStates(); // Initial shadow state fetch for all devices
             setIsLoading(false);
         } catch (error: any) {
             console.error('Error initializing devices:', error);
@@ -871,14 +976,20 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
 
     initializeDevices();
 
-    const deviceDataInterval = setInterval(() => {
-        updateDevicesData();
+    // Poll device shadow states every 30 seconds for I/O states
+    const shadowStateInterval = setInterval(() => {
+        console.log('🔄 Polling device shadow states...');
+        fetchDeviceStates(); // Fetch all device shadows
+    }, 30000); // 30 seconds
+
+    // Poll GPS data every 5 minutes
+    const gpsDataInterval = setInterval(() => {
         fetchGPSData();
-        fetchDeviceStates().catch(() => {});
-    }, DEVICE_DATA_UPDATE_INTERVAL);
+    }, GPS_DATA_UPDATE_INTERVAL); // 5 minutes
 
     return () => {
-        clearInterval(deviceDataInterval);
+        clearInterval(shadowStateInterval);
+        clearInterval(gpsDataInterval);
     };
   }, [user.email]);
 
@@ -1045,35 +1156,84 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
     }
   };
 
-  const fetchDeviceStates = async () => {
-    if (devices.length === 0) return;
-    
+  // Fetch device shadow state (source of truth for I/O states)
+  const fetchDeviceShadowState = async (clientId: string) => {
     try {
-      const clientIds = devices.map(device => device.client_id);
-      
-      const response = await fetch(DEVICE_STATE_API_URL, {
+      const response = await fetch(SHADOW_STATE_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          client_ids: clientIds
+          client_id: clientId
         })
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        const deviceStates: {[key: string]: any} = {};
-        if (result.device_states && Array.isArray(result.device_states)) {
-          result.device_states.forEach((state: any) => {
-            deviceStates[state.client_id] = state;
-          });
+      if (!response.ok) {
+        // Silently skip devices without shadows - this is expected
+        return null;
+      }
+
+      const result = await response.json();
+      
+      // Check if the response contains an error (e.g., "Thing not found")
+      if (result.error) {
+        // This is expected for devices without shadows in AWS IoT Core
+        console.log(`ℹ️ Device ${clientId} has no shadow (expected for legacy devices)`);
+        return null;
+      }
+      
+      if (result.state) {
+        return {
+          client_id: clientId,
+          in1_state: result.state.in1_state || result.state.IN1 || 0,
+          in2_state: result.state.in2_state || result.state.IN2 || 0,
+          out1_state: result.state.out1_state || result.state.OUT1 || 0,
+          out2_state: result.state.out2_state || result.state.OUT2 || 0,
+          motor_speed: result.state.motor_speed || 0,
+          power_saving: result.state.power_saving || 0,
+          charging: result.state.charging || 0,
+          timestamp: result.state.timestamp || new Date().toISOString()
+        };
+      }
+      return null;
+    } catch (error: any) {
+      // Only log unexpected errors
+      console.warn(`⚠️ Unexpected error fetching shadow for ${clientId}:`, error.message);
+      return null;
+    }
+  };
+
+  // Fetch device states for all devices (from shadow - source of truth)
+  const fetchDeviceStates = async () => {
+    if (devices.length === 0) return;
+    
+    console.log(`📡 Fetching shadow states for ${devices.length} device(s)...`);
+    
+    try {
+      // Fetch shadow state for each device in parallel
+      const shadowPromises = devices.map(device => fetchDeviceShadowState(device.client_id));
+      const shadowResults = await Promise.all(shadowPromises);
+      
+      const newDeviceStates: {[key: string]: any} = {};
+      shadowResults.forEach(shadowState => {
+        if (shadowState && shadowState.client_id) {
+          newDeviceStates[shadowState.client_id] = shadowState;
+          console.log(`✅ Shadow loaded: ${shadowState.client_id} - OUT1:${shadowState.out1_state} OUT2:${shadowState.out2_state} Motor:${shadowState.motor_speed}%`);
         }
-        setDeviceStates(deviceStates);
+      });
+      
+      setDeviceStates(newDeviceStates);
+      
+      const shadowCount = Object.keys(newDeviceStates).length;
+      if (shadowCount > 0) {
+        console.log(`✅ Loaded ${shadowCount} device shadow state(s) successfully`);
+      } else {
+        console.log('ℹ️ No devices with shadows found (this is expected if only some devices have IoT Core shadows)');
       }
     } catch (error: any) {
-      console.warn('Device state API not accessible:', error.message);
+      console.warn('⚠️ Error fetching device shadow states:', error.message);
     }
   };
 
@@ -1117,6 +1277,47 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
     } catch (error: any) {
         console.error('Error fetching devices:', error);
         setError(error.message);
+    }
+  };
+
+  const handleSaveLocation = async (location: { lat: number; lng: number }) => {
+    if (!deviceForLocation) return;
+
+    try {
+      const response = await fetch(DEVICES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'set_device_location',
+          user_email: user.email,
+          client_id: deviceForLocation.client_id,
+          latitude: location.lat,
+          longitude: location.lng
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save location');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        showSnackbar(`Location set for ${deviceForLocation.device_name || deviceForLocation.client_id}`, 'success');
+        
+        // Refresh devices to get updated location
+        await fetchDevices();
+        // Refresh GPS data to show the new location on map
+        await fetchGPSData();
+      } else {
+        throw new Error(result.message || 'Failed to save location');
+      }
+    } catch (error: any) {
+      console.error('Error saving location:', error);
+      throw new Error(error.message || 'Failed to save location');
     }
   };
 
@@ -1639,26 +1840,39 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
               >
                 NB-Tech v1
               </Typography>
-              <Box sx={{
-                px: 1.5,
-                py: 0.5,
-                borderRadius: 2,
-                backgroundColor: currentTheme === 'dark' 
-                  ? 'rgba(76, 175, 80, 0.2)' 
-                  : 'rgba(76, 175, 80, 0.1)',
-                border: `1px solid ${currentTheme === 'dark' ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.2)'}`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5
-              }}>
+              <Tooltip title="Auto-refresh every 30 seconds">
                 <Box sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  backgroundColor: '#4caf50',
-                  animation: 'pulse 2s infinite'
-                }} />
-              </Box>
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 2,
+                  backgroundColor: currentTheme === 'dark' 
+                    ? 'rgba(33, 150, 243, 0.2)'
+                    : 'rgba(33, 150, 243, 0.1)',
+                  border: `1px solid ${currentTheme === 'dark' 
+                    ? 'rgba(33, 150, 243, 0.3)'
+                    : 'rgba(33, 150, 243, 0.2)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  transition: 'all 0.3s ease'
+                }}>
+                  <Box sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: ' 50%',
+                    backgroundColor: '#2196f3',
+                    animation: 'pulse 2s infinite',
+                    transition: 'background-color 0.3s ease'
+                  }} />
+                  <Typography variant="caption" sx={{ 
+                    fontSize: '0.7rem', 
+                    fontWeight: 500,
+                    color: currentTheme === 'dark' ? '#2196f3' : '#1976d2'
+                  }}>
+                    Auto 30s
+                  </Typography>
+                </Box>
+              </Tooltip>
             </Box>
             <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
               <UserEmailDisplay email={user.email} variant="chip" />
@@ -1672,15 +1886,12 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
             onRefresh={async () => {
               try {
                 setIsLoading(true);
+                // Only refresh devices list and GPS data
+                // WebSocket handles device data & states in real-time
                 await Promise.all([
                   fetchDevices(),
-                  fetchGPSData(),
-                  fetchDeviceStates()
+                  fetchGPSData()
                 ]);
-                if (devices && devices.length > 0) {
-                  const deviceDataPromises = devices.map(device => fetchDeviceData(device));
-                  await Promise.all(deviceDataPromises);
-                }
               } catch (error) {
                 console.error('Error refreshing data:', error);
               } finally {
@@ -1966,16 +2177,31 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                             {device.device_name || t('devices.unknownDevice')}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <IconButton
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedDeviceForBluetooth(device);
-                              }}
-                              color="primary"
-                              size="small"
-                            >
-                              <BluetoothIcon />
-                            </IconButton>
+                            <Tooltip title="Set Device Location">
+                              <IconButton
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeviceForLocation(device);
+                                  setLocationPickerOpen(true);
+                                }}
+                                color="primary"
+                                size="small"
+                              >
+                                <LocationOnIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Bluetooth Control">
+                              <IconButton
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedDeviceForBluetooth(device);
+                                }}
+                                color="primary"
+                                size="small"
+                              >
+                                <BluetoothIcon />
+                              </IconButton>
+                            </Tooltip>
                             {isUpdating && (
                               <CircularProgress size={12} sx={{ mr: 1 }} />
                             )}
@@ -2627,6 +2853,30 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
           </Button>
         </DialogActions>
       </Dialog>
+
+      {locationPickerOpen && deviceForLocation && (() => {
+        // Get current location from GPS data (priority) or fixed location (fallback)
+        const gpsInfo = gpsData[deviceForLocation.client_id];
+        const currentLoc = gpsInfo && gpsInfo.latitude && gpsInfo.longitude
+          ? { lat: gpsInfo.latitude, lng: gpsInfo.longitude }
+          : (deviceForLocation.fixed_latitude && deviceForLocation.fixed_longitude
+              ? { lat: deviceForLocation.fixed_latitude, lng: deviceForLocation.fixed_longitude }
+              : undefined);
+        
+        return (
+          <LocationPicker
+            open={locationPickerOpen}
+            onClose={() => {
+              setLocationPickerOpen(false);
+              setDeviceForLocation(null);
+            }}
+            deviceName={deviceForLocation.device_name || deviceForLocation.client_id}
+            clientId={deviceForLocation.client_id}
+            currentLocation={currentLoc}
+            onSave={handleSaveLocation}
+          />
+        );
+      })()}
     </Box>
   );
 };

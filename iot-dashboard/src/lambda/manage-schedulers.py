@@ -13,7 +13,7 @@ logger.setLevel(logging.INFO)
 
 # Initialize AWS resources
 dynamodb = boto3.resource('dynamodb')
-iot_client = boto3.client('iot-data')
+iot_data_client = boto3.client('iot-data')
 
 tasks_table = dynamodb.Table('IoT_SchedulerTasks')
 
@@ -165,44 +165,70 @@ def calculate_next_run(task_type, cron_str, from_time=None):
 # --- Task Execution Logic ---
 
 def execute_command(task):
+    """
+    Execute scheduled command by updating device shadow's DESIRED state.
+    The device will receive a delta notification and apply the change.
+    """
     try:
         device_id = task.get('device_id')
         command = task.get('command')
         target = task.get('target')
         value = task.get('value')
         
-        if not device_id: return False
-            
-        topic = f"NBtechv1/{device_id}/cmd/"
+        if not device_id:
+            logger.error("No device_id provided")
+            return False
         
-        # Prepare payload similar to send-command.py logic
-        if command == "SET_SPEED":
-            payload = {
-                "command": "SET_SPEED",
-                "speed": value
-            }
+        # Get current shadow to merge with desired state
+        try:
+            response = iot_data_client.get_thing_shadow(thingName=device_id)
+            shadow_document = json.loads(response['payload'].read())
+            current_desired = shadow_document.get('state', {}).get('desired', {})
+        except Exception as e:
+            logger.warning(f"Could not get current shadow for {device_id}: {e}, starting fresh")
+            current_desired = {}
+        
+        # Build desired state based on command
+        desired_state = dict(current_desired)  # Copy current desired state
+        
+        # Map commands to shadow fields
+        if command == "TOGGLE_1_ON":
+            desired_state['OUT1'] = 1
+        elif command == "TOGGLE_1_OFF":
+            desired_state['OUT1'] = 0
+        elif command == "TOGGLE_2_ON":
+            desired_state['OUT2'] = 1
+        elif command == "TOGGLE_2_OFF":
+            desired_state['OUT2'] = 0
+        elif command == "SET_SPEED":
+            desired_state['motor_speed'] = int(value) if value is not None else 0
+        elif command == "POWER_SAVING_ON":
+            desired_state['power_saving'] = 1
+        elif command == "POWER_SAVING_OFF":
+            desired_state['power_saving'] = 0
         else:
-            # For other commands, follow the simple format: { "command": "COMMAND_NAME" }
-            # If the scheduler UI provides 'value' but it's not SET_SPEED, we ignore it to match send-command.py strictness,
-            # OR we assume the user might have custom logic.
-            # Given the user request "copy this topic exactly" and referencing lines 1-100 of send-command.py,
-            # we should adhere to that structure.
-            
-            # Note: send-command.py (lines 80-82)
-            # else:
-            #    message_payload = {
-            #        "command": command
-            #    }
-            
-            payload = {
-                "command": command
-            }
+            logger.warning(f"Unknown command: {command}")
+            return False
         
-        iot_client.publish(topic=topic, qos=1, payload=json.dumps(payload))
-        logger.info(f"Published to {topic}: {json.dumps(payload)}")
+        # Update shadow with new desired state
+        shadow_update = {
+            "state": {
+                "desired": desired_state
+            }
+        }
+        
+        iot_data_client.update_thing_shadow(
+            thingName=device_id,
+            payload=json.dumps(shadow_update)
+        )
+        
+        logger.info(f"✅ Updated shadow for {device_id}: {json.dumps(desired_state)}")
         return True
+        
     except Exception as e:
-        logger.error(f"Exec error: {e}")
+        logger.error(f"Error executing command: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 def send_sns_notification(task, success):

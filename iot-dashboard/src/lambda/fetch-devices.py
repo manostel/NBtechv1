@@ -8,6 +8,7 @@ from decimal import Decimal
 dynamodb = boto3.resource('dynamodb')
 device_data_table = dynamodb.Table('IoT_DeviceData')
 devices_table = dynamodb.Table('Devices')
+gps_data_table = dynamodb.Table('IoT_DeviceGPS')
 
 def cors_response(status_code, body):
     return {
@@ -327,6 +328,57 @@ def lambda_handler(event, context):
             return cors_response(200, {
                 'message': 'Device updated successfully'
             })
+        
+        elif action == 'set_device_location':
+            required_fields = ['client_id', 'user_email', 'latitude', 'longitude']
+            for field in required_fields:
+                if field not in body:
+                    return cors_response(400, {
+                        'error': f'Missing required field: {field}',
+                        'debug_logs': debug_logs
+                    })
+            
+            try:
+                current_timestamp = datetime.utcnow().isoformat() + 'Z'
+                
+                # Update the device with the fixed location (for reference)
+                devices_table.update_item(
+                    Key={
+                        'client_id': body['client_id'],
+                        'user_email': body['user_email']
+                    },
+                    UpdateExpression='SET fixed_latitude = :lat, fixed_longitude = :lng, location_set_at = :timestamp',
+                    ExpressionAttributeValues={
+                        ':lat': Decimal(str(body['latitude'])),
+                        ':lng': Decimal(str(body['longitude'])),
+                        ':timestamp': current_timestamp
+                    }
+                )
+                
+                # Also write to IoT_DeviceGPS table (so GPS Lambda can retrieve it)
+                # Table structure: client_id (partition key), timestamp (sort key), lat, lon, alt, sats
+                gps_item = {
+                    'client_id': body['client_id'],
+                    'timestamp': current_timestamp,
+                    'lat': Decimal(str(body['latitude'])),
+                    'lon': Decimal(str(body['longitude'])),
+                    'alt': None,  # Fixed location doesn't have altitude
+                    'sats': None  # Fixed location doesn't have satellite count
+                }
+                gps_data_table.put_item(Item=gps_item)
+                debug_logs.append(f"GPS data written to IoT_DeviceGPS: {body['client_id']} at {current_timestamp}")
+                
+                return cors_response(200, {
+                    'success': True,
+                    'message': 'Device location set successfully and written to GPS table'
+                })
+            except Exception as e:
+                debug_logs.append(f"Error setting device location: {str(e)}")
+                return cors_response(500, {
+                    'success': False,
+                    'error': f'Failed to set device location: {str(e)}',
+                    'debug_logs': debug_logs
+                })
         
         else:
             return cors_response(400, {

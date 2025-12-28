@@ -24,6 +24,7 @@ import {
   CardContent,
   CardActions,
   Chip,
+  Paper,
   SelectChangeEvent
 } from '@mui/material';
 import { 
@@ -62,10 +63,11 @@ const defaultMetricsConfig: MetricsConfig = {
   thermistor_temp: { label: 'Thermistor Temperature', unit: '°C', color: '#ff5722' }
 };
 
-// Extended parameter types for alarms
+// Two-group alarm parameter types: Metrics (telemetry) and State (shadow reported)
 const ALARM_PARAMETER_TYPES: any = {
   metrics: {
-    label: 'Metrics',
+    label: 'Metrics (Sensors)',
+    description: 'Sensor readings from telemetry',
     icon: <TrendingUpIcon />,
     parameters: {
       battery: { label: 'Battery', unit: '%', type: 'numeric' },
@@ -75,29 +77,18 @@ const ALARM_PARAMETER_TYPES: any = {
       signal_quality: { label: 'Signal Quality', unit: '%', type: 'numeric' }
     }
   },
-  status: {
-    label: 'Device Status',
+  state: {
+    label: 'State (Device)',
+    description: 'Device state from shadow reported',
     icon: <DeviceIcon />,
     parameters: {
-      status: { label: 'State', unit: '', type: 'status' }
-    }
-  },
-  inputs: {
-    label: 'Inputs',
-    icon: <InputIcon />,
-    parameters: {
-      'inputs.IN1': { label: 'Input 1', unit: '', type: 'boolean' },
-      'inputs.IN2': { label: 'Input 2', unit: '', type: 'boolean' }
-    }
-  },
-  outputs: {
-    label: 'Outputs',
-    icon: <OutputIcon />,
-    parameters: {
-      'outputs.OUT1': { label: 'Output 1', unit: '', type: 'boolean' },
-      'outputs.OUT2': { label: 'Output 2', unit: '', type: 'boolean' },
-      'outputs.speed': { label: 'Motor Speed', unit: '', type: 'numeric' },
-      'outputs.charging': { label: 'Charging Status', unit: '', type: 'boolean' }
+      'IN1': { label: 'Input 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'IN2': { label: 'Input 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'OUT1': { label: 'Output 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'OUT2': { label: 'Output 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'motor_speed': { label: 'Motor Speed', unit: '', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      'charging': { label: 'Charging Status', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'power_saving': { label: 'Power Saving', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] }
     }
   }
 };
@@ -140,30 +131,20 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
     const parameterConfig = ALARM_PARAMETER_TYPES[parameterType]?.parameters[variableName];
     if (!parameterConfig) return [];
 
-    switch (parameterConfig.type) {
-      case 'numeric':
-        return [
-          { value: 'above', label: t('alarms.aboveThreshold') },
-          { value: 'below', label: t('alarms.belowThreshold') },
-          { value: 'equals', label: t('alarms.equals') }
-        ];
-      case 'boolean':
-        return [
-          { value: 'equals', label: t('alarms.equals') },
-          { value: 'not_equals', label: t('alarms.notEquals') },
-          { value: 'change', label: t('alarms.anyChange') }
-        ];
-      case 'status':
-        return [
-          { value: 'equals', label: t('alarms.equals') },
-          { value: 'not_equals', label: t('alarms.notEquals') },
-          { value: 'change', label: t('alarms.anyChange') }
-        ];
-      default:
-        return [
-          { value: 'change', label: t('alarms.anyChange') }
-        ];
-    }
+    // Use allowedConditions from parameter config for precise control
+    const allowedConditions = parameterConfig.allowedConditions || ['change'];
+    
+    // Map condition values to labels
+    const conditionLabels: any = {
+      'change': { value: 'change', label: t('alarms.anyChange') },
+      'above': { value: 'above', label: t('alarms.aboveThreshold') },
+      'below': { value: 'below', label: t('alarms.belowThreshold') },
+      'equals': { value: 'equals', label: t('alarms.equals') },
+      'not_equals': { value: 'not_equals', label: t('alarms.notEquals') }
+    };
+    
+    // Return only the allowed conditions for this parameter
+    return allowedConditions.map((condition: string) => conditionLabels[condition]).filter(Boolean);
   };
 
   // Get threshold input based on parameter type and condition
@@ -195,14 +176,14 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       case 'boolean':
         return (
           <FormControl fullWidth>
-            <InputLabel>{t('alarms.value')}</InputLabel>
+            <InputLabel>Value (0 or 1)</InputLabel>
             <Select
               value={newAlarm.threshold}
               onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
-              label={t('alarms.value')}
+              label="Value (0 or 1)"
             >
-              <MenuItem value="true">{t('alarms.true')}</MenuItem>
-              <MenuItem value="false">{t('alarms.false')}</MenuItem>
+              <MenuItem value="1">ON (1)</MenuItem>
+              <MenuItem value="0">OFF (0)</MenuItem>
             </Select>
           </FormControl>
         );
@@ -780,6 +761,7 @@ const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metrics
       </Tabs>
       {activeTab === 0 && (
         <Box>
+          
           <Box sx={{ 
             display: 'flex', 
             alignItems: 'center', 

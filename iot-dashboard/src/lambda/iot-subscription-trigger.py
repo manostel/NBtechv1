@@ -12,6 +12,8 @@ logger.setLevel(logging.INFO)
 
 # Initialize AWS services
 dynamodb = boto3.resource('dynamodb')
+iot_data_client = boto3.client('iot-data')
+
 subscriptions_table = dynamodb.Table('IoT_DeviceSubscriptions')
 notifications_table = dynamodb.Table('IoT_SubscriptionNotifications')
 
@@ -92,21 +94,42 @@ def lambda_handler(event, context):
             'body': json.dumps({'error': str(e)})
         }
 
+def get_device_shadow(device_id):
+    """Get device shadow state from AWS IoT"""
+    try:
+        response = iot_data_client.get_thing_shadow(thingName=device_id)
+        shadow_document = json.loads(response['payload'].read())
+        return shadow_document
+    except Exception as e:
+        logger.error(f"Error getting shadow for {device_id}: {e}")
+        return None
+
 def check_io_state_changes(device_id, device_data):
     """
     Check for Input/Output state changes by comparing with stored state.
+    NOW READS FROM SHADOW instead of telemetry table.
     Sends notification if state changed.
     """
     try:
-        # Define IO parameters to monitor
-        io_params = ['out1_state', 'out2_state', 'in1_state', 'in2_state']
+        # Get current shadow state
+        shadow_document = get_device_shadow(device_id)
+        if not shadow_document or 'state' not in shadow_document:
+            logger.warning(f"No shadow found for {device_id}")
+            return
         
-        # Check if any IO params are present in current data
-        present_params = [p for p in io_params if p in device_data]
+        shadow_state = shadow_document.get('state', {}).get('reported', {})
+        
+        # Define IO parameters to monitor (from shadow)
+        # Shadow has: IN1, IN2, OUT1, OUT2, charging
+        io_params = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging']
+        
+        # Check if any IO params are present in current shadow
+        present_params = [p for p in io_params if p in shadow_state]
         if not present_params:
+            logger.info(f"No IO parameters found in shadow for {device_id}")
             return
             
-        # Get last known state from IoT_DeviceData table
+        # Get last known state from IoT_DeviceData table (for comparison)
         device_data_table = dynamodb.Table('IoT_DeviceData')
         response = device_data_table.query(
             KeyConditionExpression=Key('client_id').eq(device_id),
@@ -114,13 +137,13 @@ def check_io_state_changes(device_id, device_data):
             ScanIndexForward=False
         )
         
-        if not response.get('Items'):
-            return
-            
-        last_state = response['Items'][0]
+        # Store current shadow state for future comparison
+        last_state = {}
+        if response.get('Items'):
+            last_state = response['Items'][0]
         
         for param in present_params:
-            current_val = device_data[param]
+            current_val = shadow_state[param]
             last_val = last_state.get(param)
             
             # Normalize for comparison (0/1, True/False)
@@ -129,11 +152,14 @@ def check_io_state_changes(device_id, device_data):
             
             if curr_norm != last_norm:
                 # State Changed!
-                io_type = "Output" if "out" in param else "Input"
-                io_num = "1" if "1" in param else "2"
+                io_type = "Charging" if param == "charging" else ("Output" if "OUT" in param else "Input")
+                io_num = param[-1] if param in ['IN1', 'IN2', 'OUT1', 'OUT2'] else ""
                 state_str = "ON" if curr_norm == 1 else "OFF"
                 
-                message = f"{io_type} {io_num} changed to {state_str}"
+                if param == "charging":
+                    message = f"Charging state changed to {state_str}"
+                else:
+                    message = f"{io_type} {io_num} changed to {state_str}"
                 
                 logger.info(f"IO State Change detected for {device_id}: {param} {last_norm}->{curr_norm}")
                 
@@ -421,24 +447,26 @@ async def get_device_subscriptions(device_id):
         logger.error(f"Error getting subscriptions for {device_id}: {e}")
         return []
 
-def extract_parameter_value(device_data, parameter_name):
-    """Extract parameter value from device data, handling nested and direct parameters"""
+def extract_parameter_value(device_data, parameter_name, device_id=None):
+    """
+    Extract parameter value from device data, handling nested and direct parameters.
+    NOW READS FROM SHADOW for input/output states, TELEMETRY for metrics.
+    """
     try:
-        # Handle nested parameters like outputs.OUT1
-        if '.' in parameter_name:
-            # Extract nested value: outputs.OUT1 -> device_data['outputs']['OUT1']
-            parts = parameter_name.split('.')
-            current_value = device_data
-            for part in parts:
-                if isinstance(current_value, dict):
-                    current_value = current_value.get(part)
-                else:
-                    current_value = None
-                    break
-            return current_value
-        else:
-            # Handle direct parameters
-            return device_data.get(parameter_name)
+        # Determine if this is a state parameter (from shadow) or metric (from telemetry)
+        # Shadow has flat structure: IN1, IN2, OUT1, OUT2, charging, motor_speed, power_saving
+        state_params = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+        
+        if parameter_name in state_params and device_id:
+            # Read from shadow for device states
+            shadow_document = get_device_shadow(device_id)
+            if shadow_document and 'state' in shadow_document:
+                shadow_state = shadow_document['state'].get('reported', {})
+                return shadow_state.get(parameter_name)
+        
+        # Fall back to device_data (telemetry) for metrics
+        # Metrics: battery, temperature, humidity, signal_quality, pressure
+        return device_data.get(parameter_name)
     except Exception as e:
         logger.error(f"Error extracting parameter {parameter_name}: {e}")
         return None
@@ -468,8 +496,8 @@ def check_single_subscription_sync(subscription, device_data, message_type):
         logger.info(f"Checking subscription {subscription_id} for parameter: {parameter_name}, device: {device_id}")
         logger.info(f"Device data keys: {list(device_data.keys()) if isinstance(device_data, dict) else 'not a dict'}")
         
-        # Extract parameter value
-        current_value = extract_parameter_value(device_data, parameter_name)
+        # Extract parameter value (will read from shadow for states, telemetry for metrics)
+        current_value = extract_parameter_value(device_data, parameter_name, device_id=device_id)
         
         if current_value is None:
             logger.warning(f"Parameter {parameter_name} not found in device data")
@@ -889,7 +917,8 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
     """Trigger a subscription notification (synchronous version)"""
     try:
         parameter_name = subscription['parameter_name']
-        current_value = extract_parameter_value(device_data, parameter_name)
+        device_id = subscription['device_id']
+        current_value = extract_parameter_value(device_data, parameter_name, device_id=device_id)
         current_value_normalized = normalize_value_for_comparison(current_value)
         
         # Create notification
@@ -1093,7 +1122,10 @@ async def send_email_notification(notification):
         logger.error(f"Error sending email notification: {e}")
 
 def execute_multiple_commands_sync(subscription):
-    """Execute multiple command actions when subscription is triggered (synchronous version)"""
+    """
+    Execute multiple command actions when subscription is triggered (synchronous version).
+    NOW UPDATES SHADOW DESIRED STATE instead of publishing to /cmd topic.
+    """
     try:
         device_id = subscription['device_id']
         commands = subscription.get('commands', [])
@@ -1113,59 +1145,61 @@ def execute_multiple_commands_sync(subscription):
             logger.info("No valid commands to execute")
             return True
         
-        # Use boto3 IoT client to publish
-        import boto3
-        iot_client = boto3.client('iot-data')
+        # Get current shadow to merge with desired state
+        try:
+            response = iot_data_client.get_thing_shadow(thingName=device_id)
+            shadow_document = json.loads(response['payload'].read())
+            current_desired = shadow_document.get('state', {}).get('desired', {})
+        except Exception as e:
+            logger.warning(f"Could not get current shadow for {device_id}: {e}, starting fresh")
+            current_desired = {}
         
-        # Execute each command
+        # Build desired state by merging all commands
+        desired_state = dict(current_desired)  # Copy current desired state
+        
+        # Execute each command by updating desired state
         for command in active_commands:
             command_action = command['action']
             command_value = command.get('value', '')
             target_device = command.get('target_device', device_id)  # Default to same device
             
-            # Create command payload in the format expected by PCB
+            # Skip if targeting different device (not yet supported for shadow)
+            if target_device != device_id:
+                logger.warning(f"Cross-device commands not supported via shadow: {target_device}")
+                continue
+            
+            # Map command actions to shadow fields
             if command_action == 'out1':
-                if command_value == '1':
-                    command_payload = {"command": "TOGGLE_1_ON"}
-                else:
-                    command_payload = {"command": "TOGGLE_1_OFF"}
+                desired_state['OUT1'] = 1 if command_value == '1' else 0
             elif command_action == 'out2':
-                if command_value == '1':
-                    command_payload = {"command": "TOGGLE_2_ON"}
-                else:
-                    command_payload = {"command": "TOGGLE_2_OFF"}
+                desired_state['OUT2'] = 1 if command_value == '1' else 0
             elif command_action == 'motor_speed':
-                command_payload = {"command": "SET_SPEED", "speed": int(command_value)}
+                desired_state['motor_speed'] = int(command_value)
             elif command_action == 'power_saving':
-                if command_value == '1':
-                    command_payload = {"command": "POWER_SAVING_ON"}
-                else:
-                    command_payload = {"command": "POWER_SAVING_OFF"}
+                desired_state['power_saving'] = 1 if command_value == '1' else 0
             else:
-                # Fallback to generic format
-                command_payload = {
-                    'device_id': target_device,
-                    'timestamp': datetime.now(timezone.utc).isoformat(),
-                    'command_type': command_action,
-                    'value': command_value
-                }
-            
-            # Publish command to IoT Core
-            topic = f"NBtechv1/{target_device}/cmd/"
-            
-            response = iot_client.publish(
-                topic=topic,
-                payload=json.dumps(command_payload),
-                qos=1
-            )
-            
-            logger.info(f"Command sent to {topic}: {command_payload}")
+                logger.warning(f"Unknown command action: {command_action}")
         
+        # Update shadow with new desired state
+        shadow_update = {
+            "state": {
+                "desired": desired_state
+            }
+        }
+        
+        iot_data_client.update_thing_shadow(
+            thingName=device_id,
+            payload=json.dumps(shadow_update)
+        )
+        
+        logger.info(f"✅ Updated shadow for {device_id}: {json.dumps(desired_state)}")
         logger.info(f"Executed {len(active_commands)} commands for device {device_id}")
         return True
         
     except Exception as e:
         logger.error(f"Error executing multiple commands: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 async def execute_multiple_commands(subscription):

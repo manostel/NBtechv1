@@ -107,11 +107,15 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`dashboard-tab-${index}`}
       {...other}
     >
-      {value === index && (
-        <Box sx={{ py: 0, px: { xs: 0, sm: 3 } }}>
-          {children}
-        </Box>
-      )}
+      {/* Always render children (even when hidden) so WebSocket updates trigger re-renders */}
+      {/* Use display: none instead of conditional rendering to keep component mounted */}
+      <Box sx={{ 
+        py: 0, 
+        px: { xs: 0, sm: 3 },
+        display: value === index ? 'block' : 'none'
+      }}>
+        {children}
+      </Box>
     </div>
   );
 }
@@ -227,6 +231,12 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
   const wsRef = useRef<WebSocket | null>(null);
   const wsReconnectRef = useRef<NodeJS.Timeout | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
+  const lastShadowVersionRef = useRef<number>(0);
+  const lastShadowTimestampRef = useRef<number>(0);
+  const wsReconnectAttemptsRef = useRef<number>(0);
+  const wsIsReconnectingRef = useRef<boolean>(false);
+  const wsLastMessageTimeRef = useRef<number>(0);
+  const wsWatchdogIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Separate state for overview tab
   const [selectedVariablesOverview, setSelectedVariablesOverview] = useState<string[]>([]);
@@ -235,6 +245,13 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
   const [selectedVariablesChartsStats, setSelectedVariablesChartsStats] = useState<string[]>([]);
   
   const [availableVariables, setAvailableVariables] = useState<string[]>([]);
+
+  // Coercion helpers (shadow values can arrive as number | string | boolean depending on source)
+  const toNum = (v: any, fallback = 0) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const to01 = (v: any) => (v === true || v === '1' || v === 1 ? 1 : 0);
 
   useEffect(() => {
     if (metricsConfig) {
@@ -587,13 +604,13 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
         const mappedState: DeviceData = {
           client_id: result.state.client_id,
           timestamp: result.state.timestamp ? new Date(result.state.timestamp * 1000).toISOString() : new Date().toISOString(),
-          out1_state: result.state.out1_state,
-          out2_state: result.state.out2_state,
-          motor_speed: result.state.motor_speed,
-          power_saving: result.state.power_saving,
-          in1_state: result.state.in1_state,
-          in2_state: result.state.in2_state,
-          charging: result.state.charging,
+          out1_state: to01(result.state.out1_state),
+          out2_state: to01(result.state.out2_state),
+          motor_speed: toNum(result.state.motor_speed, 0),
+          power_saving: to01(result.state.power_saving),
+          in1_state: to01(result.state.in1_state),
+          in2_state: to01(result.state.in2_state),
+          charging: to01(result.state.charging),
           connection_status: result.state.connection_status
         };
         
@@ -712,80 +729,159 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
 
       initialize();
       
-      // Connect WebSocket for real-time device state updates
+      const scheduleReconnect = (reason: string) => {
+        if (!isMounted.current) return;
+        if (wsIsReconnectingRef.current) return;
+
+        // Exponential backoff: 2s, 4s, 8s, 16s, max 30s
+        const baseDelay = 2000;
+        const maxDelay = 30000;
+        const delay = Math.min(baseDelay * Math.pow(2, wsReconnectAttemptsRef.current), maxDelay);
+        wsReconnectAttemptsRef.current++;
+
+        wsIsReconnectingRef.current = true;
+        if (wsReconnectRef.current) clearTimeout(wsReconnectRef.current);
+        wsReconnectRef.current = setTimeout(() => {
+          wsIsReconnectingRef.current = false;
+          console.log(`🔄 Dashboard: Reconnecting WebSocket (${reason}) attempt=${wsReconnectAttemptsRef.current} delay=${delay}ms`);
+          connectWebSocket();
+        }, delay);
+      };
+
+      // Connect WebSocket for real-time device state updates (single owner, robust reconnect)
       const connectWebSocket = () => {
-        if (!device?.client_id) return;
-        
+        if (!device?.client_id || !isMounted.current) return;
+
+        // Prevent duplicate connections
         if (wsRef.current) {
-          wsRef.current.close();
+          const st = wsRef.current.readyState;
+          if (st === WebSocket.CONNECTING || st === WebSocket.OPEN) {
+            return;
+          }
+          try { wsRef.current.close(); } catch {}
+          wsRef.current = null;
         }
-        
+
         try {
-          const url = `${WEBSOCKET_URL}?client_id=${device.client_id}`;
+          // Include both user_email (for ownership) and client_id (for specific device)
+          const url = `${WEBSOCKET_URL}?user_email=${encodeURIComponent(user.email)}&client_id=${device.client_id}`;
           console.log('🔌 Dashboard: Connecting WebSocket:', url);
-          
+
           const ws = new WebSocket(url);
           wsRef.current = ws;
-          
+
           ws.onopen = () => {
             console.log('✅ Dashboard: WebSocket connected');
             setWsConnected(true);
+            wsReconnectAttemptsRef.current = 0;
+            wsIsReconnectingRef.current = false;
+            wsLastMessageTimeRef.current = Date.now(); // Reset on connect
           };
-          
+
           ws.onmessage = (event) => {
+            wsLastMessageTimeRef.current = Date.now();
             try {
               const message = JSON.parse(event.data);
-              console.log('📨 Dashboard: WebSocket message:', message);
-              
+              console.log('📨 Dashboard: WebSocket message received:', message);
+
               if (message.type === 'SHADOW_UPDATE' && message.client_id === device.client_id) {
-                const reported = message.reported;
-                
-                // Update device state from WebSocket (real-time!)
+                const msgVersion = typeof message.version === 'number' ? message.version : 0;
+                const msgTs = typeof message.timestamp === 'number' ? message.timestamp : 0;
+
+                // Ignore out-of-order deliveries
+                if (msgVersion > 0 && msgVersion < lastShadowVersionRef.current) {
+                  console.log(`⏭️ Dashboard: Ignoring stale SHADOW_UPDATE (version ${msgVersion} < ${lastShadowVersionRef.current})`);
+                  return;
+                }
+                if (msgVersion === 0 && msgTs > 0 && msgTs < lastShadowTimestampRef.current) {
+                  console.log(`⏭️ Dashboard: Ignoring stale SHADOW_UPDATE (timestamp ${msgTs} < ${lastShadowTimestampRef.current})`);
+                  return;
+                }
+
+                if (msgVersion > 0) lastShadowVersionRef.current = msgVersion;
+                if (msgTs > 0) lastShadowTimestampRef.current = Math.max(lastShadowTimestampRef.current, msgTs);
+
+                const reported = message.reported || {};
                 const newState: DeviceData = {
                   client_id: device.client_id,
                   timestamp: new Date().toISOString(),
-                  out1_state: reported.out1_state,
-                  out2_state: reported.out2_state,
-                  motor_speed: reported.motor_speed,
-                  power_saving: reported.power_saving,
-                  in1_state: reported.in1_state,
-                  in2_state: reported.in2_state,
-                  charging: reported.charging,
+                  shadow_version: msgVersion || undefined,
+                  shadow_timestamp: msgTs || undefined,
+                  out1_state: to01(reported.out1_state),
+                  out2_state: to01(reported.out2_state),
+                  motor_speed: toNum(reported.motor_speed, 0),
+                  power_saving: to01(reported.power_saving),
+                  in1_state: to01(reported.in1_state),
+                  in2_state: to01(reported.in2_state),
+                  charging: to01(reported.charging),
                   connection_status: reported.connection_status
                 };
-                
+
                 setDeviceState(newState);
                 previousDeviceStateRef.current = newState;
-                console.log('✅ Dashboard: Device state updated via WebSocket');
+                console.log('✅ Dashboard: Device state updated via WebSocket', newState);
+              } else {
+                console.log('ℹ️ Dashboard: Received non-SHADOW_UPDATE message:', message.type);
               }
             } catch (e) {
-              console.error('❌ Dashboard: Error parsing WebSocket message:', e);
+              console.error('❌ Dashboard: Error parsing WebSocket message:', e, 'Raw data:', event.data);
             }
           };
-          
+
           ws.onerror = (event) => {
             console.error('❌ Dashboard: WebSocket error:', event);
+            // Let onclose handle reconnection.
           };
-          
+
           ws.onclose = (event) => {
-            console.log('🔌 Dashboard: WebSocket closed:', event.code);
+            console.log('🔌 Dashboard: WebSocket closed:', event.code, event.reason);
             setWsConnected(false);
             wsRef.current = null;
-            
-            // Reconnect after 5 seconds
-            if (event.code !== 1000 && isMounted.current) {
-              wsReconnectRef.current = setTimeout(() => {
-                console.log('🔄 Dashboard: Reconnecting WebSocket...');
-                connectWebSocket();
-              }, 5000);
-            }
+
+            // Don't reconnect only when we intentionally unmount.
+            if (!isMounted.current) return;
+            if (event.code === 1000 && event.reason === 'Component unmount') return;
+
+            scheduleReconnect(`close code=${event.code}`);
           };
         } catch (e) {
           console.error('❌ Dashboard: Error creating WebSocket:', e);
+          scheduleReconnect('create_failed');
         }
       };
       
       connectWebSocket();
+
+      // Reconnect when tab becomes visible (mobile browsers often kill sockets in background)
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          const st = wsRef.current?.readyState;
+          if (st !== WebSocket.OPEN && st !== WebSocket.CONNECTING) {
+            console.log('👁️ Dashboard: Tab visible - reconnecting WebSocket');
+            connectWebSocket();
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      // Watchdog: if no messages for 30s while "connected", force reconnect
+      // This ensures we detect when WebSocket is "connected" but not receiving messages
+      if (wsWatchdogIntervalRef.current) clearInterval(wsWatchdogIntervalRef.current);
+      wsWatchdogIntervalRef.current = setInterval(() => {
+        if (!isMounted.current) return;
+        const st = wsRef.current?.readyState;
+        if (st !== WebSocket.OPEN) return;
+        
+        const since = Date.now() - wsLastMessageTimeRef.current;
+        const connectionAge = Date.now() - (wsLastMessageTimeRef.current || Date.now());
+        
+        // If we've been connected for at least 5 seconds and no messages for 30s, force reconnect
+        if (connectionAge > 5000 && wsLastMessageTimeRef.current > 0 && since > 30000) {
+          console.warn(`🩺 Dashboard: WebSocket watchdog - no messages for ${Math.round(since/1000)}s, forcing reconnect`);
+          try { wsRef.current?.close(); } catch {}
+          scheduleReconnect('watchdog_no_messages');
+        }
+      }, 10000); // Check every 10 seconds
       
       // Set up intervals for telemetry data only (NOT device state - that's via WebSocket)
       const latestDataInterval = setInterval(async () => {
@@ -813,8 +909,13 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
 
       // Cleanup on unmount
       return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
         if (wsReconnectRef.current) {
           clearTimeout(wsReconnectRef.current);
+        }
+        if (wsWatchdogIntervalRef.current) {
+          clearInterval(wsWatchdogIntervalRef.current);
+          wsWatchdogIntervalRef.current = null;
         }
         if (wsRef.current) {
           wsRef.current.close(1000, 'Component unmount');

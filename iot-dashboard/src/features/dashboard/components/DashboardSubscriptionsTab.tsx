@@ -64,42 +64,56 @@ const SUBSCRIPTIONS_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazo
 const DEVICES_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/devices";
 
 // Parameter type configurations - will be translated in component
+// Two-group subscription parameter types: Metrics (telemetry) and State (shadow reported)
 const PARAMETER_TYPES: any = {
-  inputs: {
-    labelKey: 'subscriptions.inputs',
-    icon: <InputIcon />,
-    parameters: ['inputs.IN1', 'inputs.IN2']
-  },
-  outputs: {
-    labelKey: 'subscriptions.outputs',
-    icon: <OutputIcon />,
-    parameters: ['outputs.OUT1', 'outputs.OUT2', 'outputs.speed', 'outputs.charging']
-  },
   metrics: {
     labelKey: 'subscriptions.metrics',
     icon: <TrendingUpIcon />,
-    parameters: ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure']
+    parameters: {
+      'battery': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      'temperature': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      'humidity': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      'signal_quality': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      'pressure': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] }
+    }
   },
-  variables: {
-    labelKey: 'subscriptions.variables',
-    icon: <SettingsIcon />,
-    parameters: ['motor_speed', 'power_saving', 'outputs.power_saving']
-  },
-  status: {
-    labelKey: 'subscriptions.status',
+  state: {
+    labelKey: 'subscriptions.state',
     icon: <DeviceIcon />,
-    parameters: ['status']
+    parameters: {
+      'IN1': { allowedConditions: ['change', 'equals', 'not_equals'] },
+      'IN2': { allowedConditions: ['change', 'equals', 'not_equals'] },
+      'OUT1': { allowedConditions: ['change', 'equals', 'not_equals'] },
+      'OUT2': { allowedConditions: ['change', 'equals', 'not_equals'] },
+      'charging': { allowedConditions: ['change', 'equals', 'not_equals'] },
+      'motor_speed': { allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      'power_saving': { allowedConditions: ['change', 'equals', 'not_equals'] }
+    }
   }
 };
 
-// Condition types for subscriptions - will be translated in component
-const getConditionTypes = (t: any) => [
-  { value: 'change', label: t('subscriptions.anyChange'), description: t('subscriptions.notifyOnChange', { param: '{{param}}' }) },
-  { value: 'above', label: t('subscriptions.aboveThreshold'), description: t('subscriptions.notifyAbove', { param: '{{param}}', value: '{{value}}' }) },
-  { value: 'below', label: t('subscriptions.belowThreshold'), description: t('subscriptions.notifyBelow', { param: '{{param}}', value: '{{value}}' }) },
-  { value: 'equals', label: t('subscriptions.equalsValue'), description: t('subscriptions.notifyEquals', { param: '{{param}}', value: '{{value}}' }) },
-  { value: 'not_equals', label: t('subscriptions.notEqualsValue'), description: t('subscriptions.notifyNotEquals', { param: '{{param}}', value: '{{value}}' }) }
-];
+// All condition types available
+const ALL_CONDITION_TYPES = (t: any) => ({
+  'change': { value: 'change', label: t('subscriptions.anyChange'), description: t('subscriptions.notifyOnChange', { param: '{{param}}' }) },
+  'above': { value: 'above', label: t('subscriptions.aboveThreshold'), description: t('subscriptions.notifyAbove', { param: '{{param}}', value: '{{value}}' }) },
+  'below': { value: 'below', label: t('subscriptions.belowThreshold'), description: t('subscriptions.notifyBelow', { param: '{{param}}', value: '{{value}}' }) },
+  'equals': { value: 'equals', label: t('subscriptions.equalsValue'), description: t('subscriptions.notifyEquals', { param: '{{param}}', value: '{{value}}' }) },
+  'not_equals': { value: 'not_equals', label: t('subscriptions.notEqualsValue'), description: t('subscriptions.notifyNotEquals', { param: '{{param}}', value: '{{value}}' }) }
+});
+
+// Get allowed condition types for a specific parameter
+const getConditionTypes = (t: any, parameterType?: string, parameterName?: string) => {
+  if (!parameterType || !parameterName) {
+    // Return all conditions if no parameter selected
+    return Object.values(ALL_CONDITION_TYPES(t));
+  }
+  
+  const paramConfig = PARAMETER_TYPES[parameterType]?.parameters?.[parameterName];
+  const allowedConditions = paramConfig?.allowedConditions || ['change'];
+  const allConditions = ALL_CONDITION_TYPES(t);
+  
+  return allowedConditions.map((conditionKey: string) => allConditions[conditionKey]).filter(Boolean);
+};
 
 // Notification methods - will be translated in component
 const getNotificationMethods = (t: any) => [
@@ -647,16 +661,12 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
   };
 
   const getAvailableParameters = (deviceId: string, parameterType: string) => {
-    // Return a default list of parameters for each type
-    const defaultParameters: any = {
-      'inputs': ['inputs.IN1', 'inputs.IN2'],
-      'outputs': ['outputs.OUT1', 'outputs.OUT2', 'outputs.speed', 'outputs.charging', 'outputs.power_saving'],
-      'metrics': ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure'],
-      'variables': ['motor_speed', 'power_saving'],
-      'status': ['status']
-    };
+    // Return parameter names from PARAMETER_TYPES
+    if (!parameterType || !PARAMETER_TYPES[parameterType]) {
+      return [];
+    }
     
-    return defaultParameters[parameterType] || [];
+    return Object.keys(PARAMETER_TYPES[parameterType].parameters || {});
   };
 
   const getConditionDescription = (subscription: any) => {
@@ -1000,7 +1010,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                 label={t('subscriptions.parameter')}
                 disabled={!formData.parameter_type}
               >
-                {formData.parameter_type && PARAMETER_TYPES[formData.parameter_type]?.parameters.map((param: string) => (
+                {formData.parameter_type && Object.keys(PARAMETER_TYPES[formData.parameter_type]?.parameters || {}).map((param: string) => (
                   <MenuItem key={param} value={param}>
                     {param}
                   </MenuItem>
@@ -1017,7 +1027,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                 onChange={(e) => setFormData({ ...formData, condition_type: e.target.value })}
                 label={t('subscriptions.condition')}
               >
-                {getConditionTypes(t).map((condition) => (
+                {getConditionTypes(t, formData.parameter_type, formData.parameter_name).map((condition) => (
                   <MenuItem key={condition.value} value={condition.value}>
                     <Box>
                       <Typography>{condition.label}</Typography>

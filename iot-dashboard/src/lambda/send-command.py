@@ -98,11 +98,11 @@ def lambda_handler(event, context):
             # (Shadow is for state management, RESTART is an action)
             command_topic = f"NBtechv1/{client_id}/cmd"
             message_payload = {"command": "RESTART"}
-            iot_client.publish(
-                topic=command_topic,
-                qos=1,
-                payload=json.dumps(message_payload)
-            )
+        iot_client.publish(
+            topic=command_topic,
+            qos=1,
+            payload=json.dumps(message_payload)
+        )
             print(f"Published RESTART to {command_topic}: {json.dumps(message_payload)}")
             return create_cors_response(200, {
                 "message": f"RESTART command sent successfully to device {client_id}",
@@ -165,8 +165,8 @@ def lambda_handler(event, context):
             except Exception as shadow_error:
                 print(f"Warning: Could not fetch shadow state after update: {str(shadow_error)}")
                 current_state = None
-            
-            return create_cors_response(200, {
+
+        return create_cors_response(200, {
                 "message": f"Command '{command}' sent successfully via Device Shadow",
                 "thingName": client_id,
                 "desiredState": desired_state,
@@ -181,7 +181,7 @@ def lambda_handler(event, context):
             print(f"Error updating shadow: {str(e)}")
             return create_cors_response(500, {
                 "error": f"Failed to update shadow: {str(e)}"
-            })
+        })
 
     except Exception as e:
         print("Error:", str(e))

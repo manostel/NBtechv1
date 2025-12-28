@@ -15,7 +15,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions
+  DialogActions,
+  Slider
 } from '@mui/material';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SpeedIcon from '@mui/icons-material/Speed';
@@ -56,197 +57,46 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
   setSnackbar
 }) => {
   const { t } = useTranslation();
-  const [output1State, setOutput1State] = useState(false);
-  const [output2State, setOutput2State] = useState(false);
-  const [motorSpeed, setMotorSpeed] = useState('');
-  const [powerSavingMode, setPowerSavingMode] = useState(false);
+
+  // Coercion helpers (shadow values can arrive as number | string | boolean depending on source)
+  const toBool01 = (v: any) => v === 1 || v === '1' || v === true;
+  const toNum = (v: any, fallback = 0) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  // Desired states (what we want - controlled by switches/inputs)
+  const [output1Desired, setOutput1Desired] = useState(false);
+  const [output2Desired, setOutput2Desired] = useState(false);
+  const [motorSpeedDesired, setMotorSpeedDesired] = useState('');
+  const [powerSavingDesired, setPowerSavingDesired] = useState(false);
+  
+  // Reported states (actual device state - from shadow)
+  const [output1Reported, setOutput1Reported] = useState(false);
+  const [output2Reported, setOutput2Reported] = useState(false);
+  const [motorSpeedReported, setMotorSpeedReported] = useState('');
+  const [powerSavingReported, setPowerSavingReported] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(false);
   // @ts-ignore
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  // Pending states for individual toggles
-  const [output1Pending, setOutput1Pending] = useState(false);
-  const [output2Pending, setOutput2Pending] = useState(false);
-  const [powerSavingPending, setPowerSavingPending] = useState(false);
   
-  // Refs to track pending state in WebSocket callback (avoid stale closures)
-  const output1PendingRef = useRef(false);
-  const output2PendingRef = useRef(false);
-  const powerSavingPendingRef = useRef(false);
-  const output1ExpectedRef = useRef(false);
-  const output2ExpectedRef = useRef(false);
-  const powerSavingExpectedRef = useRef(false);
+  // Track if we've initialized desired state from deviceState (only once on mount)
+  const initializedDesiredRef = useRef(false);
   const [commandFeedback, setCommandFeedback] = useState({
     show: false,
     message: '',
     loading: false
   });
   const [restartDialogOpen, setRestartDialogOpen] = useState(false);
-  
-  // WebSocket state
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [wsConnected, setWsConnected] = useState(false);
 
-  // WebSocket connection handler
-  const connectWebSocket = useCallback(() => {
-    if (!device?.client_id || WEBSOCKET_URL.includes('YOUR_API_ID')) {
-      console.log('⚠️ WebSocket not configured or no device');
-      return;
-    }
-
-    // Clean up existing connection
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
-    try {
-      const url = `${WEBSOCKET_URL}?client_id=${device.client_id}`;
-      console.log('🔌 Connecting WebSocket:', url);
-      
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('✅ WebSocket connected');
-        setWsConnected(true);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          console.log('📨 WebSocket message:', message);
-
-          if (message.type === 'SHADOW_UPDATE' && message.client_id === device.client_id) {
-            const reported = message.reported;
-            const newOut1 = reported.out1_state === 1;
-            const newOut2 = reported.out2_state === 1;
-            const newPowerSaving = reported.power_saving === 1;
-            
-            // Update OUT1: if pending, only accept if matches expected
-            if (!output1PendingRef.current) {
-              setOutput1State(newOut1);
-            } else if (newOut1 === output1ExpectedRef.current) {
-              // Confirmed! Now update the state
-              setOutput1State(newOut1);
-              setOutput1Pending(false);
-              output1PendingRef.current = false;
-              console.log('✅ OUT1 confirmed');
-            } else {
-              console.log('⏳ Ignoring stale OUT1 update');
-            }
-            
-            // Update OUT2
-            if (!output2PendingRef.current) {
-              setOutput2State(newOut2);
-            } else if (newOut2 === output2ExpectedRef.current) {
-              // Confirmed! Now update the state
-              setOutput2State(newOut2);
-              setOutput2Pending(false);
-              output2PendingRef.current = false;
-              console.log('✅ OUT2 confirmed');
-            } else {
-              console.log('⏳ Ignoring stale OUT2 update');
-            }
-            
-            // Update motor speed (always update)
-            setMotorSpeed(reported.motor_speed?.toString() || '0');
-            
-            // Update power saving
-            if (!powerSavingPendingRef.current) {
-              setPowerSavingMode(newPowerSaving);
-            } else if (newPowerSaving === powerSavingExpectedRef.current) {
-              // Confirmed! Now update the state
-              setPowerSavingMode(newPowerSaving);
-              setPowerSavingPending(false);
-              powerSavingPendingRef.current = false;
-              console.log('✅ Power saving confirmed');
-            } else {
-              console.log('⏳ Ignoring stale power saving update');
-            }
-            
-            setIsVerifying(false);
-            setCommandFeedback({ show: false, message: '', loading: false });
-            
-            console.log('✅ State updated via WebSocket');
-          }
-        } catch (e) {
-          console.error('❌ Error parsing WebSocket message:', e);
-        }
-      };
-
-      ws.onerror = (event) => {
-        console.error('❌ WebSocket error:', event);
-      };
-
-      ws.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code);
-        setWsConnected(false);
-        wsRef.current = null;
-
-        // Reconnect after 5 seconds
-        if (event.code !== 1000) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Reconnecting WebSocket...');
-            connectWebSocket();
-          }, 5000);
-        }
-      };
-    } catch (e) {
-      console.error('❌ Error creating WebSocket:', e);
-    }
-  }, [device?.client_id]);
-
-  // Connect WebSocket on mount
-  useEffect(() => {
-    connectWebSocket();
-    
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close(1000, 'Component unmount');
-      }
-    };
-  }, [connectWebSocket]);
-
-  useEffect(() => {
-    if (deviceState) {
-      setOutput1State(deviceState.out1_state === 1);
-      setOutput2State(deviceState.out2_state === 1);
-      setPowerSavingMode(deviceState.power_saving === 1);
-      if (deviceState.motor_speed !== undefined) {
-        setMotorSpeed(deviceState.motor_speed.toString());
-      }
-    }
-  }, [deviceState]);
-
-  /*
-  const verifyCommandSuccess = (command: string, params: any, state: any) => {
-    if (!state) return false;
-
-    switch (command) {
-      case 'TOGGLE_1_ON':
-        return state.out1_state === 1;
-      case 'TOGGLE_1_OFF':
-        return state.out1_state === 0;
-      case 'TOGGLE_2_ON':
-        return state.out2_state === 1;
-      case 'TOGGLE_2_OFF':
-        return state.out2_state === 0;
-      case 'SET_SPEED':
-        return state.motor_speed === params.speed;
-      case 'RESTART':
-        return true; // Consider restart always successful if we get a state
-      default:
-        return false;
-    }
-  };
-  */
+  // IMPORTANT:
+  // Only ONE component should own the WebSocket connection for device shadow updates.
+  // `Dashboard.tsx` is the single owner and passes `deviceState` down.
+  // This prevents duplicated/out-of-order updates from multiple sockets.
 
   // Fetch device state from Device Shadow (source of truth - no fallback)
-  const fetchDeviceStateFromShadow = async () => {
+  const fetchDeviceStateFromShadow = useCallback(async () => {
     try {
       if (!device || !device.client_id) {
         throw new Error('No device or client_id available');
@@ -272,9 +122,12 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       
       if (result.state) {
         // Map shadow state format to frontend format
+        // Include both reported and desired state
+        const desired = result.state.desired || {};
         return {
           client_id: result.state.client_id,
           timestamp: result.state.timestamp,
+          // Reported state (actual device state)
           out1_state: result.state.out1_state,
           out2_state: result.state.out2_state,
           motor_speed: result.state.motor_speed,
@@ -282,7 +135,10 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
           in1_state: result.state.in1_state,
           in2_state: result.state.in2_state,
           charging: result.state.charging,
-          connection_status: result.state.connection_status
+          connection_status: result.state.connection_status,
+          // Desired state (what we want - persists in shadow)
+          // Lambda returns desired state with keys: out1_state, out2_state, motor_speed, power_saving
+          desired: desired
         };
       }
       
@@ -293,7 +149,164 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       setError(error.message || 'Failed to fetch device state from Shadow');
       return null;
     }
+  }, [device]);
+
+  // Fetch shadow state ONCE on mount (for initial state only)
+  // After that, WebSocket is the primary source of truth for reported state
+  useEffect(() => {
+    const fetchInitialState = async () => {
+      if (!device?.client_id || initializedDesiredRef.current) return;
+      
+      try {
+        console.log('📥 Fetching initial state from shadow (one-time on mount)...');
+        const shadowState = await fetchDeviceStateFromShadow();
+        if (shadowState) {
+          console.log('🔍 Initializing state from shadow:', {
+            out1_state: shadowState.out1_state,
+            out2_state: shadowState.out2_state,
+            power_saving: shadowState.power_saving,
+            motor_speed: shadowState.motor_speed
+          });
+          
+          // Initialize reported state from shadow (one-time)
+          const out1 = toBool01(shadowState.out1_state);
+          const out2 = toBool01(shadowState.out2_state);
+          const powerSaving = toBool01(shadowState.power_saving);
+          const motorSpeed = toNum(shadowState.motor_speed, 0).toString();
+          
+          setOutput1Reported(out1);
+          setOutput2Reported(out2);
+          setPowerSavingReported(powerSaving);
+          setMotorSpeedReported(motorSpeed);
+          
+          console.log('✅ Reported state initialized from shadow:', { out1, out2, powerSaving, motorSpeed });
+          
+          // Initialize desired state from shadow (persisted state) - only once
+          if (shadowState.desired) {
+            const desired = shadowState.desired;
+            if (desired.out1_state !== undefined && desired.out1_state !== null) {
+              setOutput1Desired(toBool01(desired.out1_state));
+            }
+            if (desired.out2_state !== undefined && desired.out2_state !== null) {
+              setOutput2Desired(toBool01(desired.out2_state));
+            }
+            if (desired.power_saving !== undefined && desired.power_saving !== null) {
+              setPowerSavingDesired(toBool01(desired.power_saving));
+            }
+            if (desired.motor_speed !== undefined && desired.motor_speed !== null) {
+              setMotorSpeedDesired(toNum(desired.motor_speed, 0).toString());
+            }
+          } else {
+            // Fallback: if no desired state in shadow, use reported state
+            setOutput1Desired(toBool01(shadowState.out1_state));
+            setOutput2Desired(toBool01(shadowState.out2_state));
+            setPowerSavingDesired(toBool01(shadowState.power_saving));
+            setMotorSpeedDesired(toNum(shadowState.motor_speed, 0).toString());
+          }
+          
+          initializedDesiredRef.current = true;
+          console.log('✅ Initial state loaded from shadow - WebSocket will handle all future updates');
+        } else {
+          console.warn('⚠️ Shadow state fetch returned null');
+        }
+      } catch (error) {
+        console.error('❌ Error fetching initial shadow state:', error);
+      }
+    };
+    
+    // Fetch ONLY once on mount
+    fetchInitialState();
+  }, [device?.client_id, fetchDeviceStateFromShadow]);
+
+  // Debug: Log current reported state values
+  useEffect(() => {
+    console.log('🔍 Current reported state values:', {
+      output1Reported,
+      output2Reported,
+      powerSavingReported,
+      motorSpeedReported
+    });
+  }, [output1Reported, output2Reported, powerSavingReported, motorSpeedReported]);
+
+  // Update reported state from deviceState prop (from parent component)
+  // Only update if values actually changed to prevent unnecessary re-renders
+  useEffect(() => {
+    if (deviceState) {
+      console.log('🔍 deviceState prop received:', {
+        out1_state: deviceState.out1_state,
+        out2_state: deviceState.out2_state,
+        power_saving: deviceState.power_saving,
+        motor_speed: deviceState.motor_speed
+      });
+      const out1 = toBool01(deviceState.out1_state);
+      const out2 = toBool01(deviceState.out2_state);
+      const powerSaving = toBool01(deviceState.power_saving);
+      const motorSpeed = toNum(deviceState.motor_speed, 0).toString();
+      
+      // Only update reported state if values actually changed (prevents unnecessary re-renders)
+      setOutput1Reported(prev => {
+        if (prev !== out1) {
+          console.log(`🔄 OUT1 reported state changed from prop: ${prev} → ${out1}`);
+          return out1;
+        }
+        return prev;
+      });
+      
+      setOutput2Reported(prev => {
+        if (prev !== out2) {
+          console.log(`🔄 OUT2 reported state changed from prop: ${prev} → ${out2}`);
+          return out2;
+        }
+        return prev;
+      });
+      
+      setPowerSavingReported(prev => {
+        if (prev !== powerSaving) {
+          console.log(`🔄 Power saving reported state changed from prop: ${prev} → ${powerSaving}`);
+          return powerSaving;
+        }
+        return prev;
+      });
+      
+      setMotorSpeedReported(prev => {
+        if (prev !== motorSpeed) {
+          console.log(`🔄 Motor speed reported state changed from prop: ${prev} → ${motorSpeed}`);
+          return motorSpeed;
+        }
+        return prev;
+      });
+
+      // If we got a fresh state update from the parent, stop "verifying" UX.
+      setIsVerifying(false);
+      setCommandFeedback(prev => (prev.show ? { show: false, message: '', loading: false } : prev));
+      
+      // Do NOT update desired state from deviceState - it's only controlled by user input
+      // Desired state is initialized from shadow on mount and persists there
+    }
+  }, [deviceState]);
+
+  /*
+  const verifyCommandSuccess = (command: string, params: any, state: any) => {
+    if (!state) return false;
+
+    switch (command) {
+      case 'TOGGLE_1_ON':
+        return state.out1_state === 1;
+      case 'TOGGLE_1_OFF':
+        return state.out1_state === 0;
+      case 'TOGGLE_2_ON':
+        return state.out2_state === 1;
+      case 'TOGGLE_2_OFF':
+        return state.out2_state === 0;
+      case 'SET_SPEED':
+        return state.motor_speed === params.speed;
+      case 'RESTART':
+        return true; // Consider restart always successful if we get a state
+      default:
+        return false;
+    }
   };
+  */
 
   // Professional: Update Device Shadow desired state directly
   // Device is subscribed to delta topics, so it will process immediately
@@ -357,7 +370,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       } else if (command === "TOGGLE_2_OFF") {
         desiredState = { OUT2: 0 };
       } else if (command === "SET_SPEED") {
-        const speed = (params as any).speed || parseInt(motorSpeed);
+        const speed = (params as any).speed || parseInt(motorSpeedDesired);
         if (isNaN(speed) || speed < 0 || speed > 255) {
           throw new Error('Speed must be between 0 and 255');
         }
@@ -368,23 +381,23 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
         desiredState = { power_saving: 0 };
       } else if (command === "RESTART") {
         // RESTART is a special action command - use MQTT topic (not state)
-        const payload = {
-          client_id: device.client_id,
-          command: command,
-          ...params
-        };
-        const response = await fetch(COMMAND_API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to send command');
-        }
+      const payload = {
+        client_id: device.client_id,
+        command: command,
+        ...params
+      };
+      const response = await fetch(COMMAND_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send command');
+      }
         return { success: true };
       } else {
         throw new Error(`Unknown command: ${command}`);
@@ -399,80 +412,19 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
   };
 
   const handleSwitchChange = async (led: number, isOn: boolean) => {
-    // NO optimistic update - keep current state, just show pending indicator
-    // State changes only when WebSocket confirms
+    // Update desired state immediately (what user wants)
     if (led === 1) {
-      setOutput1Pending(true);
-      output1PendingRef.current = true;
-      output1ExpectedRef.current = isOn;
+      setOutput1Desired(isOn);
     } else {
-      setOutput2Pending(true);
-      output2PendingRef.current = true;
-      output2ExpectedRef.current = isOn;
+      setOutput2Desired(isOn);
     }
-    
-    const oldState = led === 1 ? output1State : output2State;
     
     try {
       const command = isOn ? `TOGGLE_${led}_ON` : `TOGGLE_${led}_OFF`;
-      
-      // Send the command
       await sendCommand(command);
-      console.log('📡 Command sent - waiting for WebSocket real-time update');
-      
-      // Timeout: if WebSocket doesn't update in 40 seconds, fetch actual state from shadow
-      setTimeout(async () => {
-        if ((led === 1 && output1PendingRef.current) || (led === 2 && output2PendingRef.current)) {
-          console.warn('⚠️ WebSocket update timeout - fetching actual state from shadow');
-          
-          // Fetch actual state from shadow instead of assuming rollback
-          const actualState = await fetchDeviceStateFromShadow();
-          
-          if (actualState) {
-            if (led === 1) {
-              setOutput1State(actualState.out1_state === 1);
-              setOutput1Pending(false);
-              output1PendingRef.current = false;
-            } else {
-              setOutput2State(actualState.out2_state === 1);
-              setOutput2Pending(false);
-              output2PendingRef.current = false;
-            }
-            console.log('✅ Updated state from shadow after timeout');
-          } else {
-            // Fallback: rollback if fetch failed
-            console.warn('⚠️ Failed to fetch shadow state, rolling back');
-            if (led === 1) {
-              setOutput1State(oldState);
-              setOutput1Pending(false);
-              output1PendingRef.current = false;
-            } else {
-              setOutput2State(oldState);
-              setOutput2Pending(false);
-              output2PendingRef.current = false;
-            }
-          }
-          
-          setSnackbar({
-            open: true,
-            message: 'Device did not respond in time - state synced from shadow',
-            severity: 'warning'
-          });
-        }
-      }, 40000);
-      
+      console.log('📡 Command sent - reported state will update via WebSocket');
     } catch (error: any) {
       console.error('Error in handleSwitchChange:', error);
-      // Rollback on error
-      if (led === 1) {
-        setOutput1State(oldState);
-        setOutput1Pending(false);
-        output1PendingRef.current = false;
-      } else {
-        setOutput2State(oldState);
-        setOutput2Pending(false);
-        output2PendingRef.current = false;
-      }
       setSnackbar({
         open: true,
         message: error.message || t('commands.failedUpdateSwitch'),
@@ -482,52 +434,15 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
   };
 
   const handlePowerSavingChange = async (isOn: boolean) => {
-    const oldState = powerSavingMode;
-    
-    // NO optimistic update - keep current state, just show pending indicator
-    setPowerSavingPending(true);
-    powerSavingPendingRef.current = true;
-    powerSavingExpectedRef.current = isOn;
+    // Update desired state immediately (what user wants)
+    setPowerSavingDesired(isOn);
     
     try {
       const command = isOn ? 'POWER_SAVING_ON' : 'POWER_SAVING_OFF';
       await sendCommand(command);
-      console.log('📡 Power saving command sent - waiting for WebSocket update');
-      
-      // Timeout: fetch actual state from shadow if no response
-      setTimeout(async () => {
-        if (powerSavingPendingRef.current) {
-          console.warn('⚠️ Power saving WebSocket update timeout - fetching actual state from shadow');
-          
-          // Fetch actual state from shadow instead of assuming rollback
-          const actualState = await fetchDeviceStateFromShadow();
-          
-          if (actualState) {
-            setPowerSavingMode(actualState.power_saving === 1);
-            setPowerSavingPending(false);
-            powerSavingPendingRef.current = false;
-            console.log('✅ Updated power saving state from shadow after timeout');
-          } else {
-            // Fallback: rollback if fetch failed
-            console.warn('⚠️ Failed to fetch shadow state, rolling back');
-            setPowerSavingMode(oldState);
-            setPowerSavingPending(false);
-            powerSavingPendingRef.current = false;
-          }
-          
-          setSnackbar({
-            open: true,
-            message: 'Device did not respond in time - state synced from shadow',
-            severity: 'warning'
-          });
-        }
-      }, 40000);
-      
+      console.log('📡 Power saving command sent - reported state will update via WebSocket');
     } catch (error: any) {
       console.error('Error in handlePowerSavingChange:', error);
-      setPowerSavingMode(oldState); // Rollback
-      setPowerSavingPending(false);
-      powerSavingPendingRef.current = false;
       setSnackbar({
         open: true,
         message: error.message || t('commands.failedUpdatePowerSaving'),
@@ -549,7 +464,7 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
         loading: true
       });
 
-      const speed = parseInt(motorSpeed);
+      const speed = parseInt(motorSpeedDesired);
       if (isNaN(speed) || speed < 0 || speed > 100) {
         throw new Error(t('commands.speedRangeError'));
       }
@@ -561,12 +476,12 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       setTimeout(() => {
         if (isVerifying) {
           setIsVerifying(false);
-          setCommandFeedback({
-            show: true,
+        setCommandFeedback({
+          show: true,
             message: 'Device did not respond in time',
-            loading: false
-          });
-        }
+          loading: false
+        });
+      }
       }, 40000);
       
     } catch (error: any) {
@@ -684,53 +599,59 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'space-between',
-                  p: 1.25,
+                  p: 1.5,
                   borderRadius: 2,
                   border: '1px solid',
                   borderColor: 'divider',
                   backgroundColor: 'rgba(0,0,0,0.02)'
                 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', minWidth: '70px' }}>
                       {t('commands.output1')}
                     </Typography>
-                    <Chip 
-                      size="small" 
-                      label={output1Pending ? '' : (output1State ? t('devices.on') : t('devices.off'))} 
-                      icon={output1Pending ? <CircularProgress size={12} color="inherit" /> : undefined}
-                      variant="outlined"
-                      color={output1Pending ? 'warning' : (output1State ? 'success' : 'default')}
-                      sx={{ fontSize: '0.75rem', height: '20px', minWidth: output1Pending ? '40px' : 'auto' }}
+                    {/* Reported state LED indicator (actual device state) */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                        Reported:
+                      </Typography>
+                      <Box
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          backgroundColor: output1Reported ? '#4caf50' : '#9e9e9e',
+                          boxShadow: output1Reported 
+                            ? '0 0 8px rgba(76, 175, 80, 0.6)' 
+                            : 'none',
+                          transition: 'all 0.3s ease',
+                        }}
+                        title={`OUT1 Reported: ${output1Reported ? 'ON' : 'OFF'}`}
                     />
                   </Box>
+                  </Box>
+                  {/* Switch controls desired state */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                      Desired:
+                    </Typography>
                   <Switch
-                    checked={output1State}
+                      checked={output1Desired}
                     onChange={(e) => handleSwitchChange(1, e.target.checked)}
-                    disabled={output1Pending}
-                    inputProps={{ 'aria-label': 'Output 1 switch' }}
+                      inputProps={{ 'aria-label': 'Output 1 switch (desired state)' }}
                     size="small"
                     sx={{
-                      // Disable slide animation when pending - snap instantly
                       '& .MuiSwitch-switchBase': {
                         borderRadius: '16px',
-                        transition: output1Pending ? 'none' : undefined,
                       },
                       '& .MuiSwitch-thumb': {
                         borderRadius: '16px',
-                        transition: output1Pending ? 'none' : undefined,
-                        animation: output1Pending ? 'pulse 1s infinite' : 'none',
                       },
                       '& .MuiSwitch-track': {
                         borderRadius: '16px',
-                        transition: output1Pending ? 'none' : undefined,
-                        animation: output1Pending ? 'pulse 1s infinite' : 'none',
-                      },
-                      '@keyframes pulse': {
-                        '0%, 100%': { opacity: 0.5 },
-                        '50%': { opacity: 1 },
                       },
                     }}
                   />
+                  </Box>
                 </Box>
 
                 {/* Output 2 */}
@@ -738,53 +659,59 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'space-between',
-                  p: 1.25,
+                  p: 1.5,
                   borderRadius: 2,
                   border: '1px solid',
                   borderColor: 'divider',
                   backgroundColor: 'rgba(0,0,0,0.02)'
                 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', minWidth: '70px' }}>
                       {t('commands.output2')}
                     </Typography>
-                    <Chip 
-                      size="small" 
-                      label={output2Pending ? '' : (output2State ? t('devices.on') : t('devices.off'))} 
-                      icon={output2Pending ? <CircularProgress size={12} color="inherit" /> : undefined}
-                      variant="outlined"
-                      color={output2Pending ? 'warning' : (output2State ? 'success' : 'default')}
-                      sx={{ fontSize: '0.75rem', height: '20px', minWidth: output2Pending ? '40px' : 'auto' }}
+                    {/* Reported state LED indicator (actual device state) */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                        Reported:
+                      </Typography>
+                      <Box
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          backgroundColor: output2Reported ? '#4caf50' : '#9e9e9e',
+                          boxShadow: output2Reported 
+                            ? '0 0 8px rgba(76, 175, 80, 0.6)' 
+                            : 'none',
+                          transition: 'all 0.3s ease',
+                        }}
+                        title={`OUT2 Reported: ${output2Reported ? 'ON' : 'OFF'}`}
                     />
                   </Box>
+                  </Box>
+                  {/* Switch controls desired state */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                      Desired:
+                    </Typography>
                   <Switch
-                    checked={output2State}
+                      checked={output2Desired}
                     onChange={(e) => handleSwitchChange(2, e.target.checked)}
-                    disabled={output2Pending}
-                    inputProps={{ 'aria-label': 'Output 2 switch' }}
+                      inputProps={{ 'aria-label': 'Output 2 switch (desired state)' }}
                     size="small"
                     sx={{
-                      // Disable slide animation when pending - snap instantly
                       '& .MuiSwitch-switchBase': {
                         borderRadius: '16px',
-                        transition: output2Pending ? 'none' : undefined,
                       },
                       '& .MuiSwitch-thumb': {
                         borderRadius: '16px',
-                        transition: output2Pending ? 'none' : undefined,
-                        animation: output2Pending ? 'pulse 1s infinite' : 'none',
                       },
                       '& .MuiSwitch-track': {
                         borderRadius: '16px',
-                        transition: output2Pending ? 'none' : undefined,
-                        animation: output2Pending ? 'pulse 1s infinite' : 'none',
-                      },
-                      '@keyframes pulse': {
-                        '0%, 100%': { opacity: 0.5 },
-                        '50%': { opacity: 1 },
                       },
                     }}
                   />
+                  </Box>
                 </Box>
               </Box>
             </CardContent>
@@ -829,65 +756,66 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
                 </Typography>
               </Box>
 
-              <form onSubmit={handleSpeedSubmit}>
-                <TextField
-                  label={t('commands.motorSpeed') + ' (0-100)'}
-                  type="number"
-                  value={motorSpeed}
-                  onChange={(e) => setMotorSpeed(e.target.value)}
-                  inputProps={{ min: 0, max: 100, step: 1 }}
-                  fullWidth
-                  variant="outlined"
-                  disabled={isVerifying}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* Reported state indicator */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', minWidth: '70px' }}>
+                    Reported:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', minWidth: '30px' }}>
+                    {motorSpeedReported || '0'}
+                  </Typography>
+                </Box>
+                
+                {/* Desired state slider */}
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                      Desired:
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', minWidth: '30px', textAlign: 'right' }}>
+                      {motorSpeedDesired || '0'}
+                    </Typography>
+                  </Box>
+                  <Slider
+                    value={parseInt(motorSpeedDesired) || 0}
+                    onChange={(_, value) => setMotorSpeedDesired(value.toString())}
+                    onChangeCommitted={async (_, value) => {
+                      const speed = value as number;
+                      // Desired state already updated by onChange
+                      
+                      try {
+                        await sendCommand('SET_SPEED', { speed });
+                        console.log('📡 Motor speed command sent - reported state will update via WebSocket');
+                      } catch (error: any) {
+                        console.error('Error setting motor speed:', error);
+                        setSnackbar({
+                          open: true,
+                          message: error.message || t('commands.failedUpdateSpeed'),
+                          severity: 'error'
+                        });
+                      }
+                    }}
+                    min={0}
+                    max={100}
+                    step={1}
                   sx={{
-                    mb: 2,
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
+                      color: 'primary.main',
+                      '& .MuiSlider-thumb': {
+                        width: 18,
+                        height: 18,
                     },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      border: 'none',
+                      '& .MuiSlider-track': {
+                        height: 4,
                     },
-                    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-                      border: 'none',
-                    },
-                    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      border: 'none',
-                    },
-                  }}
-                />
-                <Button
-                  type="submit"
-                  variant="outlined"
-                  fullWidth
-                  disabled={isVerifying}
-                  startIcon={isVerifying ? <CircularProgress size={20} /> : <SpeedIcon />}
-                  sx={{
-                    height: '40px',
-                    borderRadius: 2,
-                    fontWeight: 500,
-                    textTransform: 'none',
-                    borderColor: 'text.secondary',
-                    color: 'text.primary',
-                    '&:hover': {
-                      borderColor: 'text.primary',
-                      backgroundColor: 'rgba(0,0,0,0.04)'
-                    }
-                  }}
-                >
-                  {isVerifying ? t('commands.sendingSpeedCommand') : t('commands.motorSpeed')}
-                </Button>
-              </form>
-
-              {commandFeedback.show && (
-                <Box sx={{ mt: 2 }}>
-                  <Chip
-                    label={commandFeedback.message}
-                    color={commandFeedback.loading ? 'default' : 'success'}
-                    variant="outlined"
-                    icon={commandFeedback.loading ? <CircularProgress size={16} /> : undefined}
+                      '& .MuiSlider-rail': {
+                        height: 4,
+                        opacity: 0.3,
+                      },
+                    }}
                   />
               </Box>
-            )}
+              </Box>
           </CardContent>
         </Card>
       </Grid>
@@ -928,46 +856,58 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'space-between',
-              p: 1.25,
+              p: 1.5,
               borderRadius: 2,
               border: '1px solid',
               borderColor: 'divider',
               backgroundColor: 'rgba(0,0,0,0.02)'
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                  {t('common.status', { defaultValue: 'Status' })}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary', minWidth: '70px' }}>
+                  {t('commands.powerSaving')}
                 </Typography>
-                <Chip 
-                  size="small" 
-                  label={powerSavingMode ? t('alarms.enabled') : t('alarms.disabled')} 
-                  variant="outlined"
-                  color={powerSavingMode ? 'success' : 'default'}
-                  sx={{ fontSize: '0.75rem', height: '20px' }}
+                {/* Reported state LED indicator (actual device state) */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                    Reported:
+                  </Typography>
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      backgroundColor: powerSavingReported ? '#4caf50' : '#9e9e9e',
+                      boxShadow: powerSavingReported 
+                        ? '0 0 8px rgba(76, 175, 80, 0.6)' 
+                        : 'none',
+                      transition: 'all 0.3s ease',
+                    }}
                 />
               </Box>
+              </Box>
+              {/* Switch controls desired state */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                  Desired:
+                </Typography>
               <Switch
-                checked={powerSavingMode}
+                  checked={powerSavingDesired}
                 onChange={(e) => handlePowerSavingChange(e.target.checked)}
-                disabled={powerSavingPending}
-                inputProps={{ 'aria-label': 'Power Saving Mode switch' }}
+                  inputProps={{ 'aria-label': 'Power Saving Mode switch (desired state)' }}
                 size="small"
                 sx={{
-                  '& .MuiSwitch-switchBase': { borderRadius: '16px' },
-                  '& .MuiSwitch-thumb': { 
-                    borderRadius: '16px',
-                    animation: powerSavingPending ? 'pulse 1s infinite' : 'none',
-                  },
-                  '& .MuiSwitch-track': { 
-                    borderRadius: '16px',
-                    animation: powerSavingPending ? 'pulse 1s infinite' : 'none',
-                  },
-                  '@keyframes pulse': {
-                    '0%, 100%': { opacity: 0.5 },
-                    '50%': { opacity: 1 },
-                  },
+                    '& .MuiSwitch-switchBase': {
+                      borderRadius: '16px',
+                    },
+                    '& .MuiSwitch-thumb': {
+                      borderRadius: '16px',
+                    },
+                    '& .MuiSwitch-track': {
+                      borderRadius: '16px',
+                    },
                 }}
               />
+              </Box>
             </Box>
           </CardContent>
         </Card>
