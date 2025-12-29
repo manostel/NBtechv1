@@ -17,15 +17,18 @@ iot_data_client = boto3.client('iot-data')
 
 subscriptions_table = dynamodb.Table('IoT_DeviceSubscriptions')
 notifications_table = dynamodb.Table('IoT_SubscriptionNotifications')
+devices_table = dynamodb.Table('Devices')
+device_data_table = dynamodb.Table('IoT_DeviceData')
 
 def lambda_handler(event, context):
     """
     This Lambda function is triggered by AWS IoT Core Rules Engine
-    when device data messages arrive. It checks for subscription triggers
-    and sends notifications immediately.
+    when device data messages arrive OR when devices connect/disconnect.
     
-    The IoT Rule should be configured to trigger on topics like:
-    NBtechv1/+/data/+
+    Handles:
+    1. Device data messages (NBtechv1/+/data/+) - subscription triggers
+    2. Device connection events ($aws/events/presence/connected/+) - update status to Online
+    3. Device disconnection events ($aws/events/presence/disconnected/+) - update status to Offline
     """
     try:
         logger.info("=" * 80)
@@ -36,6 +39,10 @@ def lambda_handler(event, context):
         # Extract topic and log it
         topic = event.get('topic', '')
         logger.info(f"Topic received: {topic}")
+        
+        # Check if this is a presence event (connection/disconnection)
+        if '$aws/events/presence' in topic:
+            return handle_presence_event(event, topic)
         
         # Extract device information from IoT Core event
         device_id = extract_device_id(event)
@@ -90,6 +97,98 @@ def lambda_handler(event, context):
         
     except Exception as e:
         logger.error(f"Error processing IoT Rules event: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
+
+def handle_presence_event(event, topic):
+    """
+    Handle IoT Core presence events (device connected/disconnected).
+    Updates device connection status in Devices table.
+    """
+    try:
+        # Extract device_id from event
+        # For presence events, the SQL rule extracts clientId as client_id
+        device_id = event.get('client_id') or event.get('thingName') or event.get('clientId')
+        
+        if not device_id:
+            # Try to extract from topic: $aws/events/presence/connected/+/+
+            topic_parts = topic.split('/')
+            if len(topic_parts) >= 4:
+                device_id = topic_parts[-1]  # Last part is usually the thing name
+        
+        if not device_id:
+            logger.error(f"Could not extract device_id from presence event. Topic: {topic}, Event keys: {list(event.keys())}")
+            return {'statusCode': 400, 'body': 'Invalid event: No device ID found'}
+        
+        # Determine connection status from topic or event data
+        is_connected = 'connected' in topic.lower()
+        status = 'Online' if is_connected else 'Offline'
+        
+        logger.info(f"🔌 Device presence event: {device_id} -> {status}")
+        
+        # Get status from event data if available (from SQL rule)
+        event_data = event.get('data', {})
+        if isinstance(event_data, dict) and 'status' in event_data:
+            status = event_data['status']
+        
+        # Update device connection status in Devices table
+        # Need to find the device by client_id (might need to scan or have user_email)
+        try:
+            # First, try to get the device to find user_email
+            # Since Devices table has composite key (client_id, user_email), we need to scan
+            response = devices_table.scan(
+                FilterExpression='client_id = :cid',
+                ExpressionAttributeValues={':cid': device_id}
+            )
+            
+            devices = response.get('Items', [])
+            
+            if devices:
+                # Update all devices with this client_id (in case of multi-user scenarios)
+                for device in devices:
+                    user_email = device.get('user_email')
+                    if user_email:
+                        try:
+                            devices_table.update_item(
+                                Key={
+                                    'client_id': device_id,
+                                    'user_email': user_email
+                                },
+                                UpdateExpression='SET connection_status = :status, connection_status_updated_at = :timestamp',
+                                ExpressionAttributeValues={
+                                    ':status': status,
+                                    ':timestamp': datetime.now(timezone.utc).isoformat()
+                                }
+                            )
+                            logger.info(f"✅ Updated device {device_id} (user: {user_email}) connection status to {status}")
+                        except Exception as e:
+                            logger.error(f"Error updating device {device_id} for user {user_email}: {e}")
+            else:
+                logger.warning(f"⚠️ Device {device_id} not found in Devices table. Cannot update connection status.")
+                # Still log the presence event for debugging
+                
+        except Exception as e:
+            logger.error(f"Error updating device connection status: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'message': f'Device {status}',
+                'device_id': device_id,
+                'status': status
+            })
+        }
+        
+    except Exception as e:
+        logger.error(f"Error handling presence event: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return {
             'statusCode': 500,
             'body': json.dumps({'error': str(e)})

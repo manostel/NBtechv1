@@ -15,6 +15,7 @@ dynamodb = boto3.resource('dynamodb')
 alarms_table = dynamodb.Table('IoT_DeviceAlarms')
 device_states_table = dynamodb.Table('IoT_DeviceStatus')
 device_data_table = dynamodb.Table('IoT_DeviceData')
+devices_table = dynamodb.Table('Devices')
 
 # Add this helper function to handle Decimal serialization
 def decimal_default(obj):
@@ -32,9 +33,24 @@ def get_cors_headers():
     }
 
 def get_device_status(client_id):
-    """Get current device status (Online/Offline)"""
+    """Get current device status (Online/Offline) from Devices table connection_status"""
     try:
-        # Get latest device data
+        # Get device from Devices table to check connection_status
+        # Since Devices table has composite key, we need to scan
+        response = devices_table.scan(
+            FilterExpression='client_id = :cid',
+            ExpressionAttributeValues={':cid': client_id},
+            Limit=1
+        )
+        
+        if response['Items']:
+            device = response['Items'][0]
+            # Use connection_status set by IoT Core presence events
+            connection_status = device.get('connection_status')
+            if connection_status:
+                return connection_status
+        
+        # Fallback: if no connection_status, check last data timestamp (legacy behavior)
         response = device_data_table.query(
             KeyConditionExpression=Key('client_id').eq(client_id),
             Limit=1,
@@ -50,10 +66,9 @@ def get_device_status(client_id):
         if not timestamp:
             return 'Offline'
             
-        # Check if device is online (within last 7 minutes)
+        # Check if device is online (within last 7 minutes) - legacy fallback
         try:
             if isinstance(timestamp, str):
-                # Parse ISO format timestamp
                 last_update = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
             else:
                 last_update = timestamp
@@ -61,17 +76,16 @@ def get_device_status(client_id):
             now = datetime.now(timezone.utc)
             time_diff = now - last_update
             
-            # Device is online if last update was within 7 minutes
             if time_diff <= timedelta(minutes=7):
                 return 'Online'
             else:
                 return 'Offline'
         except Exception as e:
-            print(f"Error parsing timestamp: {str(e)}")
+            logger.error(f"Error parsing timestamp: {str(e)}")
             return 'Offline'
             
     except Exception as e:
-        print(f"Error getting device status: {str(e)}")
+        logger.error(f"Error getting device status: {str(e)}")
         return 'Offline'
 
 def get_nested_value(data, key_path):

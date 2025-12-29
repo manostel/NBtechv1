@@ -98,12 +98,17 @@ def lambda_handler(event, context):
                     if device_data_response.get('Items'):
                         latest_data = decimal_to_float(device_data_response['Items'][0])
                     
+                    # Get connection status from Devices table (set by IoT Core presence events)
+                    # Fallback to 'Offline' if not set
+                    connection_status = item.get('connection_status', 'Offline')
+                    
                     # Process the device data
                     device = {
                         'client_id': item['client_id'],
                         'device_name': item.get('device_name'),
-                        'status': item.get('status', 'Offline'),
+                        'status': connection_status,  # Use connection_status from IoT Core presence events
                         'last_seen': item.get('last_seen'),
+                        'connection_status_updated_at': item.get('connection_status_updated_at'),  # When status was last updated
                         'created_at': item.get('created_at'),
                         'device_type': decimal_to_float(item.get('device_info', {})).get('type', 'Unknown'),
                         'location': decimal_to_float(item.get('location', {})),
