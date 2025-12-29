@@ -269,20 +269,38 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                     
                     if 'Items' in response:
                         # Filter items based on selected variables if provided
+                        # Exclude epoch and ttl (internal DynamoDB fields)
+                        excluded_fields = ['epoch', 'ttl']
                         if selected_variables:
+                            # Filter out epoch/ttl from selected_variables
+                            filtered_variables = [var for var in selected_variables if var not in excluded_fields]
                             filtered_items = []
                             for item in response['Items']:
                                 filtered_item = {
                                     'timestamp': item['timestamp'],
                                     'client_id': item['client_id']
                                 }
-                                for var in selected_variables:
+                                for var in filtered_variables:
                                     if var in item:
-                                        filtered_item[var] = item[var]
+                                        # Convert Decimal to float for JSON serialization
+                                        value = item[var]
+                                        if isinstance(value, Decimal):
+                                            filtered_item[var] = float(value)
+                                        else:
+                                            filtered_item[var] = value
                                 filtered_items.append(filtered_item)
                             chunk_items.extend(filtered_items)
                         else:
-                            chunk_items.extend(response['Items'])
+                            # Filter out epoch/ttl even when no selected_variables
+                            filtered_chunk_items = []
+                            for item in response['Items']:
+                                filtered_item = {k: v for k, v in item.items() if k not in excluded_fields}
+                                # Convert Decimal to float for JSON serialization
+                                for key, value in filtered_item.items():
+                                    if isinstance(value, Decimal):
+                                        filtered_item[key] = float(value)
+                                filtered_chunk_items.append(filtered_item)
+                            chunk_items.extend(filtered_chunk_items)
                     
                     last_evaluated_key = response.get('LastEvaluatedKey')
                     if not last_evaluated_key:
@@ -314,6 +332,12 @@ def aggregate_data(items, target_points, selected_variables=None):
     """Aggregate data points to match target number of points"""
     if not items:
         return []
+    
+    # Exclude epoch and ttl from aggregation
+    excluded_fields = ['epoch', 'ttl']
+    if selected_variables:
+        # Filter out epoch/ttl from selected_variables
+        selected_variables = [var for var in selected_variables if var not in excluded_fields]
     
     # Sort items by timestamp
     sorted_items = sorted(items, key=lambda x: x['timestamp'])
@@ -368,11 +392,13 @@ def aggregate_data(items, target_points, selected_variables=None):
             if current_interval_items:
                 # Calculate average values for the interval
                 interval_data = {'timestamp': current_interval_start.isoformat() + 'Z'}
-                for var in selected_variables:
-                    values = [float(item[var]) for item in current_interval_items if var in item]
-                    if values:
-                        # Round to 2 decimal places
-                        interval_data[var] = round(mean(values), 2)
+                if selected_variables:
+                    for var in selected_variables:
+                        if var not in excluded_fields:
+                            values = [float(item[var]) for item in current_interval_items if var in item]
+                            if values:
+                                # Round to 2 decimal places
+                                interval_data[var] = round(mean(values), 2)
                 aggregated_data.append(interval_data)
             
             # Move to next interval
@@ -382,11 +408,13 @@ def aggregate_data(items, target_points, selected_variables=None):
     # Process the last interval
     if current_interval_items:
         interval_data = {'timestamp': current_interval_start.isoformat() + 'Z'}
-        for var in selected_variables:
-            values = [float(item[var]) for item in current_interval_items if var in item]
-            if values:
-                # Round to 2 decimal places
-                interval_data[var] = round(mean(values), 2)
+        if selected_variables:
+            for var in selected_variables:
+                if var not in excluded_fields:
+                    values = [float(item[var]) for item in current_interval_items if var in item]
+                    if values:
+                        # Round to 2 decimal places
+                        interval_data[var] = round(mean(values), 2)
         aggregated_data.append(interval_data)
     
     # If we have more points than target, resample to match target
@@ -403,12 +431,16 @@ def aggregate_data(items, target_points, selected_variables=None):
             
             if interval_points:
                 # Calculate average values for the interval
+                # Exclude epoch and ttl from resampling
+                excluded_fields = ['epoch', 'ttl']
                 interval_data = {'timestamp': current_time.isoformat() + 'Z'}
-                for var in selected_variables:
-                    values = [point[var] for point in interval_points if var in point]
-                    if values:
-                        # Round to 2 decimal places
-                        interval_data[var] = round(mean(values), 2)
+                if selected_variables:
+                    filtered_variables = [var for var in selected_variables if var not in excluded_fields]
+                    for var in filtered_variables:
+                        values = [point[var] for point in interval_points if var in point]
+                        if values:
+                            # Round to 2 decimal places
+                            interval_data[var] = round(mean(values), 2)
                 resampled_data.append(interval_data)
             
             current_time += new_step
@@ -576,7 +608,12 @@ def lambda_handler(event, context):
         aggregated_data = aggregate_data(items, target_points, selected_variables)
         
         # Calculate summary statistics
-        metrics_to_summarize = selected_variables if selected_variables else [key for key in aggregated_data[0].keys() if key != 'timestamp']
+        # Exclude epoch and ttl from summary calculations
+        excluded_fields = ['epoch', 'ttl']
+        if selected_variables:
+            metrics_to_summarize = [var for var in selected_variables if var not in excluded_fields]
+        else:
+            metrics_to_summarize = [key for key in aggregated_data[0].keys() if key not in excluded_fields and key != 'timestamp']
         summary = calculate_summary_statistics(aggregated_data, metrics_to_summarize)
         
         # Return response with CORS headers

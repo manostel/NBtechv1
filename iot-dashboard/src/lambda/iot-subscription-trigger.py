@@ -20,6 +20,21 @@ notifications_table = dynamodb.Table('IoT_SubscriptionNotifications')
 devices_table = dynamodb.Table('Devices')
 device_data_table = dynamodb.Table('IoT_DeviceData')
 
+# Field mapping: flattened event fields -> full parameter names
+# This allows the Lambda to work with both flattened payloads (t, h, b, s, p) 
+# and full parameter names used in subscriptions/alarms (temperature, humidity, battery, signal_quality, pressure)
+FLATTENED_TO_FULL_FIELD_MAP = {
+    't': 'temperature',
+    'h': 'humidity',
+    'p': 'pressure',
+    'b': 'battery',
+    's': 'signal_quality',
+    'ts': 'timestamp'
+}
+
+# Reverse mapping: full parameter names -> flattened event fields
+FULL_TO_FLATTENED_FIELD_MAP = {v: k for k, v in FLATTENED_TO_FULL_FIELD_MAP.items()}
+
 def lambda_handler(event, context):
     """
     This Lambda function is triggered by AWS IoT Core Rules Engine
@@ -347,6 +362,11 @@ def check_legacy_alarms(device_id, device_data):
     """
     Check "Alarms Tab" rules (IoT_DeviceAlarms table).
     This ensures alarms work independently of the dashboard.
+    
+    Note: device_data should already be normalized by extract_device_data(),
+    which converts flattened fields (t, h, b, s, p) to full names 
+    (temperature, humidity, battery, signal_quality, pressure).
+    Alarms use full variable names, so they will work correctly after normalization.
     """
     try:
         alarms_table = dynamodb.Table('IoT_DeviceAlarms')
@@ -483,13 +503,15 @@ def extract_device_id(event):
         return None
 
 def extract_device_data(event):
-    """Extract device data from IoT Core event"""
+    """Extract device data from IoT Core event and normalize field names"""
     try:
         # IoT Core Rules Engine provides the message payload
         # With SELECT *, data might be:
         # 1. In 'payload' field (base64 encoded or JSON string)
         # 2. Directly in the event object (SELECT * puts all fields in event)
         # 3. In 'data' field
+        
+        device_data = None
         
         # Check if payload exists and try to parse it
         if 'payload' in event:
@@ -499,34 +521,52 @@ def extract_device_data(event):
                 payload_str = base64.b64decode(event['payload']).decode('utf-8')
                 payload = json.loads(payload_str)
                 logger.info(f"Extracted data from base64-encoded payload. Keys: {list(payload.keys())}")
-                return payload
+                device_data = payload
             except:
                 # If not base64, try direct JSON
                 try:
                     payload = json.loads(event['payload'])
                     logger.info(f"Extracted data from JSON payload. Keys: {list(payload.keys())}")
-                    return payload
+                    device_data = payload
                 except:
                     pass
         
         # Check if data exists directly
-        if 'data' in event:
+        if device_data is None and 'data' in event:
             logger.info(f"Extracted data from event.data. Keys: {list(event['data'].keys()) if isinstance(event['data'], dict) else 'not a dict'}")
-            return event['data']
+            device_data = event['data']
         
         # With SELECT *, all fields are directly in the event
-        # Exclude metadata fields that shouldn't be part of device data
-        metadata_fields = {'topic', 'timestamp', 'messageId', 'ruleName', 'ruleArn'}
-        device_data = {k: v for k, v in event.items() if k not in metadata_fields and k != 'payload'}
-        
-        # If we have device data fields, return them
-        if device_data:
-            logger.info(f"Extracted data from event fields (SELECT *). Keys: {list(device_data.keys())}")
-            return device_data
+        if device_data is None:
+            # Exclude metadata fields that shouldn't be part of device data
+            metadata_fields = {'topic', 'timestamp', 'messageId', 'ruleName', 'ruleArn', 'client_id', 'epoch', 'ttl'}
+            device_data = {k: v for k, v in event.items() if k not in metadata_fields and k != 'payload'}
             
-        # Fallback: return entire event
-        logger.warning(f"Could not extract device data. Returning full event. Keys: {list(event.keys())}")
-        return event
+            if device_data:
+                logger.info(f"Extracted data from event fields (SELECT *). Keys: {list(device_data.keys())}")
+        
+        # Normalize flattened fields to full names for backward compatibility
+        # This allows subscriptions/alarms to continue using full parameter names
+        # while the firmware sends flattened payloads (t, h, b, s, p)
+        if device_data and isinstance(device_data, dict):
+            normalized_data = {}
+            for key, value in device_data.items():
+                # Map flattened fields to full names (t -> temperature, h -> humidity, etc.)
+                full_name = FLATTENED_TO_FULL_FIELD_MAP.get(key, key)
+                normalized_data[full_name] = value
+                # Keep original flattened key if it was mapped (for debugging)
+                if full_name != key and key in FLATTENED_TO_FULL_FIELD_MAP:
+                    logger.debug(f"Mapped flattened field '{key}' to full name '{full_name}'")
+            
+            logger.info(f"Normalized device data. Keys: {list(normalized_data.keys())}")
+            return normalized_data
+        
+        # Fallback: return entire event if we couldn't extract anything
+        if device_data is None:
+            logger.warning(f"Could not extract device data. Returning full event. Keys: {list(event.keys())}")
+            return event
+            
+        return device_data
     except Exception as e:
         logger.error(f"Error extracting device data: {e}")
         import traceback
@@ -666,12 +706,21 @@ def extract_parameter_value(device_data, parameter_name, device_id=None, paramet
         
         # Fall back to device_data (telemetry) for metrics
         if parameter_type == 'metrics':
+            # First try full name (as stored in subscriptions, after normalization)
             value = device_data.get(parameter_name)
             if value is not None:
                 logger.info(f"Found {parameter_name} in device_data: {value}")
                 return value
-            else:
-                logger.warning(f"Parameter {parameter_name} not found in device_data. Available keys: {list(device_data.keys())}")
+            
+            # If not found, try flattened name (in case normalization didn't happen)
+            flattened_name = FULL_TO_FLATTENED_FIELD_MAP.get(parameter_name)
+            if flattened_name:
+                value = device_data.get(flattened_name)
+                if value is not None:
+                    logger.info(f"Found {parameter_name} using flattened field {flattened_name}: {value}")
+                    return value
+            
+            logger.warning(f"Parameter {parameter_name} not found in device_data. Available keys: {list(device_data.keys())}")
         
         return None
     except Exception as e:

@@ -28,9 +28,11 @@ def get_latest_data(client_id):
             latest_item = response['Items'][0]
             
             # Convert Decimal to float for all numeric values
+            # Exclude epoch and ttl (internal DynamoDB fields) along with device and client_id
+            excluded_fields = ['device', 'client_id', 'epoch', 'ttl']
             processed_data = {}
             for key, value in latest_item.items():
-                if key in ['device', 'client_id']:
+                if key in excluded_fields:
                     continue
                 if isinstance(value, Decimal):
                     processed_data[key] = float(value)
@@ -53,8 +55,8 @@ def get_latest_data(client_id):
                     summary[f'max_{key}'] = value
             
             return {
-                'data': [processed_data],
-                'summary': summary
+                'data_latest': [processed_data],
+                'summary_latest': summary
             }
         return None
             

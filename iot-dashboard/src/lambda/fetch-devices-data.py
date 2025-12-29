@@ -88,7 +88,7 @@ def lambda_handler(event, context):
             
             # Convert all values to appropriate types, excluding specific fields
             processed_data = {}
-            excluded_fields = []  # Remove device_id and ClientID since we're not using them anymore
+            excluded_fields = ['epoch', 'ttl']  # Exclude epoch and ttl (internal DynamoDB fields)
             for key, value in device_data.items():
                 if key not in excluded_fields:  # Only process non-excluded fields
                     if isinstance(value, Decimal):

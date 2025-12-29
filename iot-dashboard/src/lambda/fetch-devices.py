@@ -94,9 +94,12 @@ def lambda_handler(event, context):
                     )
                     
                     # Convert Decimal to float in the latest data
+                    # Exclude epoch and ttl (internal DynamoDB fields)
                     latest_data = {}
                     if device_data_response.get('Items'):
-                        latest_data = decimal_to_float(device_data_response['Items'][0])
+                        raw_data = decimal_to_float(device_data_response['Items'][0])
+                        excluded_fields = ['epoch', 'ttl']
+                        latest_data = {k: v for k, v in raw_data.items() if k not in excluded_fields}
                     
                     # Get connection status from Devices table (set by IoT Core presence events)
                     # Fallback to 'Offline' if not set
@@ -172,8 +175,9 @@ def lambda_handler(event, context):
             debug_logs.append(f"Most recent data: {json.dumps(device_data)}")
             
             # Process the data excluding specific fields
+            # Exclude epoch and ttl (internal DynamoDB fields)
             processed_data = {}
-            excluded_fields = []
+            excluded_fields = ['epoch', 'ttl']
             for key, value in device_data.items():
                 if key not in excluded_fields:
                     processed_data[key] = value

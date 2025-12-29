@@ -310,13 +310,14 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                         # Filter items based on selected variables if provided
                         if selected_variables:
                             filtered_items = []
+                            excluded_fields = ['epoch', 'ttl']  # Exclude epoch and ttl (internal DynamoDB fields)
                             for item in response['Items']:
                                 filtered_item = {
                                     'timestamp': item['timestamp'],
                                     'client_id': item['client_id']
                                 }
                                 for var in selected_variables:
-                                    if var in item:
+                                    if var in item and var not in excluded_fields:
                                         # Convert Decimal to float for JSON serialization
                                         value = item[var]
                                         if isinstance(value, Decimal):
@@ -326,7 +327,17 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                                 filtered_items.append(filtered_item)
                             chunk_items.extend(filtered_items)
                         else:
-                            chunk_items.extend(response['Items'])
+                            # Filter out epoch and ttl even when no selected_variables
+                            excluded_fields = ['epoch', 'ttl']
+                            filtered_chunk_items = []
+                            for item in response['Items']:
+                                filtered_item = {k: v for k, v in item.items() if k not in excluded_fields}
+                                # Convert Decimal to float for JSON serialization
+                                for key, value in filtered_item.items():
+                                    if isinstance(value, Decimal):
+                                        filtered_item[key] = float(value)
+                                filtered_chunk_items.append(filtered_item)
+                            chunk_items.extend(filtered_chunk_items)
                     
                     last_evaluated_key = response.get('LastEvaluatedKey')
                     if not last_evaluated_key:
@@ -385,13 +396,14 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                     # Filter items based on selected variables if provided
                     if selected_variables:
                         filtered_items = []
+                        excluded_fields = ['epoch', 'ttl']  # Exclude epoch and ttl (internal DynamoDB fields)
                         for item in filtered_fallback_items:
                             filtered_item = {
                                 'timestamp': item['timestamp'],
                                 'client_id': item['client_id']
                             }
                             for var in selected_variables:
-                                if var in item:
+                                if var in item and var not in excluded_fields:
                                     # Convert Decimal to float for JSON serialization
                                     value = item[var]
                                     if isinstance(value, Decimal):
@@ -460,9 +472,14 @@ def aggregate_data(items, target_points, selected_variables=None, table_type='da
         interval_data = {'timestamp': current_interval_start.isoformat() + 'Z'}
         has_data = False  # Track if this interval has any actual data
         
+        # Exclude epoch and ttl from aggregation
+        excluded_fields = ['epoch', 'ttl']
+        
         if selected_variables:
-            for var in selected_variables:
-                values = [float(it[var]) for it in interval_items if var in it]
+            # Filter out epoch and ttl from selected_variables if present
+            filtered_variables = [var for var in selected_variables if var not in excluded_fields]
+            for var in filtered_variables:
+                values = [float(it[var]) for it in interval_items if var in it and var not in excluded_fields]
                 if values:
                     has_data = True  # Mark that we have at least one value
                     if table_type == 'status' and (var.endswith('_state') or var in ['charging', 'power_saving']):
@@ -506,8 +523,11 @@ def aggregate_data(items, target_points, selected_variables=None, table_type='da
                 interval_data = {'timestamp': current_time.isoformat() + 'Z'}
                 has_resampled_data = False  # Track if this resampled interval has any actual data
                 
-                for var in selected_variables:
-                    values = [point[var] for point in interval_points if var in point]
+                # Exclude epoch and ttl from resampling
+                excluded_fields = ['epoch', 'ttl']
+                filtered_variables = [var for var in selected_variables if var not in excluded_fields] if selected_variables else []
+                for var in filtered_variables:
+                    values = [point[var] for point in interval_points if var in point and var not in excluded_fields]
                     if values:
                         has_resampled_data = True  # Mark that we have at least one value
                         # For state history (status table), use mode instead of mean for boolean values
@@ -730,7 +750,12 @@ def lambda_handler(event, context):
         )
         
         # Calculate summary statistics
-        metrics_to_summarize = selected_variables if selected_variables else [key for key in aggregated_data[0].keys() if key != 'timestamp']
+        # Exclude epoch and ttl from summary calculations
+        excluded_fields = ['epoch', 'ttl']
+        if selected_variables:
+            metrics_to_summarize = [var for var in selected_variables if var not in excluded_fields]
+        else:
+            metrics_to_summarize = [key for key in aggregated_data[0].keys() if key not in excluded_fields and key != 'timestamp']
         summary = calculate_summary_statistics(aggregated_data, metrics_to_summarize, table_type)
         
         # Return response with CORS headers

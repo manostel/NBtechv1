@@ -83,7 +83,9 @@ def lambda_handler(event, context):
                     })
                 
                 # Convert DynamoDB response to regular Python dict
+                # Only extract specific fields (epoch/ttl are not in preferences table, but filter defensively)
                 item = response['Item']
+                excluded_fields = ['epoch', 'ttl']
                 preferences = {
                     'user_email': item['user_email'],
                     'client_id': item['client_id'],
@@ -97,6 +99,8 @@ def lambda_handler(event, context):
                     }),
                     'display_order': item.get('display_order', Decimal('0'))
                 }
+                # Remove epoch/ttl if they somehow exist (defensive)
+                preferences = {k: v for k, v in preferences.items() if k not in excluded_fields}
                 
                 return cors_response(200, {
                     'preferences': preferences
@@ -179,6 +183,8 @@ def lambda_handler(event, context):
                 )
                 
                 # Convert Decimal types to float in the response
+                # Only extract specific fields (epoch/ttl are not in preferences table, but filter defensively)
+                excluded_fields = ['epoch', 'ttl']
                 items = []
                 for item in response.get('Items', []):
                     converted_item = {
@@ -194,6 +200,8 @@ def lambda_handler(event, context):
                         }),
                         'display_order': item.get('display_order', Decimal('0'))
                     }
+                    # Remove epoch/ttl if they somehow exist (defensive)
+                    converted_item = {k: v for k, v in converted_item.items() if k not in excluded_fields}
                     items.append(converted_item)
                 
                 return cors_response(200, {

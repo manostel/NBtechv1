@@ -139,8 +139,8 @@ def get_available_variables(client_id):
         # Get all keys except the ones we want to exclude
         latest_item = response['Items'][0]
         
-        # Define columns to exclude
-        exclude_columns = ['client_id', 'device', 'timestamp']
+        # Define columns to exclude (including internal DynamoDB fields)
+        exclude_columns = ['client_id', 'device', 'timestamp', 'epoch', 'ttl']
         
         # Get all columns except the excluded ones
         variables = [key for key in latest_item.keys() 
