@@ -2,14 +2,17 @@ import json
 import boto3
 import os
 import logging
+from datetime import datetime
 from botocore.exceptions import ClientError
 
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Initialize SNS client
+# Initialize SNS client and DynamoDB
 sns = boto3.client('sns')
+dynamodb = boto3.resource('dynamodb')
+users_table = dynamodb.Table('IoT_Users')
 
 def lambda_handler(event, context):
     """
@@ -61,18 +64,64 @@ def lambda_handler(event, context):
 
 def send_notification(data):
     """
-    Send a notification to a specific target ARN or Topic ARN
+    Send a notification to a specific user's SNS endpoint ARN.
+    Only sends if user has an endpoint configured.
     """
     message = data.get('message')
     subject = data.get('subject', 'IoT Dashboard Notification')
-    # Use provided target_arn or fallback to environment variable
-    target_arn = data.get('target_arn') or os.environ.get('SNS_TOPIC_ARN')
+    user_email = data.get('user_email')
     
-    if not message or not target_arn:
-        logger.warning("Missing message or target_arn")
+    if not message:
+        logger.warning("Missing message")
         return {
             'statusCode': 400,
-            'body': json.dumps({'error': 'Missing message or target_arn (and SNS_TOPIC_ARN env var not set)'})
+            'body': json.dumps({'error': 'Missing message'})
+        }
+    
+    # If user_email is provided, check if they have an endpoint configured
+    target_arn = None
+    if user_email:
+        try:
+            user_response = users_table.get_item(Key={'email': user_email})
+            if 'Item' in user_response:
+                target_arn = user_response['Item'].get('sns_endpoint_arn')
+                if target_arn:
+                    logger.info(f"Found SNS endpoint for user {user_email}: {target_arn}")
+                else:
+                    logger.info(f"User {user_email} does not have SNS endpoint configured - skipping notification")
+                    return {
+                        'statusCode': 200,
+                        'body': json.dumps({
+                            'success': True,
+                            'skipped': True,
+                            'reason': 'User does not have SNS endpoint configured'
+                        })
+                    }
+            else:
+                logger.warning(f"User {user_email} not found in Users table - skipping notification")
+                return {
+                    'statusCode': 200,
+                    'body': json.dumps({
+                        'success': True,
+                        'skipped': True,
+                        'reason': 'User not found'
+                    })
+                }
+        except Exception as e:
+            logger.error(f"Error checking user SNS endpoint: {e}")
+            return {
+                'statusCode': 500,
+                'body': json.dumps({'error': f'Error checking user endpoint: {str(e)}'})
+            }
+    
+    # Fallback to global topic if no user_email provided (for backward compatibility)
+    if not target_arn:
+        target_arn = data.get('target_arn') or os.environ.get('SNS_TOPIC_ARN')
+        if not target_arn:
+            logger.warning("No target_arn and no user_email provided")
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'Missing target_arn or user_email (and SNS_TOPIC_ARN env var not set)'})
         }
         
     try:
@@ -156,6 +205,22 @@ def register_device(data):
         
         endpoint_arn = response['EndpointArn']
         logger.info(f"Created/Retrieved EndpointArn: {endpoint_arn}")
+        
+        # Store endpoint ARN in Users table for this user (using custom_user_data as email)
+        if custom_user_data:  # This should be the user's email
+            try:
+                users_table.update_item(
+                    Key={'email': custom_user_data},
+                    UpdateExpression='SET sns_endpoint_arn = :arn, sns_endpoint_updated_at = :timestamp',
+                    ExpressionAttributeValues={
+                        ':arn': endpoint_arn,
+                        ':timestamp': str(datetime.now())
+                    }
+                )
+                logger.info(f"Stored endpoint ARN for user: {custom_user_data}")
+            except Exception as e:
+                logger.warning(f"Could not store endpoint ARN in Users table: {e}")
+                # Don't fail registration if this fails
         
         # Subscribe the endpoint to the global alerts topic
         topic_arn = os.environ.get('SNS_TOPIC_ARN')

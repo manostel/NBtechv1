@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from boto3.dynamodb.conditions import Key, Attr
+from botocore.exceptions import ClientError
 
 # Configure logging
 logger = logging.getLogger()
@@ -175,55 +176,144 @@ def execute_command(task):
         target = task.get('target')
         value = task.get('value')
         
+        logger.info(f"🔧 Executing command - device_id: {device_id}, command: {command}, target: {target}, value: {value}")
+        
         if not device_id:
             logger.error("No device_id provided")
             return False
         
-        # Get current shadow to merge with desired state
-        try:
-            response = iot_data_client.get_thing_shadow(thingName=device_id)
-            shadow_document = json.loads(response['payload'].read())
-            current_desired = shadow_document.get('state', {}).get('desired', {})
-        except Exception as e:
-            logger.warning(f"Could not get current shadow for {device_id}: {e}, starting fresh")
-            current_desired = {}
+        # Build desired state with only the field we're changing (delta update)
+        # This ensures AWS IoT sends a delta update to the device and properly merges with existing desired state
+        desired_state = {}
         
-        # Build desired state based on command
-        desired_state = dict(current_desired)  # Copy current desired state
+        # Helper function to normalize target to shadow field name
+        def normalize_target_to_shadow_field(target_str):
+            """Convert target names like 'output1', 'out1' to shadow field names like 'OUT1'"""
+            if not target_str:
+                return None
+            target_lower = target_str.lower()
+            # Map common variations to shadow field names
+            if target_lower in ['output1', 'out1', 'output_1']:
+                return 'OUT1'
+            elif target_lower in ['output2', 'out2', 'output_2']:
+                return 'OUT2'
+            elif target_lower in ['input1', 'in1', 'input_1']:
+                return 'IN1'
+            elif target_lower in ['input2', 'in2', 'input_2']:
+                return 'IN2'
+            elif target_lower in ['motor_speed', 'speed', 'motor speed']:
+                return 'motor_speed'
+            elif target_lower in ['power_saving', 'power saving']:
+                return 'power_saving'
+            else:
+                # Default: uppercase the target
+                return target_str.upper()
         
-        # Map commands to shadow fields
-        if command == "TOGGLE_1_ON":
-            desired_state['OUT1'] = 1
-        elif command == "TOGGLE_1_OFF":
-            desired_state['OUT1'] = 0
-        elif command == "TOGGLE_2_ON":
-            desired_state['OUT2'] = 1
-        elif command == "TOGGLE_2_OFF":
-            desired_state['OUT2'] = 0
-        elif command == "SET_SPEED":
-            desired_state['motor_speed'] = int(value) if value is not None else 0
-        elif command == "POWER_SAVING_ON":
-            desired_state['power_saving'] = 1
-        elif command == "POWER_SAVING_OFF":
-            desired_state['power_saving'] = 0
-        else:
-            logger.warning(f"Unknown command: {command}")
+        # Priority 1: Use target + value if both are provided (most flexible)
+        if target and (value is not None and value != ''):
+            logger.info(f"Using Priority 1: target + value")
+            shadow_field = normalize_target_to_shadow_field(target)
+            try:
+                # Try to parse as number first
+                if '.' in str(value):
+                    desired_state[shadow_field] = float(value)
+                else:
+                    desired_state[shadow_field] = int(value)
+            except ValueError:
+                # If not a number, use as boolean or string
+                if str(value).lower() in ['true', '1', 'on']:
+                    desired_state[shadow_field] = 1
+                elif str(value).lower() in ['false', '0', 'off']:
+                    desired_state[shadow_field] = 0
+                else:
+                    desired_state[shadow_field] = str(value)
+            logger.info(f"Command: Setting {shadow_field} = {desired_state[shadow_field]} (from target: {target}, value: {value})")
+        # Priority 2: Use target + command to determine value (e.g., TOGGLE_1_OFF with target=output1)
+        elif target and command:
+            logger.info(f"Using Priority 2: target + command")
+            shadow_field = normalize_target_to_shadow_field(target)
+            logger.info(f"Normalized target '{target}' to shadow field '{shadow_field}'")
+            # Extract value from command if it's a TOGGLE_X_ON/OFF pattern
+            command_upper = command.upper()
+            logger.info(f"Checking command '{command}' (upper: '{command_upper}') for ON/OFF pattern")
+            if "ON" in command_upper or command_upper.endswith("_ON"):
+                desired_state[shadow_field] = 1
+                logger.info(f"✅ Command: Setting {shadow_field} = 1 (from command: {command}, target: {target})")
+            elif "OFF" in command_upper or command_upper.endswith("_OFF"):
+                desired_state[shadow_field] = 0
+                logger.info(f"✅ Command: Setting {shadow_field} = 0 (from command: {command}, target: {target})")
+            elif command == "SET_SPEED" and shadow_field in ['motor_speed', 'MOTOR_SPEED']:
+                desired_state['motor_speed'] = int(value) if value is not None and value != '' else 0
+                logger.info(f"Command: Setting motor_speed = {desired_state['motor_speed']}")
+            else:
+                # Fall through to legacy command mapping
+                logger.info(f"Command pattern not matched in Priority 2, falling through to Priority 3")
+                pass
+        # Priority 3: Fall back to legacy command-based mapping for backward compatibility
+        if not desired_state:
+            logger.info(f"Using Priority 3: legacy command mapping")
+            if command == "TOGGLE_1_ON":
+                desired_state['OUT1'] = 1
+                logger.info(f"Command: Setting OUT1 = 1")
+            elif command == "TOGGLE_1_OFF":
+                desired_state['OUT1'] = 0
+                logger.info(f"Command: Setting OUT1 = 0")
+            elif command == "TOGGLE_2_ON":
+                desired_state['OUT2'] = 1
+                logger.info(f"Command: Setting OUT2 = 1")
+            elif command == "TOGGLE_2_OFF":
+                desired_state['OUT2'] = 0
+                logger.info(f"Command: Setting OUT2 = 0")
+            elif command == "SET_SPEED":
+                desired_state['motor_speed'] = int(value) if value is not None and value != '' else 0
+                logger.info(f"Command: Setting motor_speed = {desired_state['motor_speed']}")
+            elif command == "POWER_SAVING_ON":
+                desired_state['power_saving'] = 1
+                logger.info(f"Command: Setting power_saving = 1")
+            elif command == "POWER_SAVING_OFF":
+                desired_state['power_saving'] = 0
+                logger.info(f"Command: Setting power_saving = 0")
+            else:
+                logger.warning(f"Unknown command: {command} (target: {target}, value: {value})")
+                return False
+        
+        if not desired_state:
+            logger.warning("No valid command to execute")
             return False
         
-        # Update shadow with new desired state
+        # Update shadow with only the fields we're changing (delta update)
+        # This ensures AWS IoT sends a delta update to the device
         shadow_update = {
             "state": {
                 "desired": desired_state
             }
         }
         
-        iot_data_client.update_thing_shadow(
-            thingName=device_id,
-            payload=json.dumps(shadow_update)
-        )
+        logger.info(f"📤 Updating shadow for {device_id} with delta: {json.dumps(desired_state)}")
         
-        logger.info(f"✅ Updated shadow for {device_id}: {json.dumps(desired_state)}")
-        return True
+        try:
+            response = iot_data_client.update_thing_shadow(
+                thingName=device_id,
+                payload=json.dumps(shadow_update)
+            )
+            
+            # Log the response version to confirm update
+            if response.get('version'):
+                logger.info(f"✅ Shadow updated successfully (version: {response['version']})")
+            
+            logger.info(f"✅ Updated shadow desired state for {device_id}: {json.dumps(desired_state)}")
+            logger.info(f"💡 Device should receive delta update and apply: {json.dumps(desired_state)}")
+            return True
+            
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            if error_code == 'ForbiddenException':
+                logger.error(f"Permission denied updating shadow for {device_id}. Lambda needs iot:UpdateThingShadow permission. Error: {e}")
+            elif error_code == 'ResourceNotFoundException':
+                logger.warning(f"Shadow not found for device {device_id}: {e}")
+            else:
+                logger.error(f"Error updating shadow for {device_id} (Error Code: {error_code}): {e}")
+            return False
         
     except Exception as e:
         logger.error(f"Error executing command: {e}")
@@ -234,8 +324,17 @@ def execute_command(task):
 def send_sns_notification(task, success):
     """
     Invoke sns-notification Lambda to send push notification
+    Only sends if task is enabled
     """
     try:
+        # Check if task is enabled before sending notification
+        enabled_status = task.get('enabled_status', '0')
+        enabled = task.get('enabled', False)
+        
+        if enabled_status != '1' and not enabled:
+            logger.info(f"Task {task.get('task_id')} is disabled - skipping SNS notification")
+            return
+        
         lambda_client = boto3.client('lambda')
         
         task_name = task.get('name', 'Scheduled Task')
@@ -246,11 +345,15 @@ def send_sns_notification(task, success):
         message = f"Task '{task_name}' {status}: Executed {command} on {device_id}"
         subject = f"Scheduler {status.title()}: {device_id}"
         
+        # Get user_email from task for SNS routing
+        user_email = task.get('user_email')
+        
         payload = {
             "action": "send_notification",
             "message": message,
             "subject": subject,
             "type": "scheduler_trigger",
+            "user_email": user_email,  # Pass user_email so sns-notification can check for endpoint
             "data": {
                 "task_id": task.get('task_id'),
                 "device_id": device_id,
@@ -273,15 +376,37 @@ def send_sns_notification(task, success):
 
 def process_scheduled_tasks():
     now_ts = int(time.time())
+    now_dt = datetime.fromtimestamp(now_ts, tz=timezone.utc)
+    logger.info(f"🕐 Processing scheduled tasks at timestamp: {now_ts} ({now_dt.strftime('%Y-%m-%d %H:%M:%S UTC')})")
     try:
+        logger.info(f"Querying tasks table with IndexName='NextRunIndex', enabled_status='1', next_run_timestamp<={now_ts}")
         response = tasks_table.query(
             IndexName='NextRunIndex',
             KeyConditionExpression=Key('enabled_status').eq('1') & Key('next_run_timestamp').lte(now_ts)
         )
         
         tasks = response.get('Items', [])
+        logger.info(f"Found {len(tasks)} task(s) ready to execute")
+        
+        if not tasks:
+            logger.info("No tasks ready to execute at this time")
+            return "No tasks ready to execute"
+        
+        processed_count = 0
         for task in tasks:
+            task_id = task.get('task_id', 'unknown')
+            device_id = task.get('device_id', 'unknown')
+            command = task.get('command', 'unknown')
+            task_name = task.get('name', 'unnamed')
+            # Convert Decimal to int (DynamoDB returns numbers as Decimal)
+            next_ts_raw = task.get('next_run_timestamp', 0)
+            next_ts = int(next_ts_raw) if next_ts_raw else 0
+            next_dt = datetime.fromtimestamp(next_ts, tz=timezone.utc) if next_ts else None
+            schedule_info = f" (scheduled for {next_dt.strftime('%Y-%m-%d %H:%M:%S UTC')})" if next_dt else ""
+            logger.info(f"Executing task {task_id} '{task_name}': {command} on device {device_id}{schedule_info}")
+            
             success = execute_command(task)
+            logger.info(f"Task {task_id} execution result: {'success' if success else 'failed'}")
             
             # Send Push Notification
             send_sns_notification(task, success)
@@ -296,25 +421,35 @@ def process_scheduled_tasks():
                 update_expression += ", enabled = :false, enabled_status = :status_disabled"
                 expression_values[':false'] = False
                 expression_values[':status_disabled'] = '0'
+                logger.info(f"Task {task_id} is one_time - disabling after execution")
             elif task['type'] == 'recurring':
                 next_ts = calculate_next_run(task['type'], task['schedule'], from_time=datetime.now(timezone.utc))
                 if next_ts:
                     update_expression += ", next_run_timestamp = :next"
                     expression_values[':next'] = int(next_ts)
+                    logger.info(f"Task {task_id} is recurring - next run at timestamp: {int(next_ts)}")
                 else:
                     update_expression += ", enabled = :false, enabled_status = :status_disabled"
                     expression_values[':false'] = False
                     expression_values[':status_disabled'] = '0'
+                    logger.info(f"Task {task_id} is recurring but no next run calculated - disabling")
             
             tasks_table.update_item(
                 Key={'user_email': user_email, 'task_id': task_id},
                 UpdateExpression=update_expression,
                 ExpressionAttributeValues=expression_values
             )
-        return f"Processed {len(tasks)} tasks"
+            processed_count += 1
+            logger.info(f"✅ Updated task {task_id} in database")
+        
+        result_msg = f"Processed {processed_count} task(s)"
+        logger.info(f"✅ {result_msg}")
+        return result_msg
     except Exception as e:
-        logger.error(f"Process error: {e}")
-        return str(e)
+        logger.error(f"❌ Process error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return f"Error: {str(e)}"
 
 # --- API Handlers ---
 
@@ -400,8 +535,16 @@ def lambda_handler(event, context):
     logger.info("Received event: %s", json.dumps(event))
     
     if event.get('source') == 'aws.events':
-        result = process_scheduled_tasks()
-        return {'statusCode': 200, 'body': json.dumps({'message': result})}
+        logger.info("📅 EventBridge scheduled event received - processing scheduled tasks")
+        try:
+            result = process_scheduled_tasks()
+            logger.info(f"✅ Scheduled tasks processing completed: {result}")
+            return {'statusCode': 200, 'body': json.dumps({'message': result})}
+        except Exception as e:
+            logger.error(f"❌ Error processing scheduled tasks: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return {'statusCode': 500, 'body': json.dumps({'error': str(e)})}
 
     if event.get("httpMethod") == "OPTIONS":
         return {'statusCode': 200, 'headers': get_cors_headers(), 'body': json.dumps({"message": "CORS OK"})}

@@ -614,19 +614,19 @@ const MapView = ({ devices, deviceData, gpsData, gpsLoading, deviceStates, onDev
                   }
                 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography 
-                      variant="h6" 
-                      sx={{
-                        fontWeight: 600,
-                        letterSpacing: '0.2px',
-                        background: 'linear-gradient(45deg, #4caf50, #2196f3)',
-                        backgroundClip: 'text',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent'
-                      }}
-                    >
-                      {device.device_name}
-                    </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{
+                      fontWeight: 600,
+                      letterSpacing: '0.2px',
+                      background: 'linear-gradient(45deg, #4caf50, #2196f3)',
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent'
+                    }}
+                  >
+                    {device.device_name}
+                  </Typography>
                     <Box sx={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1175,7 +1175,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
         return null;
       }
 
-      const result = await response.json();
+        const result = await response.json();
       
       // Check if the response contains an error (e.g., "Thing not found")
       if (result.error) {
@@ -1841,24 +1841,24 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                 NB-Tech v1
               </Typography>
               <Tooltip title="Auto-refresh every 30 seconds">
-                <Box sx={{
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 2,
-                  backgroundColor: currentTheme === 'dark' 
+              <Box sx={{
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                backgroundColor: currentTheme === 'dark' 
                     ? 'rgba(33, 150, 243, 0.2)'
                     : 'rgba(33, 150, 243, 0.1)',
                   border: `1px solid ${currentTheme === 'dark' 
                     ? 'rgba(33, 150, 243, 0.3)'
                     : 'rgba(33, 150, 243, 0.2)'}`,
-                  display: 'flex',
-                  alignItems: 'center',
+                display: 'flex',
+                alignItems: 'center',
                   gap: 0.5,
                   transition: 'all 0.3s ease'
-                }}>
-                  <Box sx={{
-                    width: 8,
-                    height: 8,
+              }}>
+                <Box sx={{
+                  width: 8,
+                  height: 8,
                     borderRadius: ' 50%',
                     backgroundColor: '#2196f3',
                     animation: 'pulse 2s infinite',
@@ -1871,7 +1871,7 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                   }}>
                     Auto 30s
                   </Typography>
-                </Box>
+              </Box>
               </Tooltip>
             </Box>
             <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
@@ -2191,16 +2191,16 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Bluetooth Control">
-                              <IconButton
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedDeviceForBluetooth(device);
-                                }}
-                                color="primary"
-                                size="small"
-                              >
-                                <BluetoothIcon />
-                              </IconButton>
+                            <IconButton
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDeviceForBluetooth(device);
+                              }}
+                              color="primary"
+                              size="small"
+                            >
+                              <BluetoothIcon />
+                            </IconButton>
                             </Tooltip>
                             {isUpdating && (
                               <CircularProgress size={12} sx={{ mr: 1 }} />

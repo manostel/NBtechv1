@@ -675,9 +675,9 @@ def lambda_handler(event, context):
                 
                 # Try query first (if user_email is partition key)
                 try:
-                    response = notifications_table.query(
-                        KeyConditionExpression=Key('user_email').eq(user_email),
-                        ScanIndexForward=False,  # Most recent first
+                response = notifications_table.query(
+                    KeyConditionExpression=Key('user_email').eq(user_email),
+                    ScanIndexForward=False,  # Most recent first
                         Limit=body.get('limit', 50)
                     )
                     notifications = response.get('Items', [])
@@ -692,7 +692,7 @@ def lambda_handler(event, context):
                         ExpressionAttributeValues={':email': user_email},
                         Limit=body.get('limit', 50)
                     )
-                    notifications = response.get('Items', [])
+                notifications = response.get('Items', [])
                     
                     # Sort by timestamp descending (most recent first)
                     notifications.sort(key=lambda x: x.get('timestamp', ''), reverse=True)

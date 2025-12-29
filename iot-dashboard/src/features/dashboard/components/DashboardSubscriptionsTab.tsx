@@ -981,57 +981,57 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
       <DialogTitle sx={{ color: '#E0E0E0' }}>{t('subscriptions.createSubscription')}</DialogTitle>
       <DialogContent ref={createDialogContentRef}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          {/* Error Display */}
-          {dialogError && (
-            <Alert 
-              severity="error" 
-              onClose={() => setDialogError(null)}
-            >
-              {dialogError}
-            </Alert>
-          )}
-
-          <FormControl fullWidth>
-            <InputLabel>Device</InputLabel>
-            <Select
-              value={formData.device_id}
-              onChange={(e) => setFormData({ ...formData, device_id: e.target.value })}
-              label="Device"
-            >
-              {devices.map((device) => (
-                <MenuItem key={device.client_id} value={device.client_id}>
-                  {device.device_name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth>
-            <InputLabel>{t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}</InputLabel>
-            <Select
+        {/* Error Display */}
+        {dialogError && (
+          <Alert 
+            severity="error" 
+            onClose={() => setDialogError(null)}
+          >
+            {dialogError}
+          </Alert>
+        )}
+          
+            <FormControl fullWidth>
+              <InputLabel>Device</InputLabel>
+              <Select
+                value={formData.device_id}
+                onChange={(e) => setFormData({ ...formData, device_id: e.target.value })}
+                label="Device"
+              >
+                {devices.map((device) => (
+                  <MenuItem key={device.client_id} value={device.client_id}>
+                    {device.device_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          
+            <FormControl fullWidth>
+              <InputLabel>{t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}</InputLabel>
+              <Select
               value={formData.parameter_type || 'metrics'}
-              onChange={(e) => setFormData({ ...formData, parameter_type: e.target.value, parameter_name: '' })}
-              label={t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}
-            >
-              {Object.entries(PARAMETER_TYPES).map(([key, config]: [string, any]) => (
-                <MenuItem key={key} value={key}>
+                onChange={(e) => setFormData({ ...formData, parameter_type: e.target.value, parameter_name: '' })}
+                label={t('subscriptions.parameterType', { defaultValue: 'Parameter Type' })}
+              >
+                {Object.entries(PARAMETER_TYPES).map(([key, config]: [string, any]) => (
+                  <MenuItem key={key} value={key}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {config.icon}
+                      {config.icon}
                     {config.label}
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth>
-            <InputLabel>{t('subscriptions.parameter')}</InputLabel>
-            <Select
-              value={formData.parameter_name}
-              onChange={(e) => setFormData({ ...formData, parameter_name: e.target.value })}
-              label={t('subscriptions.parameter')}
-              disabled={!formData.parameter_type}
-            >
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          
+            <FormControl fullWidth>
+              <InputLabel>{t('subscriptions.parameter')}</InputLabel>
+              <Select
+                value={formData.parameter_name}
+                onChange={(e) => setFormData({ ...formData, parameter_name: e.target.value })}
+                label={t('subscriptions.parameter')}
+                disabled={!formData.parameter_type}
+              >
               {formData.parameter_type && PARAMETER_TYPES[formData.parameter_type] && 
                 Object.entries(PARAMETER_TYPES[formData.parameter_type].parameters).map(([key, config]: [string, any]) => (
                   <MenuItem key={key} value={key}>
@@ -1039,23 +1039,23 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                   </MenuItem>
                 ))
               }
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth>
-            <InputLabel>{t('subscriptions.condition')}</InputLabel>
-            <Select
-              value={formData.condition_type}
-              onChange={(e) => setFormData({ ...formData, condition_type: e.target.value })}
-              label={t('subscriptions.condition')}
-            >
+              </Select>
+            </FormControl>
+          
+            <FormControl fullWidth>
+              <InputLabel>{t('subscriptions.condition')}</InputLabel>
+              <Select
+                value={formData.condition_type}
+                onChange={(e) => setFormData({ ...formData, condition_type: e.target.value })}
+                label={t('subscriptions.condition')}
+              >
               {getConditionTypes(t, formData.parameter_type, formData.parameter_name).map((condition) => (
-                <MenuItem key={condition.value} value={condition.value}>
+                  <MenuItem key={condition.value} value={condition.value}>
                   {condition.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
           {getThresholdInput(
             formData.parameter_type,
@@ -1065,94 +1065,94 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
             (value) => setFormData({ ...formData, threshold_value: value })
           )}
 
-          <TextField
-            label={t('subscriptions.cooldownSeconds')}
-            value={formData.cooldown_ms ? Math.floor(formData.cooldown_ms / 1000) : ''}
-            onChange={(e) => {
-              const inputValue = e.target.value;
-              if (inputValue === '') {
-                setFormData({ ...formData, cooldown_ms: 0 });
-                return;
-              }
-              const secs = Math.max(0, parseInt(inputValue, 10));
-              if (!isNaN(secs)) {
-                setFormData({ ...formData, cooldown_ms: secs * 1000 });
-              }
-            }}
-            type="number"
-            inputProps={{ min: 0 }}
-            helperText={t('subscriptions.cooldownHelper')}
+            <TextField
+              label={t('subscriptions.cooldownSeconds')}
+              value={formData.cooldown_ms ? Math.floor(formData.cooldown_ms / 1000) : ''}
+              onChange={(e) => {
+                const inputValue = e.target.value;
+                if (inputValue === '') {
+                  setFormData({ ...formData, cooldown_ms: 0 });
+                  return;
+                }
+                const secs = Math.max(0, parseInt(inputValue, 10));
+                if (!isNaN(secs)) {
+                  setFormData({ ...formData, cooldown_ms: secs * 1000 });
+                }
+              }}
+              type="number"
+              inputProps={{ min: 0 }}
+              helperText={t('subscriptions.cooldownHelper')}
             fullWidth
-          />
+            />
 
-          <TextField
-            label={t('subscriptions.customTolerance')}
-            value={formData.tolerance_percent}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d+$/.test(value)) {
-                setFormData({ ...formData, tolerance_percent: value });
-              }
-            }}
-            type="number"
-            inputProps={{ min: 0, max: 100, step: 1 }}
-            helperText={t('subscriptions.toleranceHelper')}
-            placeholder={t('subscriptions.autoDefault', { defaultValue: 'Auto (default)' })}
+            <TextField
+              label={t('subscriptions.customTolerance')}
+              value={formData.tolerance_percent}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '' || /^\d+$/.test(value)) {
+                  setFormData({ ...formData, tolerance_percent: value });
+                }
+              }}
+              type="number"
+              inputProps={{ min: 0, max: 100, step: 1 }}
+              helperText={t('subscriptions.toleranceHelper')}
+              placeholder={t('subscriptions.autoDefault', { defaultValue: 'Auto (default)' })}
             fullWidth
-          />
+            />
           
-          <FormControl fullWidth>
-            <InputLabel>{t('subscriptions.notificationMethod')}</InputLabel>
-            <Select
-              value={formData.notification_method}
-              onChange={(e) => setFormData({ ...formData, notification_method: e.target.value })}
-              label={t('subscriptions.notificationMethod')}
-            >
-              {getNotificationMethods(t).map((method) => (
-                <MenuItem key={method.value} value={method.value}>
+            <FormControl fullWidth>
+              <InputLabel>{t('subscriptions.notificationMethod')}</InputLabel>
+              <Select
+                value={formData.notification_method}
+                onChange={(e) => setFormData({ ...formData, notification_method: e.target.value })}
+                label={t('subscriptions.notificationMethod')}
+              >
+                {getNotificationMethods(t).map((method) => (
+                  <MenuItem key={method.value} value={method.value}>
                   {method.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           
-          <TextField
-            label={t('subscriptions.description')}
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            multiline
-            rows={2}
+            <TextField
+              label={t('subscriptions.description')}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              multiline
+              rows={2}
             fullWidth
-          />
-
+            />
+          
           <Divider sx={{ my: 1 }} />
           
           <Typography variant="h6" gutterBottom>
-            {t('subscriptions.automatedResponses')}
-          </Typography>
+              {t('subscriptions.automatedResponses')}
+            </Typography>
           
           {(formData.commands || []).map((command, index) => (
             <Box key={index} sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-              <FormControl fullWidth>
-                <InputLabel>{t('subscriptions.action')} {index + 1}</InputLabel>
-                <Select
-                  value={command.action}
-                  onChange={(e) => {
-                    const newCommands = [...formData.commands];
-                    newCommands[index].action = e.target.value;
-                    setFormData({ ...formData, commands: newCommands });
-                  }}
-                  label={`${t('subscriptions.action')} ${index + 1}`}
-                >
-                  <MenuItem value="none">{t('subscriptions.noCommand', { defaultValue: 'No Command' })}</MenuItem>
-                  <MenuItem value="out1">{t('subscriptions.setOut1', { defaultValue: 'Set OUT1' })}</MenuItem>
-                  <MenuItem value="out2">{t('subscriptions.setOut2', { defaultValue: 'Set OUT2' })}</MenuItem>
-                  <MenuItem value="motor_speed">{t('subscriptions.setMotorSpeed', { defaultValue: 'Set Motor Speed' })}</MenuItem>
-                  <MenuItem value="power_saving">{t('subscriptions.setPowerSaving', { defaultValue: 'Set Power Saving' })}</MenuItem>
-                </Select>
-              </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel>{t('subscriptions.action')} {index + 1}</InputLabel>
+                  <Select
+                    value={command.action}
+                    onChange={(e) => {
+                      const newCommands = [...formData.commands];
+                      newCommands[index].action = e.target.value;
+                      setFormData({ ...formData, commands: newCommands });
+                    }}
+                    label={`${t('subscriptions.action')} ${index + 1}`}
+                  >
+                    <MenuItem value="none">{t('subscriptions.noCommand', { defaultValue: 'No Command' })}</MenuItem>
+                    <MenuItem value="out1">{t('subscriptions.setOut1', { defaultValue: 'Set OUT1' })}</MenuItem>
+                    <MenuItem value="out2">{t('subscriptions.setOut2', { defaultValue: 'Set OUT2' })}</MenuItem>
+                    <MenuItem value="motor_speed">{t('subscriptions.setMotorSpeed', { defaultValue: 'Set Motor Speed' })}</MenuItem>
+                    <MenuItem value="power_saving">{t('subscriptions.setPowerSaving', { defaultValue: 'Set Power Saving' })}</MenuItem>
+                  </Select>
+                </FormControl>
               
-              {command.action !== 'none' && (
+                {command.action !== 'none' && (
                 <>
                   <FormControl fullWidth>
                     <InputLabel>{t('subscriptions.targetDevice')}</InputLabel>
@@ -1173,7 +1173,7 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                       ))}
                     </Select>
                   </FormControl>
-                  
+              
                   <TextField
                     label={t('subscriptions.value')}
                     value={command.value}
@@ -1187,18 +1187,18 @@ const DashboardSubscriptionsTab: React.FC<DashboardSubscriptionsTabProps> = ({
                   />
                 </>
               )}
-            </Box>
+                  </Box>
           ))}
           
-          <FormControlLabel
-            control={
-              <Switch
-                checked={formData.enabled}
-                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-              />
-            }
-            label={t('subscriptions.activateSubscription')}
-          />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.enabled}
+                  onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                />
+              }
+              label={t('subscriptions.activateSubscription')}
+            />
         </Box>
       </DialogContent>
       <DialogActions>

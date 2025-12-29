@@ -217,7 +217,7 @@ def check_io_state_changes(device_id, device_data):
     """
     Check for Input/Output state changes by comparing with stored state.
     NOW READS FROM SHADOW instead of telemetry table.
-    Sends notification if state changed.
+    Only sends notification if state changed AND there's an active alarm or subscription for that parameter.
     """
     try:
         # Get current shadow state
@@ -251,6 +251,13 @@ def check_io_state_changes(device_id, device_data):
         if response.get('Items'):
             last_state = response['Items'][0]
         
+        # Get ALL device owners (device can be configured to multiple users)
+        devices_response = devices_table.scan(
+            FilterExpression='client_id = :cid',
+            ExpressionAttributeValues={':cid': device_id}
+        )
+        device_owners = [item.get('user_email') for item in devices_response.get('Items', []) if item.get('user_email')]
+        
         for param in present_params:
             current_val = shadow_state[param]
             last_val = last_state.get(param)
@@ -260,7 +267,56 @@ def check_io_state_changes(device_id, device_data):
             last_norm = 1 if last_val in [1, '1', True, 'true', 'on', 'ON'] else 0
             
             if curr_norm != last_norm:
-                # State Changed!
+                # State Changed! Check which users have active alarms or subscriptions for this parameter
+                users_with_monitoring = set()
+                
+                # Check for active alarms for this parameter
+                try:
+                    alarms_table = dynamodb.Table('IoT_DeviceAlarms')
+                    alarms_response = alarms_table.query(
+                        KeyConditionExpression=Key('client_id').eq(device_id)
+                    )
+                    alarms = alarms_response.get('Items', [])
+                    
+                    for alarm in alarms:
+                        if (alarm.get('enabled', True) and 
+                            alarm.get('variable_name') == param):
+                            # Get user_email from alarm if available, otherwise check device owners
+                            alarm_user = alarm.get('user_email')
+                            if alarm_user and alarm_user in device_owners:
+                                users_with_monitoring.add(alarm_user)
+                            elif device_owners:
+                                # If alarm doesn't have user_email, add all device owners
+                                users_with_monitoring.update(device_owners)
+                            logger.info(f"Found active alarm for {device_id}/{param}")
+                except Exception as e:
+                    logger.warning(f"Error checking alarms for {device_id}/{param}: {e}")
+                
+                # Check for active subscriptions for this parameter (subscriptions have user_email)
+                try:
+                    subscriptions_response = subscriptions_table.scan(
+                        FilterExpression='device_id = :did AND parameter_name = :pname AND enabled = :enabled',
+                        ExpressionAttributeValues={
+                            ':did': device_id,
+                            ':pname': param,
+                            ':enabled': True
+                        }
+                    )
+                    subscriptions = subscriptions_response.get('Items', [])
+                    for sub in subscriptions:
+                        sub_user = sub.get('user_email')
+                        if sub_user and sub_user in device_owners:
+                            users_with_monitoring.add(sub_user)
+                            logger.info(f"Found active subscription for {device_id}/{param} for user {sub_user}")
+                except Exception as e:
+                    logger.warning(f"Error checking subscriptions for {device_id}/{param}: {e}")
+                
+                # Only send notification if there's active monitoring for this parameter
+                if not users_with_monitoring:
+                    logger.info(f"IO State Change detected for {device_id}: {param} {last_norm}->{curr_norm}, but no active alarms/subscriptions - skipping notification")
+                    continue
+                
+                # State Changed and has active monitoring!
                 io_type = "Charging" if param == "charging" else ("Output" if "OUT" in param else "Input")
                 io_num = param[-1] if param in ['IN1', 'IN2', 'OUT1', 'OUT2'] else ""
                 state_str = "ON" if curr_norm == 1 else "OFF"
@@ -270,19 +326,19 @@ def check_io_state_changes(device_id, device_data):
                 else:
                     message = f"{io_type} {io_num} changed to {state_str}"
                 
-                logger.info(f"IO State Change detected for {device_id}: {param} {last_norm}->{curr_norm}")
+                logger.info(f"IO State Change detected for {device_id}: {param} {last_norm}->{curr_norm} - sending notification to {len(users_with_monitoring)} user(s) (has active monitoring)")
                 
-                # Construct notification payload
-                notification = {
-                    'message': message,
-                    'parameter_name': param,
-                    'device_id': device_id,
-                    'subscription_id': 'io_change', # Virtual ID
-                    'current_value': state_str
-                }
-                
-                # Send Push
-                send_sns_push_notification_sync(notification)
+                # Send notification to ALL users who have active monitoring
+                for user_email in users_with_monitoring:
+                    notification = {
+                        'message': message,
+                        'parameter_name': param,
+                        'device_id': device_id,
+                        'subscription_id': 'io_change', # Virtual ID
+                        'current_value': state_str,
+                        'user_email': user_email  # Include user_email for SNS routing
+                    }
+                    send_sns_push_notification_sync(notification, user_email)
                 
     except Exception as e:
         logger.error(f"Error checking IO state changes: {e}")
@@ -294,6 +350,17 @@ def check_legacy_alarms(device_id, device_data):
     """
     try:
         alarms_table = dynamodb.Table('IoT_DeviceAlarms')
+        
+        # Get ALL device owners (device can be configured to multiple users)
+        device_owners = []
+        try:
+            devices_response = devices_table.scan(
+                FilterExpression='client_id = :cid',
+                ExpressionAttributeValues={':cid': device_id}
+            )
+            device_owners = [item.get('user_email') for item in devices_response.get('Items', []) if item.get('user_email')]
+        except Exception as e:
+            logger.warning(f"Error getting device owners for {device_id}: {e}")
         
         # Get all alarms for this device
         response = alarms_table.query(
@@ -346,15 +413,30 @@ def check_legacy_alarms(device_id, device_data):
                     ExpressionAttributeValues={':now': datetime.now(timezone.utc).isoformat()}
                 )
                 
-                # Send Push
-                notification = {
-                    'message': f"ALARM: {variable} is {current_val} ({condition} {threshold})",
-                    'parameter_name': variable,
-                    'device_id': device_id,
-                    'subscription_id': alarm['alarm_id'],
-                    'current_value': current_val
-                }
-                send_sns_push_notification_sync(notification)
+                # Determine which users to notify
+                # If alarm has user_email, notify only that user (if they own the device)
+                # Otherwise, notify all device owners
+                users_to_notify = []
+                alarm_user = alarm.get('user_email')
+                if alarm_user and alarm_user in device_owners:
+                    users_to_notify = [alarm_user]
+                elif device_owners:
+                    users_to_notify = device_owners
+                
+                # Send Push to all relevant users
+                for user_email in users_to_notify:
+                    notification = {
+                        'message': f"ALARM: {variable} is {current_val} ({condition} {threshold})",
+                        'parameter_name': variable,
+                        'device_id': device_id,
+                        'subscription_id': alarm['alarm_id'],
+                        'current_value': current_val,
+                        'user_email': user_email  # Include user_email for SNS routing
+                    }
+                    send_sns_push_notification_sync(notification, user_email)
+                
+                if not users_to_notify:
+                    logger.warning(f"Cannot send SNS notification for alarm {alarm['alarm_id']}: no valid user_email found")
                 
     except Exception as e:
         logger.error(f"Error checking legacy alarms: {e}")
@@ -1129,9 +1211,16 @@ def trigger_subscription_notification_sync(subscription, device_data, message_ty
         if subscription.get('notification_method') in ['email', 'both']:
             send_email_notification_sync(notification)
             
-        # Send Push Notification (SNS) - Independent of Dashboard
-        # We send high priority push for all subscription triggers
-        send_sns_push_notification_sync(notification)
+        # Send Push Notification (SNS) - Only if subscription is enabled AND user has SNS endpoint configured
+        # Check if subscription is enabled before sending
+        if subscription.get('enabled', True):
+            user_email = subscription.get('user_email')
+            if user_email:
+                send_sns_push_notification_sync(notification, user_email)
+            else:
+                logger.warning(f"Cannot send SNS notification for subscription {subscription['subscription_id']}: no user_email found")
+        else:
+            logger.info(f"Subscription {subscription['subscription_id']} is disabled - skipping SNS notification")
         
         logger.info(f"Subscription triggered: {subscription['subscription_id']} - {parameter_name} = {current_value_normalized}")
         
@@ -1201,27 +1290,37 @@ def format_notification_message(subscription, current_value, message_type):
     else:
         return f"{parameter_name} {type_context} value changed to {current_value}"
 
-def send_sns_push_notification_sync(notification):
+def send_sns_push_notification_sync(notification, user_email=None):
     """
     Send SNS Push Notification by invoking the centralized sns-notification Lambda.
+    Only sends if user_email is provided and user has SNS endpoint configured.
     This ensures consistent payload formatting and decoupling.
     """
     try:
+        # If no user_email provided, try to get it from notification
+        if not user_email:
+            user_email = notification.get('user_email')
+        
+        if not user_email:
+            logger.warning("No user_email provided for SNS notification - skipping")
+            return
+        
         import boto3
         import json
         
         lambda_client = boto3.client('lambda')
         
         # Construct the payload for the sns-notification lambda
-        # It expects: { action, message, subject, type, data... }
+        # It expects: { action, message, subject, type, user_email, data... }
         payload = {
             "action": "send_notification",
             "message": notification['message'],
             "subject": f"Alert: {notification['parameter_name']} - {notification['device_id']}",
             "type": "subscription_trigger",
+            "user_email": user_email,  # Pass user_email so sns-notification can check for endpoint
             # We can pass additional data that sns-notification will put into the 'data' field
             "data": {
-                "subscription_id": notification['subscription_id'],
+                "subscription_id": notification.get('subscription_id', ''),
                 "device_id": notification['device_id'],
                 "parameter": notification['parameter_name'],
                 "value": str(notification['current_value'])
@@ -1240,7 +1339,7 @@ def send_sns_push_notification_sync(notification):
             Payload=json.dumps(payload)
         )
         
-        logger.info(f"Invoked {target_function} for notification")
+        logger.info(f"Invoked {target_function} for notification to user {user_email}")
         
     except Exception as e:
         logger.error(f"Error invoking SNS lambda: {e}")

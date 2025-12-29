@@ -383,7 +383,7 @@ def lambda_handler(event, context):
                     'success': False,
                     'error': f'Failed to set device location: {str(e)}',
                     'debug_logs': debug_logs
-                })
+            })
         
         else:
             return cors_response(400, {
