@@ -17,6 +17,7 @@ dynamodb = boto3.resource('dynamodb')
 iot_data_client = boto3.client('iot-data')
 
 tasks_table = dynamodb.Table('IoT_SchedulerTasks')
+scheduler_notifications_table = dynamodb.Table('IoT_SchedulerNotifications')
 
 def decimal_default(obj):
     if isinstance(obj, Decimal):
@@ -408,11 +409,31 @@ def process_scheduled_tasks():
             success = execute_command(task)
             logger.info(f"Task {task_id} execution result: {'success' if success else 'failed'}")
             
-            # Send Push Notification
-            send_sns_notification(task, success)
-            
             user_email = task['user_email']
             task_id = task['task_id']
+            
+            # Store notification in DynamoDB for in-app display
+            try:
+                notification_id = f"{task_id}_{int(time.time())}"
+                notification = {
+                    'user_email': user_email,
+                    'notification_id': notification_id,
+                    'task_id': task_id,
+                    'task_name': task_name,
+                    'device_id': device_id,
+                    'command': command,
+                    'status': 'success' if success else 'failed',
+                    'message': f"Task '{task_name}' {'succeeded' if success else 'failed'}: Executed {command} on {device_id}",
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                    'read': False
+                }
+                scheduler_notifications_table.put_item(Item=notification)
+                logger.info(f"✅ Stored scheduler notification {notification_id} for user {user_email}")
+            except Exception as e:
+                logger.warning(f"Could not store scheduler notification: {e}")
+            
+            # Send Push Notification (SNS)
+            send_sns_notification(task, success)
             
             update_expression = "SET last_run = :now, last_status = :status"
             expression_values = { ':now': now_ts, ':status': 'success' if success else 'failed' }
@@ -531,6 +552,50 @@ def toggle_task(user_email, task_id, enabled):
     )
     return True, "Toggled"
 
+def get_notifications(user_email, limit=50):
+    """Get scheduler notifications for a user"""
+    try:
+        notifications = []
+        
+        # Try query first (if user_email is partition key)
+        try:
+            response = scheduler_notifications_table.query(
+                KeyConditionExpression=Key('user_email').eq(user_email),
+                ScanIndexForward=False,  # Most recent first
+                Limit=limit
+            )
+            notifications = response.get('Items', [])
+            logger.info(f"✅ Query successful: Found {len(notifications)} scheduler notifications for {user_email}")
+        except Exception as query_error:
+            # If query fails, try scan with filter (if notification_id is the primary key)
+            logger.warning(f"Query failed (table might have different key structure): {query_error}")
+            logger.info("Trying scan with filter...")
+            
+            response = scheduler_notifications_table.scan(
+                FilterExpression='user_email = :email',
+                ExpressionAttributeValues={':email': user_email},
+                Limit=limit
+            )
+            notifications = response.get('Items', [])
+            logger.info(f"✅ Scan successful: Found {len(notifications)} scheduler notifications for {user_email}")
+        
+        # Convert Decimal to native types for JSON serialization
+        for notif in notifications:
+            if 'timestamp' in notif:
+                # Keep timestamp as string (ISO format)
+                pass
+            # Convert any Decimal values
+            for key, value in notif.items():
+                if isinstance(value, Decimal):
+                    notif[key] = int(value) if value % 1 == 0 else float(value)
+        
+        return notifications
+    except Exception as e:
+        logger.error(f"Error getting scheduler notifications: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return []
+
 def lambda_handler(event, context):
     logger.info("Received event: %s", json.dumps(event))
     
@@ -571,6 +636,9 @@ def lambda_handler(event, context):
         elif action == 'toggle_task':
             success, result = toggle_task(user_email, body.get('task_id'), body.get('enabled'))
             return cors_response(200 if success else 400, {'success': success, 'result': result})
+        elif action == 'get_notifications':
+            notifications = get_notifications(user_email, body.get('limit', 50))
+            return cors_response(200, {'success': True, 'notifications': notifications})
         
         return cors_response(400, {'error': 'Invalid action'})
 

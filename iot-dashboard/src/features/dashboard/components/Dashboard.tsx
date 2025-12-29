@@ -61,6 +61,7 @@ import DashboardSchedulerTab from './DashboardSchedulerTab';
 import DeviceNotificationService from '../../../utils/DeviceNotificationService';
 import NotificationService from '../../../utils/NotificationService';
 import PushNotificationService from '../../../utils/PushNotificationService';
+import schedulerNotificationService from '../../../utils/SchedulerNotificationService';
 import { useGlobalTimer } from '../../../hooks/useGlobalTimer';
 import { Device, User, MetricsConfig, DeviceData } from '../../../types';
 import './Dashboard.css';
@@ -274,6 +275,15 @@ export default function Dashboard2({ user, device, onLogout, onBack }: Dashboard
   useEffect(() => {
     return () => {
       isMounted.current = false;
+    };
+  }, []);
+
+  // Initialize scheduler notification service
+  useEffect(() => {
+    schedulerNotificationService.connect();
+    
+    return () => {
+      schedulerNotificationService.disconnect();
     };
   }, []);
 
