@@ -242,13 +242,15 @@ def check_io_state_changes(device_id, device_data):
             return
         
         shadow_state = shadow_document.get('state', {}).get('reported', {})
+        # Normalize shadow state (convert short names to full names)
+        normalized_state = normalize_shadow_state(shadow_state)
         
         # Define IO parameters to monitor (from shadow)
-        # Shadow has: IN1, IN2, OUT1, OUT2, charging
+        # Shadow has: IN1, IN2, OUT1, OUT2, charging (now using normalized names)
         io_params = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging']
         
-        # Check if any IO params are present in current shadow
-        present_params = [p for p in io_params if p in shadow_state]
+        # Check if any IO params are present in current shadow (use normalized state)
+        present_params = [p for p in io_params if p in normalized_state]
         if not present_params:
             logger.info(f"No IO parameters found in shadow for {device_id}")
             return
@@ -274,7 +276,7 @@ def check_io_state_changes(device_id, device_data):
         device_owners = [item.get('user_email') for item in devices_response.get('Items', []) if item.get('user_email')]
         
         for param in present_params:
-            current_val = shadow_state[param]
+            current_val = normalized_state[param]  # Use normalized state
             last_val = last_state.get(param)
             
             # Normalize for comparison (0/1, True/False)
@@ -678,10 +680,37 @@ async def get_device_subscriptions(device_id):
         logger.error(f"Error getting subscriptions for {device_id}: {e}")
         return []
 
+# Shadow field mapping: short names (from firmware) -> full names (for compatibility)
+SHADOW_FIELD_MAP = {
+    'ms': 'motor_speed',
+    'o1': 'OUT1',
+    'o2': 'OUT2',
+    'ps': 'power_saving',
+    'i1': 'IN1',
+    'i2': 'IN2',
+    'ch': 'charging'
+}
+
+# Reverse mapping (full -> short)
+FULL_TO_SHORT_MAP = {v: k for k, v in SHADOW_FIELD_MAP.items()}
+
+def normalize_shadow_state(shadow_state):
+    """Convert short field names to full names for backward compatibility"""
+    if not shadow_state:
+        return shadow_state
+    
+    normalized = {}
+    for key, value in shadow_state.items():
+        full_name = SHADOW_FIELD_MAP.get(key, key)
+        normalized[full_name] = value
+    
+    return normalized
+
 def extract_parameter_value(device_data, parameter_name, device_id=None, parameter_type=None):
     """
     Extract parameter value from device data, handling nested and direct parameters.
     NOW READS FROM SHADOW for state parameters, TELEMETRY for metrics.
+    Handles both short field names (from firmware) and full names (for compatibility).
     """
     try:
         # Use parameter_type from subscription if available, otherwise infer from parameter name
@@ -695,12 +724,24 @@ def extract_parameter_value(device_data, parameter_name, device_id=None, paramet
             shadow_document = get_device_shadow(device_id)
             if shadow_document and 'state' in shadow_document:
                 shadow_state = shadow_document['state'].get('reported', {})
-                value = shadow_state.get(parameter_name)
+                # Normalize shadow state (convert short names to full names)
+                normalized_state = normalize_shadow_state(shadow_state)
+                
+                # Try full name first (for backward compatibility)
+                value = normalized_state.get(parameter_name)
                 if value is not None:
-                    logger.info(f"Found {parameter_name} in shadow: {value}")
+                    logger.info(f"Found {parameter_name} in shadow (normalized): {value}")
                     return value
-                else:
-                    logger.warning(f"Parameter {parameter_name} not found in shadow state. Available keys: {list(shadow_state.keys())}")
+                
+                # Also try short name directly (in case normalization didn't work)
+                short_name = FULL_TO_SHORT_MAP.get(parameter_name)
+                if short_name:
+                    value = shadow_state.get(short_name)
+                    if value is not None:
+                        logger.info(f"Found {parameter_name} in shadow using short name {short_name}: {value}")
+                        return value
+                
+                logger.warning(f"Parameter {parameter_name} not found in shadow state. Available keys: {list(shadow_state.keys())} (normalized: {list(normalized_state.keys())})")
             else:
                 logger.warning(f"Could not retrieve shadow for {device_id} or shadow has no state")
         

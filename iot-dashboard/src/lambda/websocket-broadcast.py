@@ -7,6 +7,29 @@ dynamodb = boto3.resource('dynamodb')
 connections_table = dynamodb.Table(os.environ.get('CONNECTIONS_TABLE', 'WebSocketConnections'))
 devices_table = dynamodb.Table(os.environ.get('DEVICES_TABLE', 'Devices'))
 
+# Shadow field mapping: short names (from firmware) -> full names (for compatibility)
+SHADOW_FIELD_MAP = {
+    'ms': 'motor_speed',
+    'o1': 'OUT1',
+    'o2': 'OUT2',
+    'ps': 'power_saving',
+    'i1': 'IN1',
+    'i2': 'IN2',
+    'ch': 'charging'
+}
+
+def normalize_shadow_state(shadow_state):
+    """Convert short field names to full names for backward compatibility"""
+    if not shadow_state:
+        return shadow_state
+    
+    normalized = {}
+    for key, value in shadow_state.items():
+        full_name = SHADOW_FIELD_MAP.get(key, key)
+        normalized[full_name] = value
+    
+    return normalized
+
 def lambda_handler(event, context):
     """
     Broadcast device state updates to connected WebSocket clients.
@@ -79,30 +102,35 @@ def lambda_handler(event, context):
         shadow_version = event.get('version') or current.get('version') or event.get('previous', {}).get('version', 0)
         shadow_ts = event.get('timestamp') or current.get('timestamp') or event.get('previous', {}).get('timestamp', 0)
         
+        # Normalize shadow state (convert short names to full names)
+        normalized_reported = normalize_shadow_state(reported)
+        normalized_desired = normalize_shadow_state(desired)
+        
         print(f"📦 Parsed event - client_id: {client_id}, version: {shadow_version}, timestamp: {shadow_ts}")
-        print(f"   Reported keys: {list(reported.keys())}, Desired keys: {list(desired.keys())}")
+        print(f"   Reported keys (raw): {list(reported.keys())}, (normalized): {list(normalized_reported.keys())}")
+        print(f"   Desired keys (raw): {list(desired.keys())}, (normalized): {list(normalized_desired.keys())}")
 
-        # Build the message to send to frontend
+        # Build the message to send to frontend (using normalized names)
         message = {
             'type': 'SHADOW_UPDATE',
             'client_id': client_id,
             'timestamp': shadow_ts,
             'version': shadow_version,
             'reported': {
-                'out1_state': reported.get('OUT1', 0),
-                'out2_state': reported.get('OUT2', 0),
-                'motor_speed': reported.get('motor_speed', 0),
-                'power_saving': reported.get('power_saving', 0),
-                'in1_state': reported.get('IN1', 0),
-                'in2_state': reported.get('IN2', 0),
-                'charging': reported.get('charging', 0),
-                'connection_status': reported.get('connection_status', 'unknown')
+                'out1_state': normalized_reported.get('OUT1', 0),
+                'out2_state': normalized_reported.get('OUT2', 0),
+                'motor_speed': normalized_reported.get('motor_speed', 0),
+                'power_saving': normalized_reported.get('power_saving', 0),
+                'in1_state': normalized_reported.get('IN1', 0),
+                'in2_state': normalized_reported.get('IN2', 0),
+                'charging': normalized_reported.get('charging', 0),
+                'connection_status': normalized_reported.get('connection_status', 'unknown')
             },
             'desired': {
-                'out1_state': desired.get('OUT1'),
-                'out2_state': desired.get('OUT2'),
-                'motor_speed': desired.get('motor_speed'),
-                'power_saving': desired.get('power_saving')
+                'out1_state': normalized_desired.get('OUT1'),
+                'out2_state': normalized_desired.get('OUT2'),
+                'motor_speed': normalized_desired.get('motor_speed'),
+                'power_saving': normalized_desired.get('power_saving')
             }
         }
         

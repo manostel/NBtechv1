@@ -5,6 +5,44 @@ import boto3
 iot_endpoint = "https://al047cml3y4l3-ats.iot.eu-central-1.amazonaws.com"
 iot_client = boto3.client("iot-data", endpoint_url=iot_endpoint, region_name="eu-central-1")
 
+# Shadow field mapping: short names (from firmware) -> full names (for compatibility)
+SHADOW_FIELD_MAP = {
+    'ms': 'motor_speed',
+    'o1': 'OUT1',
+    'o2': 'OUT2',
+    'ps': 'power_saving',
+    'i1': 'IN1',
+    'i2': 'IN2',
+    'ch': 'charging'
+}
+
+# Reverse mapping (full -> short) for converting frontend names to firmware names
+FULL_TO_SHORT_MAP = {v: k for k, v in SHADOW_FIELD_MAP.items()}
+
+def normalize_shadow_state(shadow_state):
+    """Convert short field names to full names for backward compatibility"""
+    if not shadow_state:
+        return shadow_state
+    
+    normalized = {}
+    for key, value in shadow_state.items():
+        full_name = SHADOW_FIELD_MAP.get(key, key)
+        normalized[full_name] = value
+    
+    return normalized
+
+def convert_to_short_names(state_dict):
+    """Convert full field names to short names for firmware compatibility"""
+    if not state_dict:
+        return state_dict
+    
+    converted = {}
+    for key, value in state_dict.items():
+        short_name = FULL_TO_SHORT_MAP.get(key, key)
+        converted[short_name] = value
+    
+    return converted
+
 def create_cors_response(status_code, body):
     """Create a response with CORS headers"""
     return {
@@ -51,10 +89,16 @@ def lambda_handler(event, context):
                 "error": "desired_state must be a JSON object"
             })
 
-        # Update Device Shadow with desired state
+        # Convert full field names (from frontend) to short names (for firmware)
+        # Frontend sends: OUT1, OUT2, motor_speed, power_saving, etc.
+        # Firmware expects: o1, o2, ms, ps, etc.
+        desired_state_short = convert_to_short_names(desired_state)
+        print(f"Converted desired state from full names to short: {desired_state} -> {desired_state_short}")
+
+        # Update Device Shadow with desired state (using short names)
         shadow_payload = {
             "state": {
-                "desired": desired_state
+                "desired": desired_state_short
             }
         }
         
@@ -71,16 +115,19 @@ def lambda_handler(event, context):
                 shadow_doc = json.loads(shadow_response['payload'].read())
                 reported_state = shadow_doc.get("state", {}).get("reported", {})
                 
-                # Map shadow state to frontend format
+                # Normalize shadow state (convert short names to full names)
+                normalized_reported = normalize_shadow_state(reported_state)
+                
+                # Map shadow state to frontend format (using normalized names)
                 current_state = {
-                    "out1_state": reported_state.get("OUT1", 0),
-                    "out2_state": reported_state.get("OUT2", 0),
-                    "motor_speed": reported_state.get("motor_speed", 0),
-                    "power_saving": reported_state.get("power_saving", 0),
-                    "in1_state": reported_state.get("IN1", 0),
-                    "in2_state": reported_state.get("IN2", 0),
-                    "charging": reported_state.get("charging", 0),
-                    "connection_status": reported_state.get("connection_status", "unknown")
+                    "out1_state": normalized_reported.get("OUT1", 0),
+                    "out2_state": normalized_reported.get("OUT2", 0),
+                    "motor_speed": normalized_reported.get("motor_speed", 0),
+                    "power_saving": normalized_reported.get("power_saving", 0),
+                    "in1_state": normalized_reported.get("IN1", 0),
+                    "in2_state": normalized_reported.get("IN2", 0),
+                    "charging": normalized_reported.get("charging", 0),
+                    "connection_status": normalized_reported.get("connection_status", "unknown")
                 }
             except Exception as shadow_error:
                 print(f"Warning: Could not fetch shadow state after update: {str(shadow_error)}")

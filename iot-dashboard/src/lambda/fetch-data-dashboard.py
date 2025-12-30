@@ -1,6 +1,6 @@
 import json
 import boto3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from decimal import Decimal
 from statistics import mean
@@ -13,6 +13,7 @@ logger.setLevel(logging.INFO)
 # Initialize DynamoDB
 dynamodb = boto3.resource('dynamodb')
 device_data_table = dynamodb.Table('IoT_DeviceData')
+device_status_table = dynamodb.Table('IoT_DeviceStatus')
 
 # Maximum allowed time window in hours
 MAX_TIME_WINDOW = 24
@@ -192,12 +193,23 @@ def fetch_chunk(client_id, start_time, end_time, selected_variables, include_sta
         logger.error(f"Error fetching chunk: {str(e)}")
         raise
 
-def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variables=None):
+def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variables=None, table_type='data'):
     """Fetch data in smaller chunks to prevent timeouts"""
     all_items = []
     last_evaluated_key = None
     query_count = 0
     total_scan_time = 0
+    
+    # Select table based on table_type
+    if table_type == 'status':
+        table = device_status_table
+        # Convert ISO timestamps to milliseconds for IoT_DeviceStatus (uses Number type)
+        start_timestamp_ms = int(start_time.timestamp() * 1000)
+        end_timestamp_ms = int((end_time or datetime.utcnow()).timestamp() * 1000)
+    else:
+        table = device_data_table
+        start_timestamp_ms = None
+        end_timestamp_ms = None
     
     try:
         # Calculate time range in hours
@@ -214,7 +226,7 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
         current_start = start_time
         final_end = end_time or datetime.utcnow()
         
-        logger.info(f"Starting data fetch for client_id: {client_id}")
+        logger.info(f"Starting data fetch for client_id: {client_id}, table_type: {table_type}")
         logger.info(f"Time range: {current_start.isoformat()} to {final_end.isoformat()}")
         logger.info(f"Selected variables: {selected_variables}")
         logger.info(f"Using chunk size of {chunk_hours} hours")
@@ -231,35 +243,71 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                 query_count += 1
                 
                 try:
-                    if last_evaluated_key:
-                        response = device_data_table.query(
-                            KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
-                            ExpressionAttributeValues={
-                                ':client_id': client_id,
-                                ':start_time': current_start.isoformat(),
-                                ':end_time': chunk_end.isoformat()
-                            },
-                            ExpressionAttributeNames={
-                                '#ts': 'timestamp'
-                            },
-                            ExclusiveStartKey=last_evaluated_key,
-                            ScanIndexForward=True,  # Get data in chronological order
-                            Limit=1000  # Limit number of items per query
-                        )
+                    if table_type == 'status':
+                        # IoT_DeviceStatus uses Number type for timestamp (milliseconds)
+                        chunk_start_ms = int(current_start.timestamp() * 1000)
+                        chunk_end_ms = int(chunk_end.timestamp() * 1000)
+                        
+                        if last_evaluated_key:
+                            response = table.query(
+                                KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
+                                ExpressionAttributeValues={
+                                    ':client_id': client_id,
+                                    ':start_time': chunk_start_ms,
+                                    ':end_time': chunk_end_ms
+                                },
+                                ExpressionAttributeNames={
+                                    '#ts': 'timestamp'
+                                },
+                                ExclusiveStartKey=last_evaluated_key,
+                                ScanIndexForward=True,
+                                Limit=1000
+                            )
+                        else:
+                            response = table.query(
+                                KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
+                                ExpressionAttributeValues={
+                                    ':client_id': client_id,
+                                    ':start_time': chunk_start_ms,
+                                    ':end_time': chunk_end_ms
+                                },
+                                ExpressionAttributeNames={
+                                    '#ts': 'timestamp'
+                                },
+                                ScanIndexForward=True,
+                                Limit=1000
+                            )
                     else:
-                        response = device_data_table.query(
-                            KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
-                            ExpressionAttributeValues={
-                                ':client_id': client_id,
-                                ':start_time': current_start.isoformat(),
-                                ':end_time': chunk_end.isoformat()
-                            },
-                            ExpressionAttributeNames={
-                                '#ts': 'timestamp'
-                            },
-                            ScanIndexForward=True,  # Get data in chronological order
-                            Limit=1000  # Limit number of items per query
-                        )
+                        # IoT_DeviceData uses String type for timestamp (ISO format)
+                        if last_evaluated_key:
+                            response = table.query(
+                                KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
+                                ExpressionAttributeValues={
+                                    ':client_id': client_id,
+                                    ':start_time': current_start.isoformat(),
+                                    ':end_time': chunk_end.isoformat()
+                                },
+                                ExpressionAttributeNames={
+                                    '#ts': 'timestamp'
+                                },
+                                ExclusiveStartKey=last_evaluated_key,
+                                ScanIndexForward=True,
+                                Limit=1000
+                            )
+                        else:
+                            response = table.query(
+                                KeyConditionExpression='client_id = :client_id AND #ts BETWEEN :start_time AND :end_time',
+                                ExpressionAttributeValues={
+                                    ':client_id': client_id,
+                                    ':start_time': current_start.isoformat(),
+                                    ':end_time': chunk_end.isoformat()
+                                },
+                                ExpressionAttributeNames={
+                                    '#ts': 'timestamp'
+                                },
+                                ScanIndexForward=True,
+                                Limit=1000
+                            )
                     
                     query_time = time.time() - query_start
                     total_scan_time += query_time
@@ -276,10 +324,21 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                             filtered_variables = [var for var in selected_variables if var not in excluded_fields]
                             filtered_items = []
                             for item in response['Items']:
-                                filtered_item = {
-                                    'timestamp': item['timestamp'],
-                                    'client_id': item['client_id']
-                                }
+                                # Convert timestamp from milliseconds to ISO format for status table
+                                if table_type == 'status':
+                                    timestamp_ms = item['timestamp']
+                                    if isinstance(timestamp_ms, Decimal):
+                                        timestamp_ms = int(timestamp_ms)
+                                    timestamp_iso = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc).isoformat()
+                                    filtered_item = {
+                                        'timestamp': timestamp_iso,
+                                        'client_id': item['client_id']
+                                    }
+                                else:
+                                    filtered_item = {
+                                        'timestamp': item['timestamp'],
+                                        'client_id': item['client_id']
+                                    }
                                 for var in filtered_variables:
                                     if var in item:
                                         # Convert Decimal to float for JSON serialization
@@ -295,6 +354,12 @@ def fetch_data_in_chunks(client_id, start_time, end_time=None, selected_variable
                             filtered_chunk_items = []
                             for item in response['Items']:
                                 filtered_item = {k: v for k, v in item.items() if k not in excluded_fields}
+                                # Convert timestamp from milliseconds to ISO format for status table
+                                if table_type == 'status' and 'timestamp' in filtered_item:
+                                    timestamp_ms = filtered_item['timestamp']
+                                    if isinstance(timestamp_ms, Decimal):
+                                        timestamp_ms = int(timestamp_ms)
+                                    filtered_item['timestamp'] = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc).isoformat()
                                 # Convert Decimal to float for JSON serialization
                                 for key, value in filtered_item.items():
                                     if isinstance(value, Decimal):
@@ -501,6 +566,7 @@ def lambda_handler(event, context):
         points = body.get('points', 100)
         latest_timestamp = body.get('latest_timestamp')
         selected_variables = body.get('selected_variables', None)
+        table_type = body.get('table_type', 'data')  # 'data' for IoT_DeviceData, 'status' for IoT_DeviceStatus
         
         # Validate required fields
         if not all([action, client_id]):
@@ -585,7 +651,7 @@ def lambda_handler(event, context):
             end_time = now
             
         # Fetch data from DynamoDB with selected variables
-        items = fetch_data_in_chunks(client_id, start_time, end_time, selected_variables)
+        items = fetch_data_in_chunks(client_id, start_time, end_time, selected_variables, table_type)
         
         if not items:
             return {
