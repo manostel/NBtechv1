@@ -1,0 +1,1742 @@
+<<<<<<< HEAD:iot-dashboard/src/components/dashboard2/DashboardAlarmsTab.js
+=======
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  Box, 
+  Grid, 
+  Typography, 
+  Button,
+  Switch,
+  FormControlLabel,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
+  Alert,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Tabs,
+  Tab,
+  Card,
+  CardContent,
+  CardActions,
+  Chip,
+  Paper,
+  SelectChangeEvent
+} from '@mui/material';
+import { 
+  Notifications as NotificationsIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Warning as WarningIcon,
+  Error as ErrorIcon,
+  Info as InfoIcon,
+  Edit as EditIcon,
+  NotificationsOff as NotificationsOffIcon,
+  FilterList as FilterListIcon,
+  Clear as ClearIcon,
+  TrendingUp as TrendingUpIcon,
+  DeviceHub as DeviceIcon,
+  Input as InputIcon,
+  Output as OutputIcon,
+  CheckCircle as CheckCircleIcon
+} from '@mui/icons-material';
+import { useTheme } from '@mui/material/styles';
+import notificationManager from '../../../services/NotificationManager';
+import { Device, MetricsConfig, Alarm } from '../../../types';
+import { useTranslation } from 'react-i18next';
+
+// API endpoints
+const MANAGE_ALARMS_API_URL = "https://ueqnh8082k.execute-api.eu-central-1.amazonaws.com/default/manage-alarms";
+const FETCH_ALARMS_API_URL = "https://9mho2wb0jc.execute-api.eu-central-1.amazonaws.com/default/fetch/dashboard-data-alarms";
+
+// Default metrics configuration
+const defaultMetricsConfig: MetricsConfig = {
+  battery: { label: 'Battery', unit: '%', color: '#4caf50' },
+  temperature: { label: 'Temperature', unit: '°C', color: '#ff9800' },
+  humidity: { label: 'Humidity', unit: '%', color: '#2196f3' },
+  pressure: { label: 'Pressure', unit: 'hPa', color: '#9c27b0' },
+  signal_quality: { label: 'Signal Quality', unit: '%', color: '#00bcd4' },
+  thermistor_temp: { label: 'Thermistor Temperature', unit: '°C', color: '#ff5722' }
+};
+
+// Two-group alarm parameter types: Metrics (telemetry) and State (shadow reported)
+const ALARM_PARAMETER_TYPES: any = {
+  metrics: {
+    label: 'Metrics (Sensors)',
+    description: 'Sensor readings from telemetry',
+    icon: <TrendingUpIcon />,
+    parameters: {
+      battery: { label: 'Battery', unit: '%', type: 'numeric' },
+      temperature: { label: 'Temperature', unit: '°C', type: 'numeric' },
+      humidity: { label: 'Humidity', unit: '%', type: 'numeric' },
+      pressure: { label: 'Pressure', unit: 'hPa', type: 'numeric' },
+      signal_quality: { label: 'Signal Quality', unit: '%', type: 'numeric' }
+    }
+  },
+  state: {
+    label: 'State (Device)',
+    description: 'Device state from shadow reported',
+    icon: <DeviceIcon />,
+    parameters: {
+      'IN1': { label: 'Input 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'IN2': { label: 'Input 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'OUT1': { label: 'Output 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'OUT2': { label: 'Output 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'motor_speed': { label: 'Motor Speed', unit: '', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
+      'charging': { label: 'Charging Status', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'power_saving': { label: 'Power Saving', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] }
+    }
+  }
+};
+
+interface DashboardAlarmsTabProps {
+  device: Device;
+  metricsConfig?: MetricsConfig;
+  onAlarmToggle?: () => void;
+}
+
+const DashboardAlarmsTab: React.FC<DashboardAlarmsTabProps> = ({ device, metricsConfig = defaultMetricsConfig, onAlarmToggle }) => {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const [alarms, setAlarms] = useState<any[]>([]);
+  const [triggeredAlarms, setTriggeredAlarms] = useState<any[]>([]);
+  const [newAlarmDialog, setNewAlarmDialog] = useState(false);
+  const [editAlarmDialog, setEditAlarmDialog] = useState(false);
+  const [editingAlarm, setEditingAlarm] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingAlarmId, setLoadingAlarmId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' | 'warning' });
+  const [isInitializing, setIsInitializing] = useState(true);
+  const lastAlarmNotificationRef = useRef<{[key: string]: number}>({});
+  const triggeredAlarmsRef = useRef<any[]>([]);
+  const [newAlarm, setNewAlarm] = useState({
+    parameter_type: 'metrics',
+    variable_name: '',
+    condition: 'above',
+    threshold: '',
+    description: '',
+    enabled: true,
+    severity: 'warning'
+  });
+
+  // Get available conditions based on parameter type and variable
+  const getAvailableConditions = (parameterType: string, variableName: string) => {
+    if (!parameterType || !variableName) return [];
+    
+    const parameterConfig = ALARM_PARAMETER_TYPES[parameterType]?.parameters[variableName];
+    if (!parameterConfig) return [];
+
+    // Use allowedConditions from parameter config for precise control
+    const allowedConditions = parameterConfig.allowedConditions || ['change'];
+    
+    // Map condition values to labels
+    const conditionLabels: any = {
+      'change': { value: 'change', label: t('alarms.anyChange') },
+      'above': { value: 'above', label: t('alarms.aboveThreshold') },
+      'below': { value: 'below', label: t('alarms.belowThreshold') },
+      'equals': { value: 'equals', label: t('alarms.equals') },
+      'not_equals': { value: 'not_equals', label: t('alarms.notEquals') }
+    };
+    
+    // Return only the allowed conditions for this parameter
+    return allowedConditions.map((condition: string) => conditionLabels[condition]).filter(Boolean);
+  };
+
+  // Get threshold input based on parameter type and condition
+  const getThresholdInput = (parameterType: string, variableName: string, condition: string) => {
+    if (!parameterType || !variableName || condition === 'change') {
+      return null; // No threshold needed for 'change' condition
+    }
+
+    const parameterConfig = ALARM_PARAMETER_TYPES[parameterType]?.parameters[variableName];
+    if (!parameterConfig) return null;
+
+    switch (parameterConfig.type) {
+      case 'numeric':
+        return (
+          <TextField
+            label={t('alarms.thresholdValue')}
+            type="number"
+            value={newAlarm.threshold}
+            onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
+            fullWidth
+            InputProps={{
+              endAdornment: parameterConfig.unit ? 
+                <Typography variant="body2" color="text.secondary">
+                  {parameterConfig.unit}
+                </Typography> : null
+            }}
+          />
+        );
+      case 'boolean':
+        return (
+          <FormControl fullWidth>
+            <InputLabel>Value (0 or 1)</InputLabel>
+            <Select
+              value={newAlarm.threshold}
+              onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
+              label="Value (0 or 1)"
+            >
+              <MenuItem value="1">ON (1)</MenuItem>
+              <MenuItem value="0">OFF (0)</MenuItem>
+            </Select>
+          </FormControl>
+        );
+      case 'status':
+        return (
+          <FormControl fullWidth>
+            <InputLabel>{t('alarms.status')}</InputLabel>
+            <Select
+              value={newAlarm.threshold}
+              onChange={(e) => setNewAlarm({ ...newAlarm, threshold: e.target.value })}
+              label={t('alarms.status')}
+            >
+              <MenuItem value="Online">{t('alarms.online')}</MenuItem>
+              <MenuItem value="Offline">{t('alarms.offline')}</MenuItem>
+            </Select>
+          </FormControl>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Get filtered variables based on parameter type
+  const getFilteredVariables = (parameterType: string) => {
+    if (parameterType === 'all') {
+      // Return all variables from all types
+      const allVariables = {};
+      Object.values(ALARM_PARAMETER_TYPES).forEach((type: any) => {
+        Object.assign(allVariables, type.parameters);
+      });
+      Object.assign(allVariables, metricsConfig);
+      return Object.entries(allVariables);
+    }
+    
+    if (ALARM_PARAMETER_TYPES[parameterType]) {
+      return Object.entries(ALARM_PARAMETER_TYPES[parameterType].parameters);
+    }
+    
+    return Object.entries(metricsConfig);
+  };
+  const [activeTab, setActiveTab] = useState(0);
+  const [filters, setFilters] = useState({
+    severity: 'all',
+    status: 'all',
+    variable: 'all',
+    parameterType: 'all'
+  });
+  const [triggeredFilters, setTriggeredFilters] = useState({
+    severity: 'all',
+    variable: 'all',
+    timeRange: 'all',
+    parameterType: 'all'
+  });
+
+  const fetchAlarms = useCallback(async () => {
+    if (!device?.client_id) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await fetch(FETCH_ALARMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: device.client_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch alarms: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data) {
+        throw new Error('No data received from server');
+      }
+
+      // Check for newly triggered alarms with debounce
+      const previousTriggeredIds = new Set(triggeredAlarmsRef.current.map(a => a.alarm_id));
+      const now = Date.now();
+      const newTriggeredAlarms = (data.triggered_alarms || []).filter((alarm: any) => {
+        const isNew = !previousTriggeredIds.has(alarm.alarm_id);
+        const lastNotification = lastAlarmNotificationRef.current[alarm.alarm_id] || 0;
+        const timeSinceLastNotification = now - lastNotification;
+        const shouldNotify = isNew && timeSinceLastNotification > 180000; // 3 minutes debounce
+        
+        if (shouldNotify) {
+          lastAlarmNotificationRef.current[alarm.alarm_id] = now;
+        }
+        
+        return shouldNotify;
+      });
+      
+      // Show notifications for newly triggered alarms
+      for (const alarm of newTriggeredAlarms) {
+        try {
+          await notificationManager.notifyAlarm(alarm, device);
+        } catch (error) {
+          console.error('Error showing notification for alarm:', error);
+        }
+      }
+      
+      setAlarms(data.alarms || []);
+      setTriggeredAlarms(data.triggered_alarms || []);
+      // Update ref to track current triggered alarms
+      triggeredAlarmsRef.current = data.triggered_alarms || [];
+      setError(null);
+    } catch (err: any) {
+      console.error('Error fetching alarms:', err);
+      setError(err.message);
+      setSnackbar({
+        open: true,
+        message: t('alarms.failedFetchAlarms'),
+        severity: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [device?.client_id]);
+
+  // Initialize notifications on mount
+  useEffect(() => {
+    // NotificationManager handles initialization automatically
+    // No need to manually initialize here
+  }, []);
+
+  // Fetch alarms on component mount and when device changes
+  useEffect(() => {
+    let isMounted = true;
+    let intervalId: NodeJS.Timeout | null = null;
+
+    const initializeAlarms = async () => {
+      if (!device?.client_id) {
+        return;
+      }
+
+      try {
+        setIsInitializing(true);
+        // Fetch alarms initially
+        if (isMounted) {
+          await fetchAlarms();
+        }
+        
+        // Set up polling interval (every 30 seconds) only if component is still mounted
+        if (isMounted) {
+          intervalId = setInterval(async () => {
+            if (isMounted) {
+              await fetchAlarms();
+            }
+          }, 30000); // Poll every 30 seconds
+        }
+      } catch (error) {
+        console.error('Error initializing alarms:', error);
+        if (isMounted) {
+          setSnackbar({
+            open: true,
+            message: t('alarms.failedInitializeAlarms'),
+            severity: 'error'
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
+      }
+    };
+
+    initializeAlarms();
+
+    return () => {
+      isMounted = false;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [device?.client_id, fetchAlarms]);
+
+  const handleAddAlarm = async () => {
+    // Check if required fields are filled
+    if (!newAlarm.variable_name || (!newAlarm.threshold && newAlarm.condition !== 'change')) {
+      setSnackbar({
+        open: true,
+        message: t('alarms.fillRequiredFields'),
+        severity: 'error'
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await fetch(MANAGE_ALARMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: device.client_id,
+          operation: 'create',
+          alarm: {
+            ...newAlarm,
+            threshold: newAlarm.condition === 'change' ? null : 
+              (ALARM_PARAMETER_TYPES[newAlarm.parameter_type]?.parameters[newAlarm.variable_name]?.type === 'numeric' ? 
+                parseFloat(newAlarm.threshold) : newAlarm.threshold)
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create alarm');
+      }
+
+      // Update local state directly instead of refetching
+      const newAlarmData = {
+        alarm_id: `temp_${Date.now()}`, // Temporary ID, will be updated on next fetch
+        ...newAlarm,
+        threshold: newAlarm.condition === 'change' ? null : 
+          (ALARM_PARAMETER_TYPES[newAlarm.parameter_type]?.parameters[newAlarm.variable_name]?.type === 'numeric' ? 
+            parseFloat(newAlarm.threshold) : newAlarm.threshold)
+      };
+      setAlarms(prevAlarms => [...prevAlarms, newAlarmData]);
+      
+      // Call the callback to refresh alarms in parent component
+      if (onAlarmToggle) {
+        onAlarmToggle();
+      }
+
+    setNewAlarmDialog(false);
+    setNewAlarm({
+        parameter_type: 'metrics',
+        variable_name: '',
+        condition: 'above',
+        threshold: '',
+        description: '',
+        enabled: true,
+        severity: 'warning'
+      });
+      setSnackbar({
+        open: true,
+        message: t('alarms.alarmCreated'),
+        severity: 'success'
+      });
+    } catch (err: any) {
+      console.error('Error creating alarm:', err);
+      setError(err.message);
+      setSnackbar({
+        open: true,
+        message: t('alarms.failedCreateAlarm'),
+        severity: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditAlarm = (alarm: any) => {
+    setEditingAlarm(alarm);
+    setEditAlarmDialog(true);
+  };
+
+  const handleUpdateAlarm = async () => {
+    if (!editingAlarm.variable_name || !editingAlarm.threshold) {
+      setSnackbar({
+        open: true,
+        message: t('alarms.fillRequiredFields'),
+        severity: 'error'
+      });
+      return;
+    }
+
+    try {
+      setLoadingAlarmId(editingAlarm.alarm_id);
+      
+      // First delete the old alarm
+      const deleteResponse = await fetch(MANAGE_ALARMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: device.client_id,
+          operation: 'delete',
+          alarm_id: editingAlarm.alarm_id
+        })
+      });
+
+      if (!deleteResponse.ok) {
+        throw new Error('Failed to delete old alarm');
+      }
+
+      // Then create the new alarm with updated properties
+      const createResponse = await fetch(MANAGE_ALARMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: device.client_id,
+          operation: 'create',
+          alarm: {
+            variable_name: editingAlarm.variable_name,
+            condition: editingAlarm.condition,
+            threshold: parseFloat(editingAlarm.threshold),
+            description: editingAlarm.description,
+            enabled: editingAlarm.enabled,
+            severity: editingAlarm.severity
+          }
+        })
+      });
+
+      if (!createResponse.ok) {
+        throw new Error('Failed to create updated alarm');
+      }
+
+      const createResult = await createResponse.json();
+      
+      // Update the alarm in local state with new alarm_id
+      setAlarms(prevAlarms => 
+        prevAlarms.map(alarm => 
+          alarm.alarm_id === editingAlarm.alarm_id ? {
+            ...editingAlarm,
+            alarm_id: createResult.alarm_id,
+            threshold: parseFloat(editingAlarm.threshold)
+          } : alarm
+        )
+      );
+      
+      setSnackbar({
+        open: true,
+        message: t('alarms.alarmUpdated'),
+        severity: 'success'
+      });
+      setEditAlarmDialog(false);
+      setEditingAlarm(null);
+    } catch (err: any) {
+      console.error('Error updating alarm:', err);
+      setSnackbar({
+        open: true,
+        message: t('alarms.failedUpdateAlarm'),
+        severity: 'error'
+      });
+    } finally {
+      setLoadingAlarmId(null);
+    }
+  };
+
+  const handleDeleteAlarm = async (alarmId: string) => {
+    try {
+      setLoadingAlarmId(alarmId);
+      const response = await fetch(MANAGE_ALARMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: device.client_id,
+          operation: 'delete',
+          alarm_id: alarmId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete alarm');
+      }
+
+      // Update local state directly instead of refetching all alarms
+      setAlarms(prevAlarms => prevAlarms.filter(alarm => alarm.alarm_id !== alarmId));
+      setTriggeredAlarms(prevTriggered => prevTriggered.filter(alarm => alarm.alarm_id !== alarmId));
+
+      setSnackbar({
+        open: true,
+        message: t('alarms.alarmDeleted'),
+        severity: 'success'
+      });
+    } catch (err: any) {
+      setError(err.message);
+      setSnackbar({
+        open: true,
+        message: t('alarms.failedDeleteAlarm'),
+        severity: 'error'
+      });
+    } finally {
+      setLoadingAlarmId(null);
+    }
+  };
+
+  const handleToggleAlarm = async (alarmId: string, currentEnabled: boolean) => {
+    try {
+      setLoadingAlarmId(alarmId);
+      const response = await fetch(MANAGE_ALARMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: device.client_id,
+          operation: 'update',
+          alarm_id: alarmId,
+          enabled: !currentEnabled
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update alarm');
+      }
+
+      // Update local state directly instead of refetching all alarms
+      setAlarms(prevAlarms => 
+        prevAlarms.map(alarm => 
+          alarm.alarm_id === alarmId 
+            ? { ...alarm, enabled: !currentEnabled }
+            : alarm
+        )
+      );
+
+      // Call the callback to refresh alarms in parent component
+      if (onAlarmToggle) {
+        onAlarmToggle();
+      }
+      setSnackbar({
+        open: true,
+        message: t('alarms.alarmToggled', { state: currentEnabled ? t('alarms.disabled') : t('alarms.enabled') }),
+        severity: 'success'
+      });
+    } catch (err: any) {
+      setError(err.message);
+      setSnackbar({
+        open: true,
+        message: t('alarms.failedUpdateAlarm'),
+        severity: 'error'
+      });
+    } finally {
+      setLoadingAlarmId(null);
+    }
+  };
+
+  const getSeverityText = (severity: string) => {
+    const severityLevel = severity?.toLowerCase() || 'info';
+    return severityLevel.charAt(0).toUpperCase() + severityLevel.slice(1);
+  };
+
+  // Filter alarms based on selected filters
+  const getFilteredAlarms = (alarmList: any[]) => {
+    return alarmList.filter(alarm => {
+      // Severity filter
+      if (filters.severity !== 'all' && alarm.severity !== filters.severity) {
+        return false;
+      }
+      
+      // Status filter (enabled/disabled)
+      if (filters.status !== 'all') {
+        const isEnabled = alarm.enabled;
+        if (filters.status === 'enabled' && !isEnabled) return false;
+        if (filters.status === 'disabled' && isEnabled) return false;
+      }
+      
+      // Variable filter
+      if (filters.variable !== 'all' && alarm.variable_name !== filters.variable) {
+        return false;
+      }
+      
+      // Parameter type filter
+      if (filters.parameterType !== 'all') {
+        const alarmParameterType = alarm.parameter_type || 'metrics'; // Default to metrics for backward compatibility
+        if (alarmParameterType !== filters.parameterType) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  };
+
+  // Filter triggered alarms based on selected filters
+  const getFilteredTriggeredAlarms = (alarmList: any[]) => {
+    return alarmList.filter(alarm => {
+      // Severity filter
+      if (triggeredFilters.severity !== 'all' && alarm.severity !== triggeredFilters.severity) {
+        return false;
+      }
+      
+      // Variable filter
+      if (triggeredFilters.variable !== 'all' && alarm.variable_name !== triggeredFilters.variable) {
+        return false;
+      }
+      
+      // Time range filter
+      if (triggeredFilters.timeRange !== 'all') {
+        const now = new Date().getTime();
+        const triggeredTime = new Date(alarm.triggered_at || alarm.timestamp).getTime();
+        const timeDiff = now - triggeredTime;
+        
+        switch (triggeredFilters.timeRange) {
+          case 'last_hour':
+            if (timeDiff > 60 * 60 * 1000) return false;
+            break;
+          case 'last_6_hours':
+            if (timeDiff > 6 * 60 * 60 * 1000) return false;
+            break;
+          case 'last_24_hours':
+            if (timeDiff > 24 * 60 * 60 * 1000) return false;
+            break;
+          case 'last_week':
+            if (timeDiff > 7 * 24 * 60 * 60 * 1000) return false;
+            break;
+        }
+      }
+      
+      // Parameter type filter
+      if (triggeredFilters.parameterType !== 'all') {
+        const alarmParameterType = alarm.parameter_type || 'metrics'; // Default to metrics for backward compatibility
+        if (alarmParameterType !== triggeredFilters.parameterType) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  };
+
+  const formatAlarmValue = (alarm: any) => {
+    const config = metricsConfig[alarm.variable_name] || { label: alarm.variable_name, unit: '', color: '' };
+    return `${config.label} ${alarm.condition} ${alarm.threshold}${config.unit}`;
+  };
+
+  const formatCurrentValue = (alarm: any) => {
+    const config = metricsConfig[alarm.variable_name] || { unit: '' };
+    return `${alarm.current_value}${config.unit}`;
+  };
+
+  // Add error boundary render
+  if (error) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <ErrorIcon color="error" sx={{ fontSize: 48, mb: 2 }} />
+        <Typography variant="h6" color="error" gutterBottom>
+          Error Loading Alarms
+        </Typography>
+        <Typography color="textSecondary" paragraph>
+          {error}
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={fetchAlarms}
+          sx={{ mt: 2 }}
+        >
+          Retry
+        </Button>
+      </Box>
+    );
+  }
+
+  // Add loading state
+  if (isInitializing || isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ py: 0, px: 0.5 }}>
+      <Tabs
+        value={activeTab}
+        onChange={(_, newValue) => setActiveTab(newValue)}
+        sx={{ mb: 2, minHeight: 32, '& .MuiTab-root': { minHeight: 32, fontSize: '1rem', textTransform: 'none' } }}
+      >
+        <Tab label={t('alarms.triggeredAlarms')} />
+        <Tab label={t('alarms.allAlarms')} />
+      </Tabs>
+      {activeTab === 0 && (
+        <Box>
+          
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1, 
+            mb: 2,
+            px: 2,
+            py: 1.5,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+            borderRadius: 3,
+          border: 'none',
+            position: 'relative',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: 'linear-gradient(90deg, #f44336, #ff9800)',
+              borderRadius: '3px 3px 0 0',
+              opacity: 0.4
+            }
+          }}>
+            <Box sx={{ 
+              p: 0.5, 
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #f44336, #ff9800)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <WarningIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
+            </Box>
+            <Typography variant="h6" sx={{
+              fontSize: { xs: '0.95rem', sm: '1rem' },
+              fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
+              fontWeight: 600,
+              letterSpacing: '0.2px',
+              textTransform: 'none',
+              background: 'linear-gradient(45deg, #f44336, #ff9800)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              {t('alarms.triggeredAlarms')}
+            </Typography>
+          </Box>
+          
+          {/* Filter Controls for Triggered Alarms */}
+          {triggeredAlarms.length > 0 && (
+            <Box sx={{ 
+              mb: 1.5, 
+              p: 1, 
+              borderRadius: 1.5,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              border: '1px solid #e3f2fd',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                transform: 'translateY(-1px)'
+              }
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <FilterListIcon sx={{ mr: 0.5, color: 'text.secondary', fontSize: '0.9rem' }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>
+                  {t('alarms.filterTriggeredAlarms')}
+                </Typography>
+              </Box>
+              <Grid container spacing={0.5}>
+                <Grid item xs={6} sm={3} key="severity-filter">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.severity')}</InputLabel>
+                    <Select
+                      value={triggeredFilters.severity}
+                      onChange={(e) => setTriggeredFilters({ ...triggeredFilters, severity: e.target.value, parameterType: 'all', variable: 'all' })}
+                      label={t('alarms.severity')}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      <MenuItem value="error" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.error')}</MenuItem>
+                      <MenuItem value="warning" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.warning')}</MenuItem>
+                      <MenuItem value="info" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.info')}</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3} key="parameter-type-filter-triggered">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.type')}</InputLabel>
+                    <Select
+                      value={triggeredFilters.parameterType}
+                      onChange={(e) => setTriggeredFilters({ ...triggeredFilters, parameterType: e.target.value, variable: 'all' })}
+                      label={t('alarms.type')}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]: [string, any]) => (
+                        <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            {config.icon}
+                            {config.label}
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3} key="variable-filter">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.variable')}</InputLabel>
+                    <Select
+                      value={triggeredFilters.variable}
+                      onChange={(e) => setTriggeredFilters({ ...triggeredFilters, variable: e.target.value })}
+                      label={t('alarms.variable')}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                      disabled={triggeredFilters.parameterType === 'all'}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      {getFilteredVariables(triggeredFilters.parameterType).map(([key, config]: [string, any]) => (
+                        <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
+                          {config.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3} key="time-range-filter">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.time')}</InputLabel>
+                    <Select
+                      value={triggeredFilters.timeRange}
+                      onChange={(e) => setTriggeredFilters({ ...triggeredFilters, timeRange: e.target.value })}
+                      label={t('alarms.time')}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      <MenuItem value="last_hour" sx={{ fontSize: '0.7rem', py: 0.3 }}>1H</MenuItem>
+                      <MenuItem value="last_6_hours" sx={{ fontSize: '0.7rem', py: 0.3 }}>6H</MenuItem>
+                      <MenuItem value="last_24_hours" sx={{ fontSize: '0.7rem', py: 0.3 }}>24H</MenuItem>
+                      <MenuItem value="last_week" sx={{ fontSize: '0.7rem', py: 0.3 }}>Week</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                <Button
+                  size="small"
+                  startIcon={<ClearIcon sx={{ fontSize: '0.8rem' }} />}
+                  onClick={() => setTriggeredFilters({ severity: 'all', variable: 'all', timeRange: 'all', parameterType: 'all' })}
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '0.7rem',
+                    py: 0.3,
+                    px: 1
+                  }}
+                  variant="outlined"
+                >
+                  {t('common.clear')}
+                </Button>
+              </Box>
+            </Box>
+          )}
+          
+          {isLoading && !triggeredAlarms.length && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+              <CircularProgress />
+            </Box>
+          )}
+          {!isLoading && triggeredAlarms.length === 0 ? (
+            <Card sx={{ 
+              textAlign: 'center', 
+              py: 6,
+              px: 2,
+              borderRadius: 3,
+              background: (theme) => theme.palette.mode === 'dark'
+                ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.7) 0%, rgba(31, 37, 71, 0.8) 50%, rgba(26, 31, 60, 0.7) 100%)'
+                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 250, 252, 0.8) 50%, rgba(255, 255, 255, 0.7) 100%)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) => theme.palette.mode === 'dark' 
+                ? '1px dashed rgba(255, 255, 255, 0.1)' 
+                : '1px dashed rgba(0, 0, 0, 0.1)',
+              boxShadow: 'none'
+            }}>
+              <Box sx={{ 
+                display: 'inline-flex', 
+                p: 2, 
+                borderRadius: '50%', 
+                bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(76, 175, 80, 0.1)',
+                mb: 2 
+              }}>
+                <CheckCircleIcon sx={{ fontSize: 48, color: '#4caf50' }} />
+              </Box>
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
+                {t('alarms.noTriggeredAlarms')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 400, mx: 'auto' }}>
+                {t('alarms.allSystemsNormal', { defaultValue: 'All systems are operating normally' })}
+              </Typography>
+            </Card>
+          ) : (
+            <Box>
+              {/* Filter Summary for Triggered Alarms */}
+              <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {getFilteredTriggeredAlarms(triggeredAlarms).length} of {triggeredAlarms.length} triggered alarms
+                </Typography>
+                {(triggeredFilters.severity !== 'all' || triggeredFilters.variable !== 'all' || triggeredFilters.timeRange !== 'all') && (
+                  <Chip
+                    label="Filtered"
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                  />
+                )}
+              </Box>
+              
+              <Grid container spacing={2}>
+                {getFilteredTriggeredAlarms(triggeredAlarms).map((alarm) => (
+                <Grid item xs={12} sm={6} md={4} key={alarm.alarm_id}>
+                  <Card sx={{ 
+                    height: '100%',
+                    borderRadius: 3,
+                    background: (theme) => theme.palette.mode === 'dark'
+                      ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+                    backdropFilter: 'blur(12px)',
+                    boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+                    border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+                    color: (theme) => theme.palette.text.primary,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'all 0.3s ease',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)',
+                      transition: 'background 0.3s ease',
+                    },
+                    '&:hover': {
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                      transform: 'translateY(-2px)',
+                      '&::before': {
+                        background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #5cbf60, #3399f3)' : 'linear-gradient(90deg, #1e88e5, #43a047)',
+                      }
+                    }
+                  }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, fontSize: '0.95rem', color: '#E0E0E0' }}>
+                            {formatAlarmValue(alarm)}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'rgba(224, 224, 224, 0.7)' }}>
+                            {alarm.description || 'No description'}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={getSeverityText(alarm.severity)}
+                          color={alarm.severity === 'error' ? 'error' : alarm.severity === 'warning' ? 'warning' : 'info'}
+                          size="small"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                      
+                      <Box sx={{ mb: 1.5 }}>
+                        <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: '0.85rem' }}>
+                          {t('alarms.currentValue')}: {formatCurrentValue(alarm)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                          {t('alarms.threshold')}: {alarm.condition} {alarm.threshold} {metricsConfig[alarm.variable_name]?.unit || ''}
+                        </Typography>
+                      </Box>
+                      
+                      {/* Last Triggered Information */}
+                      <Box sx={{ 
+                        borderTop: '1px solid',
+                        borderColor: 'grey.200',
+                        pt: 1.5,
+                        mt: 'auto'
+                      }}>
+                        <Typography variant="caption" sx={{ 
+                          color: 'text.secondary',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5
+                        }}>
+                          {t('alarms.lastTriggered')}
+                        </Typography>
+                        <Typography variant="body2" sx={{ 
+                          color: 'text.primary',
+                          fontSize: '0.75rem',
+                          fontWeight: 500
+                        }}>
+                          {alarm.last_triggered ? 
+                            new Date(alarm.last_triggered).toLocaleString('en-GB', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            }) : 
+                            t('alarms.justTriggered')
+                          }
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+              </Grid>
+            </Box>
+          )}
+        </Box>
+      )}
+      {activeTab === 1 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1, 
+              width: '100%',
+              px: 2,
+              py: 1.5,
+              background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.8) 0%, rgba(31, 37, 71, 0.9) 50%, rgba(26, 31, 60, 0.8) 100%)',
+              borderRadius: 3,
+              border: 'none',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                background: 'linear-gradient(90deg, #ff9800, #e91e63)',
+                borderRadius: '3px 3px 0 0',
+                opacity: 0.4
+              }
+            }}>
+              <Box sx={{ 
+                p: 0.5, 
+                borderRadius: 2,
+                background: 'linear-gradient(135deg, #ff9800, #e91e63)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <NotificationsIcon sx={{ color: '#ffffff', fontSize: '1.1rem' }} />
+              </Box>
+              <Typography variant="h6" sx={{ 
+                fontSize: '1rem', 
+                fontFamily: '"Exo 2", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 600,
+                letterSpacing: '0.5px',
+                textTransform: 'none',
+                background: 'linear-gradient(45deg, #ff9800, #e91e63)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>
+                {t('alarms.allAlarms')}
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => setNewAlarmDialog(true)}
+                size="small"
+                sx={{ 
+                  textTransform: 'none', 
+                  fontWeight: 600, 
+                  ml: 'auto',
+                  borderColor: 'text.secondary',
+                  color: 'text.primary',
+                  '&:hover': {
+                    borderColor: 'text.primary',
+                    backgroundColor: 'rgba(0,0,0,0.04)'
+                  }
+                }}
+              >
+                {t('alarms.createAlarm')}
+              </Button>
+            </Box>
+          </Box>
+          
+          {/* Filter Controls */}
+          {alarms.length > 0 && (
+            <Box sx={{ 
+              mb: 1.5, 
+              p: 1, 
+              borderRadius: 1.5,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              border: '1px solid #e3f2fd',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                transform: 'translateY(-1px)'
+              }
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <FilterListIcon sx={{ mr: 0.5, color: 'text.secondary', fontSize: '0.9rem' }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>
+                  {t('alarms.filterAlarms')}
+                </Typography>
+              </Box>
+              <Grid container spacing={0.5}>
+                <Grid item xs={6} sm={3} key="severity-filter-manage">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.severity')}</InputLabel>
+                    <Select
+                      value={filters.severity}
+                      onChange={(e) => setFilters({ ...filters, severity: e.target.value, parameterType: 'all', variable: 'all' })}
+                      label={t('alarms.severity')}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      <MenuItem value="error" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.error')}</MenuItem>
+                      <MenuItem value="warning" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.warning')}</MenuItem>
+                      <MenuItem value="info" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.info')}</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3} key="parameter-type-filter-manage">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.type')}</InputLabel>
+                    <Select
+                      value={filters.parameterType}
+                      onChange={(e) => setFilters({ ...filters, parameterType: e.target.value, variable: 'all' })}
+                      label={t('alarms.type')}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]: [string, any]) => (
+                        <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            {config.icon}
+                            {config.label}
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3} key="variable-filter-manage">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.variable')}</InputLabel>
+                    <Select
+                      value={filters.variable}
+                      onChange={(e) => setFilters({ ...filters, variable: e.target.value })}
+                      label={t('alarms.variable')}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                      disabled={filters.parameterType === 'all'}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      {getFilteredVariables(filters.parameterType).map(([key, config]: [string, any]) => (
+                        <MenuItem key={key} value={key} sx={{ fontSize: '0.7rem', py: 0.3 }}>
+                          {config.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3} key="status-filter-manage">
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: '0.65rem' }}>{t('alarms.status')}</InputLabel>
+                    <Select
+                      value={filters.status}
+                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                      label={t('alarms.status')}
+                      sx={{ fontSize: '0.7rem', '& .MuiSelect-select': { py: 0.5 } }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('filters.all')}</MenuItem>
+                      <MenuItem value="enabled" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.enabled')}</MenuItem>
+                      <MenuItem value="disabled" sx={{ fontSize: '0.7rem', py: 0.3 }}>{t('alarms.disabled')}</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                <Button
+                  size="small"
+                  startIcon={<ClearIcon sx={{ fontSize: '0.8rem' }} />}
+                  onClick={() => setFilters({ severity: 'all', status: 'all', variable: 'all', parameterType: 'all' })}
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '0.7rem',
+                    py: 0.3,
+                    px: 1
+                  }}
+                  variant="outlined"
+                >
+                  {t('common.clear')}
+                </Button>
+              </Box>
+            </Box>
+          )}
+          
+          {isLoading && !alarms.length && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+              <CircularProgress />
+            </Box>
+          )}
+          {!isLoading && alarms.length === 0 ? (
+            <Paper sx={{ 
+              textAlign: 'center', 
+              py: 6,
+              px: 2,
+              borderRadius: 3,
+              background: (theme) => theme.palette.mode === 'dark'
+                ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.7) 0%, rgba(31, 37, 71, 0.8) 50%, rgba(26, 31, 60, 0.7) 100%)'
+                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 250, 252, 0.8) 50%, rgba(255, 255, 255, 0.7) 100%)',
+              backdropFilter: 'blur(10px)',
+              border: (theme) => theme.palette.mode === 'dark' 
+                ? '1px dashed rgba(255, 255, 255, 0.1)' 
+                : '1px dashed rgba(0, 0, 0, 0.1)',
+              boxShadow: 'none'
+            }}>
+              <NotificationsIcon sx={{ 
+                fontSize: 64, 
+                color: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', 
+                mb: 2 
+              }} />
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
+                {t('alarms.noAlarms')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}>
+                {t('alarms.setupAlarms', { defaultValue: 'Set up alarms to monitor your device parameters' })}
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setNewAlarmDialog(true)}
+                sx={{ 
+                  textTransform: 'none', 
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  px: 3,
+                  background: 'linear-gradient(135deg, #4caf50, #2196f3)',
+                  boxShadow: '0 4px 12px rgba(33, 150, 243, 0.3)'
+                }}
+              >
+                {t('alarms.createAlarm')}
+              </Button>
+            </Paper>
+          ) : (
+            <Box>
+              {/* Filter Summary */}
+              <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">
+                  {t('alarms.showingAlarms', { count: getFilteredAlarms(alarms).length, total: alarms.length })}
+                </Typography>
+                {(filters.severity !== 'all' || filters.status !== 'all' || filters.variable !== 'all') && (
+                  <Chip
+                    label={t('alarms.filtered')}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                  />
+                )}
+              </Box>
+              
+              <Grid container spacing={2}>
+                {getFilteredAlarms(alarms).map((alarm) => (
+                <Grid item xs={12} sm={6} md={4} key={alarm.alarm_id}>
+                  <Card sx={{ 
+                    height: '100%',
+                    borderRadius: 3,
+                    background: (theme) => theme.palette.mode === 'dark'
+                      ? 'linear-gradient(135deg, rgba(26, 31, 60, 0.9) 0%, rgba(31, 37, 71, 0.95) 50%, rgba(26, 31, 60, 0.9) 100%)'
+                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.95) 50%, rgba(255, 255, 255, 0.9) 100%)',
+                    backdropFilter: 'blur(12px)',
+                    boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 6px 24px rgba(0,0,0,0.35)' : '0 6px 24px rgba(0,0,0,0.08)',
+                    border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+                    color: (theme) => theme.palette.text.primary,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'all 0.3s ease',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #4caf50, #2196f3)' : 'linear-gradient(90deg, #1976d2, #388e3c)',
+                      transition: 'background 0.3s ease',
+                    },
+                    '&:hover': {
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                      transform: 'translateY(-2px)',
+                      '&::before': {
+                        background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(90deg, #5cbf60, #3399f3)' : 'linear-gradient(90deg, #1e88e5, #43a047)',
+                      }
+                    }
+                  }}>
+                    <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, fontSize: '0.95rem', color: '#E0E0E0' }}>
+                            {formatAlarmValue(alarm)}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'rgba(224, 224, 224, 0.7)' }}>
+                            {alarm.description || 'No description'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                          <Chip
+                            label={alarm.enabled ? 'Active' : 'Inactive'}
+                            color={alarm.enabled ? 'success' : 'default'}
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                          <Chip
+                            label={getSeverityText(alarm.severity)}
+                            color={alarm.severity === 'error' ? 'error' : alarm.severity === 'warning' ? 'warning' : 'info'}
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </Box>
+                      </Box>
+                      
+                      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                        <Box sx={{ mb: 1.5 }}>
+                          <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: '0.85rem' }}>
+                            Threshold: {alarm.condition} {alarm.threshold} {metricsConfig[alarm.variable_name]?.unit || ''}
+                          </Typography>
+                        </Box>
+                        
+                        {/* Last Triggered Information */}
+                        <Box sx={{ 
+                          borderTop: '1px solid',
+                          borderColor: 'grey.200',
+                          pt: 1.5,
+                          mt: 'auto'
+                        }}>
+                          <Typography variant="caption" sx={{ 
+                            color: 'text.secondary',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5
+                          }}>
+                            Last Triggered
+                          </Typography>
+                          <Typography variant="body2" sx={{ 
+                            color: 'text.primary',
+                            fontSize: '0.75rem',
+                            fontWeight: 500
+                          }}>
+                            {alarm.last_triggered ? 
+                              new Date(alarm.last_triggered).toLocaleString('en-GB', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false
+                              }) : 
+                              'Not triggered yet'
+                            }
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                    
+                    <CardActions sx={{ p: 1.5, pt: 0, justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          size="small"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleEditAlarm(alarm)}
+                          sx={{ textTransform: 'none', fontWeight: 500 }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          startIcon={loadingAlarmId === alarm.alarm_id ? <CircularProgress size={16} /> : <DeleteIcon />}
+                          onClick={() => handleDeleteAlarm(alarm.alarm_id)}
+                          disabled={loadingAlarmId === alarm.alarm_id}
+                          sx={{ textTransform: 'none', fontWeight: 500 }}
+                        >
+                          {t('common.delete')}
+                        </Button>
+                      </Box>
+                      <Button
+                        size="small"
+                        variant={alarm.enabled ? 'outlined' : 'contained'}
+                        startIcon={loadingAlarmId === alarm.alarm_id ? <CircularProgress size={16} /> : (alarm.enabled ? <NotificationsOffIcon /> : <NotificationsIcon />)}
+                        onClick={() => handleToggleAlarm(alarm.alarm_id, alarm.enabled)}
+                        disabled={loadingAlarmId === alarm.alarm_id}
+                        sx={{ textTransform: 'none', fontWeight: 500 }}
+                      >
+                        {loadingAlarmId === alarm.alarm_id ? t('common.loading') : (alarm.enabled ? t('alarms.disabled') : t('alarms.enabled'))}
+                      </Button>
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
+              </Grid>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Add New Alarm Dialog */}
+      <Dialog 
+        open={newAlarmDialog} 
+        onClose={() => setNewAlarmDialog(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+              borderRadius: '3px 3px 0 0'
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: '#E0E0E0' }}>{t('alarms.createAlarm')}</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>{t('alarms.parameterType')}</InputLabel>
+              <Select
+                value={newAlarm.parameter_type || 'metrics'}
+                onChange={(e) => setNewAlarm({ ...newAlarm, parameter_type: e.target.value, variable_name: '' })}
+                label={t('alarms.parameterType')}
+              >
+                {Object.entries(ALARM_PARAMETER_TYPES).map(([key, config]: [string, any]) => (
+                  <MenuItem key={key} value={key}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {config.icon}
+                      {config.label}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>{t('alarms.parameter')}</InputLabel>
+              <Select
+                value={newAlarm.variable_name}
+                onChange={(e) => setNewAlarm({ ...newAlarm, variable_name: e.target.value })}
+                label={t('alarms.parameter')}
+                disabled={!newAlarm.parameter_type}
+              >
+                {newAlarm.parameter_type && ALARM_PARAMETER_TYPES[newAlarm.parameter_type] && 
+                  Object.entries(ALARM_PARAMETER_TYPES[newAlarm.parameter_type].parameters).map(([key, config]: [string, any]) => (
+                    <MenuItem key={key} value={key}>
+                      {config.label}
+                    </MenuItem>
+                  ))
+                }
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>{t('alarms.condition')}</InputLabel>
+              <Select
+                value={newAlarm.condition}
+                onChange={(e) => setNewAlarm({ ...newAlarm, condition: e.target.value })}
+                label={t('alarms.condition')}
+              >
+                {getAvailableConditions(newAlarm.parameter_type, newAlarm.variable_name).map(condition => (
+                  <MenuItem key={condition.value} value={condition.value}>
+                    {condition.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>{t('alarms.severity')}</InputLabel>
+              <Select
+                value={newAlarm.severity}
+                onChange={(e) => setNewAlarm({ ...newAlarm, severity: e.target.value })}
+                label={t('alarms.severity')}
+              >
+                <MenuItem value="info">{t('alarms.info')}</MenuItem>
+                <MenuItem value="warning">{t('alarms.warning')}</MenuItem>
+                <MenuItem value="error">{t('alarms.error')}</MenuItem>
+              </Select>
+            </FormControl>
+
+            {getThresholdInput(newAlarm.parameter_type, newAlarm.variable_name, newAlarm.condition)}
+
+            <TextField
+              label={t('alarms.description')}
+              value={newAlarm.description}
+              onChange={(e) => setNewAlarm({ ...newAlarm, description: e.target.value })}
+              fullWidth
+              multiline
+              rows={2}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={newAlarm.enabled}
+                  onChange={(e) => setNewAlarm({ ...newAlarm, enabled: e.target.checked })}
+                />
+              }
+              label={t('alarms.enabled')}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNewAlarmDialog(false)}>{t('common.cancel')}</Button>
+          <Button onClick={handleAddAlarm} variant="contained">{t('alarms.createAlarm')}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Alarm Dialog */}
+      <Dialog 
+        open={editAlarmDialog} 
+        onClose={() => setEditAlarmDialog(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, rgba(26, 31, 60, 0.95) 0%, rgba(31, 37, 71, 0.98) 50%, rgba(26, 31, 60, 0.95) 100%)',
+            color: '#E0E0E0',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #4caf50, #2196f3)',
+              borderRadius: '3px 3px 0 0'
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: '#E0E0E0' }}>{t('alarms.editAlarm')}</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel>{t('alarms.variableName')}</InputLabel>
+              <Select
+                value={editingAlarm?.variable_name || ''}
+                onChange={(e) => setEditingAlarm({ ...editingAlarm, variable_name: e.target.value })}
+                label={t('alarms.variableName')}
+              >
+                {Object.entries(metricsConfig).map(([key, config]) => (
+                  <MenuItem key={key} value={key}>
+                    {config.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>{t('alarms.condition')}</InputLabel>
+              <Select
+                value={editingAlarm?.condition || 'above'}
+                onChange={(e) => setEditingAlarm({ ...editingAlarm, condition: e.target.value })}
+                label={t('alarms.condition')}
+              >
+                <MenuItem value="above">{t('alarms.above')}</MenuItem>
+                <MenuItem value="below">{t('alarms.below')}</MenuItem>
+                <MenuItem value="equals">{t('alarms.equals')}</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>{t('alarms.severity')}</InputLabel>
+              <Select
+                value={editingAlarm?.severity || 'warning'}
+                onChange={(e) => setEditingAlarm({ ...editingAlarm, severity: e.target.value })}
+                label={t('alarms.severity')}
+              >
+                <MenuItem value="info">{t('alarms.info')}</MenuItem>
+                <MenuItem value="warning">{t('alarms.warning')}</MenuItem>
+                <MenuItem value="error">{t('alarms.error')}</MenuItem>
+              </Select>
+            </FormControl>
+
+            <TextField
+              label={t('alarms.threshold')}
+              type="number"
+              value={editingAlarm?.threshold || ''}
+              onChange={(e) => setEditingAlarm({ ...editingAlarm, threshold: e.target.value })}
+              fullWidth
+              InputProps={{
+                endAdornment: editingAlarm?.variable_name && metricsConfig[editingAlarm.variable_name]?.unit ? 
+                  <Typography variant="body2" color="text.secondary">
+                    {metricsConfig[editingAlarm.variable_name].unit}
+                  </Typography> : null
+              }}
+            />
+
+            <TextField
+              label={t('alarms.description')}
+              value={editingAlarm?.description || ''}
+              onChange={(e) => setEditingAlarm({ ...editingAlarm, description: e.target.value })}
+              fullWidth
+              multiline
+              rows={2}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editingAlarm?.enabled || false}
+                  onChange={(e) => setEditingAlarm({ ...editingAlarm, enabled: e.target.checked })}
+                />
+              }
+              label={t('alarms.enabled')}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditAlarmDialog(false)}>{t('common.cancel')}</Button>
+          <Button 
+            onClick={handleUpdateAlarm} 
+            variant="contained"
+            disabled={loadingAlarmId === editingAlarm?.alarm_id}
+          >
+            {loadingAlarmId === editingAlarm?.alarm_id ? t('common.loading') : t('alarms.editAlarm')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default DashboardAlarmsTab;
+
+>>>>>>> dev-AWS-Connect-optimize:iot-dashboard/src/features/dashboard/components/DashboardAlarmsTab.tsx
