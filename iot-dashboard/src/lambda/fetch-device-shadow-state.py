@@ -6,23 +6,21 @@ iot_endpoint = "https://al047cml3y4l3-ats.iot.eu-central-1.amazonaws.com"
 iot_client = boto3.client("iot-data", endpoint_url=iot_endpoint, region_name="eu-central-1")
 
 # Shadow field mapping: short names (from firmware) -> full names (for compatibility)
+# Note: Now using short names directly (o1, o2, i1, i2) instead of OUT1, OUT2, IN1, IN2
 SHADOW_FIELD_MAP = {
     'ms': 'motor_speed',
-    'o1': 'OUT1',
-    'o2': 'OUT2',
     'ps': 'power_saving',
-    'i1': 'IN1',
-    'i2': 'IN2',
     'ch': 'charging'
 }
 
 def normalize_shadow_state(shadow_state):
-    """Convert short field names to full names for backward compatibility"""
+    """Convert field names for compatibility (only for non-IO fields)"""
     if not shadow_state:
         return shadow_state
     
     normalized = {}
     for key, value in shadow_state.items():
+        # Use mapping only for non-IO fields, keep IO fields as-is (o1, o2, i1, i2)
         full_name = SHADOW_FIELD_MAP.get(key, key)
         normalized[full_name] = value
     
@@ -75,25 +73,25 @@ def lambda_handler(event, context):
             normalized_reported = normalize_shadow_state(reported_state)
             normalized_desired = normalize_shadow_state(desired_state)
             
-            # Map shadow state to frontend format
-            # Shadow uses: OUT1, OUT2, motor_speed, power_saving, IN1, IN2, charging, connection_status
+            # Map shadow state to frontend format (using short names: o1, o2, i1, i2)
+            # Shadow uses: o1, o2, motor_speed, power_saving, i1, i2, charging, connection_status
             # Frontend expects: out1_state, out2_state, motor_speed, power_saving, in1_state, in2_state, charging
             device_state = {
                 "client_id": client_id,
                 "timestamp": shadow_doc.get("timestamp", 0),
                 "version": shadow_doc.get("version", 0),
-                "out1_state": normalized_reported.get("OUT1", 0),
-                "out2_state": normalized_reported.get("OUT2", 0),
+                "out1_state": normalized_reported.get("o1", reported_state.get("o1", 0)),
+                "out2_state": normalized_reported.get("o2", reported_state.get("o2", 0)),
                 "motor_speed": normalized_reported.get("motor_speed", 0),
                 "power_saving": normalized_reported.get("power_saving", 0),
-                "in1_state": normalized_reported.get("IN1", 0),
-                "in2_state": normalized_reported.get("IN2", 0),
+                "in1_state": normalized_reported.get("i1", reported_state.get("i1", 0)),
+                "in2_state": normalized_reported.get("i2", reported_state.get("i2", 0)),
                 "charging": normalized_reported.get("charging", 0),
                 "connection_status": normalized_reported.get("connection_status", "unknown"),
                 # Include desired state for UI feedback
                 "desired": {
-                    "out1_state": normalized_desired.get("OUT1"),
-                    "out2_state": normalized_desired.get("OUT2"),
+                    "out1_state": normalized_desired.get("o1", desired_state.get("o1")),
+                    "out2_state": normalized_desired.get("o2", desired_state.get("o2")),
                     "motor_speed": normalized_desired.get("motor_speed"),
                     "power_saving": normalized_desired.get("power_saving")
                 },

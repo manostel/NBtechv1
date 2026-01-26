@@ -246,8 +246,8 @@ def check_io_state_changes(device_id, device_data):
         normalized_state = normalize_shadow_state(shadow_state)
         
         # Define IO parameters to monitor (from shadow)
-        # Shadow has: IN1, IN2, OUT1, OUT2, charging (now using normalized names)
-        io_params = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging']
+        # Shadow has: i1, i2, o1, o2, charging (using short names)
+        io_params = ['i1', 'i2', 'o1', 'o2', 'charging']
         
         # Check if any IO params are present in current shadow (use normalized state)
         present_params = [p for p in io_params if p in normalized_state]
@@ -334,8 +334,8 @@ def check_io_state_changes(device_id, device_data):
                     continue
                 
                 # State Changed and has active monitoring!
-                io_type = "Charging" if param == "charging" else ("Output" if "OUT" in param else "Input")
-                io_num = param[-1] if param in ['IN1', 'IN2', 'OUT1', 'OUT2'] else ""
+                io_type = "Charging" if param == "charging" else ("Output" if param in ['o1', 'o2'] else "Input")
+                io_num = param[-1] if param in ['i1', 'i2', 'o1', 'o2'] else ""
                 state_str = "ON" if curr_norm == 1 else "OFF"
                 
                 if param == "charging":
@@ -681,26 +681,32 @@ async def get_device_subscriptions(device_id):
         return []
 
 # Shadow field mapping: short names (from firmware) -> full names (for compatibility)
+# Note: Now using short names directly (o1, o2, i1, i2) instead of OUT1, OUT2, IN1, IN2
 SHADOW_FIELD_MAP = {
     'ms': 'motor_speed',
-    'o1': 'OUT1',
-    'o2': 'OUT2',
     'ps': 'power_saving',
-    'i1': 'IN1',
-    'i2': 'IN2',
     'ch': 'charging'
 }
 
-# Reverse mapping (full -> short)
-FULL_TO_SHORT_MAP = {v: k for k, v in SHADOW_FIELD_MAP.items()}
+# Mapping for backward compatibility: if frontend sends old names, convert to new
+LEGACY_TO_SHORT_MAP = {
+    'OUT1': 'o1',
+    'OUT2': 'o2',
+    'IN1': 'i1',
+    'IN2': 'i2',
+    'motor_speed': 'ms',
+    'power_saving': 'ps',
+    'charging': 'ch'
+}
 
 def normalize_shadow_state(shadow_state):
-    """Convert short field names to full names for backward compatibility"""
+    """Convert field names for compatibility (only for non-IO fields)"""
     if not shadow_state:
         return shadow_state
     
     normalized = {}
     for key, value in shadow_state.items():
+        # Use mapping only for non-IO fields, keep IO fields as-is (o1, o2, i1, i2)
         full_name = SHADOW_FIELD_MAP.get(key, key)
         normalized[full_name] = value
     
@@ -716,7 +722,7 @@ def extract_parameter_value(device_data, parameter_name, device_id=None, paramet
         # Use parameter_type from subscription if available, otherwise infer from parameter name
         if parameter_type is None:
             # Determine if this is a state parameter (from shadow) or metric (from telemetry)
-            state_params = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+            state_params = ['i1', 'i2', 'o1', 'o2', 'charging', 'motor_speed', 'power_saving']
             parameter_type = 'state' if parameter_name in state_params else 'metrics'
         
         # Read from shadow for state parameters
@@ -952,9 +958,9 @@ async def check_single_subscription(subscription, device_data, message_type):
     try:
         parameter_name = subscription['parameter_name']
         
-        # Handle nested parameters like outputs.OUT1
+        # Handle nested parameters like outputs.o1
         if '.' in parameter_name:
-            # Extract nested value: outputs.OUT1 -> device_data['outputs']['OUT1']
+            # Extract nested value: outputs.o1 -> device_data['outputs']['o1']
             parts = parameter_name.split('.')
             current_value = device_data
             for part in parts:
@@ -971,16 +977,16 @@ async def check_single_subscription(subscription, device_data, message_type):
             return False
         
         # Check if subscription is for the right message type
-        # Handle nested structure: outputs.OUT1, inputs.IN1, etc.
+        # Handle nested structure: outputs.o1, inputs.i1, etc.
         data_parameters = ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure', 'motor_speed', 'status']
         command_parameters = ['out1', 'out2', 'in1', 'in2', 'status', 'power_saving']
-        nested_parameters = ['outputs.OUT1', 'outputs.OUT2', 'outputs.speed', 'outputs.power_saving', 'outputs.charging', 
-                           'inputs.IN1', 'inputs.IN2']
+        nested_parameters = ['outputs.o1', 'outputs.o2', 'outputs.speed', 'outputs.power_saving', 'outputs.charging', 
+                           'inputs.i1', 'inputs.i2']
         
         # Check if parameter exists in nested structure
         parameter_exists = False
         if '.' in parameter_name:
-            # Handle nested parameters like outputs.OUT1
+            # Handle nested parameters like outputs.o1
             if parameter_name in nested_parameters:
                 parameter_exists = True
         else:
@@ -1510,11 +1516,11 @@ def execute_multiple_commands_sync(subscription):
             
             # Map command actions to shadow fields
             if command_action == 'out1':
-                desired_state['OUT1'] = 1 if command_value == '1' else 0
-                logger.info(f"Command: Setting OUT1 = {desired_state['OUT1']}")
+                desired_state['o1'] = 1 if command_value == '1' else 0
+                logger.info(f"Command: Setting o1 = {desired_state['o1']}")
             elif command_action == 'out2':
-                desired_state['OUT2'] = 1 if command_value == '1' else 0
-                logger.info(f"Command: Setting OUT2 = {desired_state['OUT2']}")
+                desired_state['o2'] = 1 if command_value == '1' else 0
+                logger.info(f"Command: Setting o2 = {desired_state['o2']}")
             elif command_action == 'motor_speed':
                 desired_state['motor_speed'] = int(command_value)
                 logger.info(f"Command: Setting motor_speed = {desired_state['motor_speed']}")

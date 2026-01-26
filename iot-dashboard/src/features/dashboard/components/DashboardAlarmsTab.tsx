@@ -82,10 +82,10 @@ const ALARM_PARAMETER_TYPES: any = {
     description: 'Device state from shadow reported',
     icon: <DeviceIcon />,
     parameters: {
-      'IN1': { label: 'Input 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
-      'IN2': { label: 'Input 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
-      'OUT1': { label: 'Output 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
-      'OUT2': { label: 'Output 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'i1': { label: 'Input 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'i2': { label: 'Input 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'o1': { label: 'Output 1', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
+      'o2': { label: 'Output 2', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
       'motor_speed': { label: 'Motor Speed', unit: '', type: 'numeric', allowedConditions: ['change', 'above', 'below', 'equals', 'not_equals'] },
       'charging': { label: 'Charging Status', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] },
       'power_saving': { label: 'Power Saving', unit: '', type: 'boolean', allowedConditions: ['change', 'equals', 'not_equals'] }

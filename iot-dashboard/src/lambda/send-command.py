@@ -70,13 +70,13 @@ def lambda_handler(event, context):
         desired_state = {}
         
         if command == "TOGGLE_1_ON":
-            desired_state["OUT1"] = 1
+            desired_state["o1"] = 1
         elif command == "TOGGLE_1_OFF":
-            desired_state["OUT1"] = 0
+            desired_state["o1"] = 0
         elif command == "TOGGLE_2_ON":
-            desired_state["OUT2"] = 1
+            desired_state["o2"] = 1
         elif command == "TOGGLE_2_OFF":
-            desired_state["OUT2"] = 0
+            desired_state["o2"] = 0
         elif command == "SET_SPEED":
             if "speed" not in body:
                 return create_cors_response(400, {
@@ -151,14 +151,14 @@ def lambda_handler(event, context):
                 shadow_doc = json.loads(shadow_response['payload'].read())
                 reported_state = shadow_doc.get("state", {}).get("reported", {})
                 
-                # Map shadow state to frontend format
+                # Map shadow state to frontend format (using short names: o1, o2, i1, i2)
                 current_state = {
-                    "out1_state": reported_state.get("OUT1", 0),
-                    "out2_state": reported_state.get("OUT2", 0),
+                    "out1_state": reported_state.get("o1", 0),
+                    "out2_state": reported_state.get("o2", 0),
                     "motor_speed": reported_state.get("motor_speed", 0),
                     "power_saving": reported_state.get("power_saving", 0),
-                    "in1_state": reported_state.get("IN1", 0),
-                    "in2_state": reported_state.get("IN2", 0),
+                    "in1_state": reported_state.get("i1", 0),
+                    "in2_state": reported_state.get("i2", 0),
                     "charging": reported_state.get("charging", 0),
                     "connection_status": reported_state.get("connection_status", "unknown")
                 }

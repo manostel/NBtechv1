@@ -130,7 +130,7 @@ def get_available_parameters(device_id, parameter_type):
         # Standard parameters for each type (always available)
         standard_parameters = {
             'metrics': ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure'],
-            'state': ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+            'state': ['i1', 'i2', 'o1', 'o2', 'charging', 'motor_speed', 'power_saving']
         }
         
         # Start with standard parameters
@@ -158,9 +158,9 @@ def get_available_parameters(device_id, parameter_type):
                     available_params.update(discovered)
                 elif parameter_type == 'state':
                     # State includes inputs, outputs, and variables
-                    # Look for input fields (IN1, IN2, etc.)
+                    # Look for input fields (i1, i2, etc.)
                     input_fields = [field for field in data_source.keys() if field.startswith('IN')]
-                    # Look for output fields (OUT1, OUT2, etc.)
+                    # Look for output fields (o1, o2, etc.)
                     output_fields = [field for field in data_source.keys() if field.startswith('OUT')]
                     # Look for variable fields
                     variable_fields = ['motor_speed', 'power_saving', 'charging']
@@ -182,7 +182,7 @@ def get_available_parameters(device_id, parameter_type):
         # Return standard parameters as fallback even on error
         standard_parameters = {
             'metrics': ['temperature', 'humidity', 'battery', 'signal_quality', 'pressure'],
-            'state': ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+            'state': ['i1', 'i2', 'o1', 'o2', 'charging', 'motor_speed', 'power_saving']
         }
         return standard_parameters.get(parameter_type, [])
 

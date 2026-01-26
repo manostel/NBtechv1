@@ -362,13 +362,13 @@ const DashboardCommands: React.FC<DashboardCommandsProps> = ({
       let desiredState: Record<string, any> = {};
       
       if (command === "TOGGLE_1_ON") {
-        desiredState = { OUT1: 1 };
+        desiredState = { o1: 1 };
       } else if (command === "TOGGLE_1_OFF") {
-        desiredState = { OUT1: 0 };
+        desiredState = { o1: 0 };
       } else if (command === "TOGGLE_2_ON") {
-        desiredState = { OUT2: 1 };
+        desiredState = { o2: 1 };
       } else if (command === "TOGGLE_2_OFF") {
-        desiredState = { OUT2: 0 };
+        desiredState = { o2: 0 };
       } else if (command === "SET_SPEED") {
         const speed = (params as any).speed || parseInt(motorSpeedDesired);
         if (isNaN(speed) || speed < 0 || speed > 255) {

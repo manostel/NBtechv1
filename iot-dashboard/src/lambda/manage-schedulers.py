@@ -189,19 +189,19 @@ def execute_command(task):
         
         # Helper function to normalize target to shadow field name
         def normalize_target_to_shadow_field(target_str):
-            """Convert target names like 'output1', 'out1' to shadow field names like 'OUT1'"""
+            """Convert target names like 'output1', 'out1' to shadow field names like 'o1'"""
             if not target_str:
                 return None
             target_lower = target_str.lower()
-            # Map common variations to shadow field names
+            # Map common variations to shadow field names (using short names: o1, o2, i1, i2)
             if target_lower in ['output1', 'out1', 'output_1']:
-                return 'OUT1'
+                return 'o1'
             elif target_lower in ['output2', 'out2', 'output_2']:
-                return 'OUT2'
+                return 'o2'
             elif target_lower in ['input1', 'in1', 'input_1']:
-                return 'IN1'
+                return 'i1'
             elif target_lower in ['input2', 'in2', 'input_2']:
-                return 'IN2'
+                return 'i2'
             elif target_lower in ['motor_speed', 'speed', 'motor speed']:
                 return 'motor_speed'
             elif target_lower in ['power_saving', 'power saving']:
@@ -254,17 +254,17 @@ def execute_command(task):
         if not desired_state:
             logger.info(f"Using Priority 3: legacy command mapping")
             if command == "TOGGLE_1_ON":
-                desired_state['OUT1'] = 1
-                logger.info(f"Command: Setting OUT1 = 1")
+                desired_state['o1'] = 1
+                logger.info(f"Command: Setting o1 = 1")
             elif command == "TOGGLE_1_OFF":
-                desired_state['OUT1'] = 0
-                logger.info(f"Command: Setting OUT1 = 0")
+                desired_state['o1'] = 0
+                logger.info(f"Command: Setting o1 = 0")
             elif command == "TOGGLE_2_ON":
-                desired_state['OUT2'] = 1
-                logger.info(f"Command: Setting OUT2 = 1")
+                desired_state['o2'] = 1
+                logger.info(f"Command: Setting o2 = 1")
             elif command == "TOGGLE_2_OFF":
-                desired_state['OUT2'] = 0
-                logger.info(f"Command: Setting OUT2 = 0")
+                desired_state['o2'] = 0
+                logger.info(f"Command: Setting o2 = 0")
             elif command == "SET_SPEED":
                 desired_state['motor_speed'] = int(value) if value is not None and value != '' else 0
                 logger.info(f"Command: Setting motor_speed = {desired_state['motor_speed']}")

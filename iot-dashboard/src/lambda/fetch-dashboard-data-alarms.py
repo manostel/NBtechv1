@@ -89,7 +89,7 @@ def get_device_status(client_id):
         return 'Offline'
 
 def get_nested_value(data, key_path):
-    """Get value from nested dictionary using dot notation (e.g., 'inputs.IN1')"""
+    """Get value from nested dictionary using dot notation (e.g., 'inputs.i1')"""
     try:
         keys = key_path.split('.')
         value = data
@@ -234,7 +234,7 @@ def check_alarms(client_id):
             if variable_name == 'status':
                 current_value = device_status
             elif '.' in variable_name:
-                # Handle nested values (inputs.IN1, outputs.OUT1, etc.)
+                # Handle nested values (inputs.i1, outputs.o1, etc.)
                 current_value = get_nested_value(current_state, variable_name)
             else:
                 # Handle direct values (battery, temperature, etc.)

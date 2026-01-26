@@ -6,39 +6,46 @@ iot_endpoint = "https://al047cml3y4l3-ats.iot.eu-central-1.amazonaws.com"
 iot_client = boto3.client("iot-data", endpoint_url=iot_endpoint, region_name="eu-central-1")
 
 # Shadow field mapping: short names (from firmware) -> full names (for compatibility)
+# Note: Now using short names directly (o1, o2, i1, i2) instead of OUT1, OUT2, IN1, IN2
 SHADOW_FIELD_MAP = {
     'ms': 'motor_speed',
-    'o1': 'OUT1',
-    'o2': 'OUT2',
     'ps': 'power_saving',
-    'i1': 'IN1',
-    'i2': 'IN2',
     'ch': 'charging'
 }
 
-# Reverse mapping (full -> short) for converting frontend names to firmware names
-FULL_TO_SHORT_MAP = {v: k for k, v in SHADOW_FIELD_MAP.items()}
+# Mapping for backward compatibility: if frontend sends old names, convert to new
+LEGACY_TO_SHORT_MAP = {
+    'OUT1': 'o1',
+    'OUT2': 'o2',
+    'IN1': 'i1',
+    'IN2': 'i2',
+    'motor_speed': 'ms',
+    'power_saving': 'ps',
+    'charging': 'ch'
+}
 
 def normalize_shadow_state(shadow_state):
-    """Convert short field names to full names for backward compatibility"""
+    """Convert field names for compatibility (only for non-IO fields)"""
     if not shadow_state:
         return shadow_state
     
     normalized = {}
     for key, value in shadow_state.items():
+        # Use mapping only for non-IO fields, keep IO fields as-is (o1, o2, i1, i2)
         full_name = SHADOW_FIELD_MAP.get(key, key)
         normalized[full_name] = value
     
     return normalized
 
 def convert_to_short_names(state_dict):
-    """Convert full field names to short names for firmware compatibility"""
+    """Convert legacy field names to short names for firmware compatibility"""
     if not state_dict:
         return state_dict
     
     converted = {}
     for key, value in state_dict.items():
-        short_name = FULL_TO_SHORT_MAP.get(key, key)
+        # Convert legacy names (OUT1, OUT2) to short names (o1, o2), or keep as-is if already short
+        short_name = LEGACY_TO_SHORT_MAP.get(key, key)
         converted[short_name] = value
     
     return converted
@@ -89,11 +96,11 @@ def lambda_handler(event, context):
                 "error": "desired_state must be a JSON object"
             })
 
-        # Convert full field names (from frontend) to short names (for firmware)
-        # Frontend sends: OUT1, OUT2, motor_speed, power_saving, etc.
-        # Firmware expects: o1, o2, ms, ps, etc.
+        # Convert legacy field names (if any) to short names (for firmware)
+        # Frontend may send: o1, o2 (new) or OUT1, OUT2 (legacy)
+        # Firmware expects: o1, o2, i1, i2, ms, ps, ch, etc.
         desired_state_short = convert_to_short_names(desired_state)
-        print(f"Converted desired state from full names to short: {desired_state} -> {desired_state_short}")
+        print(f"Converted desired state to short names: {desired_state} -> {desired_state_short}")
 
         # Update Device Shadow with desired state (using short names)
         shadow_payload = {
@@ -115,17 +122,17 @@ def lambda_handler(event, context):
                 shadow_doc = json.loads(shadow_response['payload'].read())
                 reported_state = shadow_doc.get("state", {}).get("reported", {})
                 
-                # Normalize shadow state (convert short names to full names)
+                # Normalize shadow state (convert short names to full names for non-IO fields)
                 normalized_reported = normalize_shadow_state(reported_state)
                 
-                # Map shadow state to frontend format (using normalized names)
+                # Map shadow state to frontend format (using short names: o1, o2, i1, i2)
                 current_state = {
-                    "out1_state": normalized_reported.get("OUT1", 0),
-                    "out2_state": normalized_reported.get("OUT2", 0),
+                    "out1_state": normalized_reported.get("o1", reported_state.get("o1", 0)),
+                    "out2_state": normalized_reported.get("o2", reported_state.get("o2", 0)),
                     "motor_speed": normalized_reported.get("motor_speed", 0),
                     "power_saving": normalized_reported.get("power_saving", 0),
-                    "in1_state": normalized_reported.get("IN1", 0),
-                    "in2_state": normalized_reported.get("IN2", 0),
+                    "in1_state": normalized_reported.get("i1", reported_state.get("i1", 0)),
+                    "in2_state": normalized_reported.get("i2", reported_state.get("i2", 0)),
                     "charging": normalized_reported.get("charging", 0),
                     "connection_status": normalized_reported.get("connection_status", "unknown")
                 }

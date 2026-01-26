@@ -122,7 +122,7 @@ def get_device_shadow(client_id):
         return None
 
 def get_nested_value(data, key_path):
-    """Get value from nested dictionary using dot notation (e.g., 'inputs.IN1')"""
+    """Get value from nested dictionary using dot notation (e.g., 'inputs.i1')"""
     try:
         keys = key_path.split('.')
         value = data
@@ -147,8 +147,8 @@ def evaluate_alarm_condition(alarm, current_value, device_status=None):
             return True  # This would need to be tracked separately for actual change detection
         
         # Convert threshold to appropriate type
-        # For boolean state parameters (IN1, IN2, OUT1, OUT2, charging, power_saving), threshold is "0" or "1"
-        boolean_params = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'power_saving']
+        # For boolean state parameters (i1, i2, o1, o2, charging, power_saving), threshold is "0" or "1"
+        boolean_params = ['i1', 'i2', 'o1', 'o2', 'charging', 'power_saving']
         if variable_name in boolean_params and threshold is not None:
             # Convert threshold string "0" or "1" to integer
             threshold = int(threshold)
@@ -186,8 +186,8 @@ def create_alarm(client_id, alarm_data):
             if variable_name not in valid_metrics:
                 raise ValueError(f"Metric alarms must use one of: {', '.join(valid_metrics)}")
         elif parameter_type == 'state':
-            # State from shadow reported: IN1, IN2, OUT1, OUT2, charging, motor_speed, power_saving
-            valid_states = ['IN1', 'IN2', 'OUT1', 'OUT2', 'charging', 'motor_speed', 'power_saving']
+            # State from shadow reported: i1, i2, o1, o2, charging, motor_speed, power_saving
+            valid_states = ['i1', 'i2', 'o1', 'o2', 'charging', 'motor_speed', 'power_saving']
             if variable_name not in valid_states:
                 raise ValueError(f"State alarms must use one of: {', '.join(valid_states)}")
         else:
@@ -257,7 +257,7 @@ def check_alarms(client_id, shadow_state_from_event=None):
         shadow_state_from_event: Optional shadow state from IoT Rule event (to avoid extra API call)
     """
     try:
-        # Get device shadow for state parameters (IN1, IN2, OUT1, OUT2, charging, etc.)
+        # Get device shadow for state parameters (i1, i2, o1, o2, charging, etc.)
         shadow_state = {}
         
         if shadow_state_from_event:
@@ -297,7 +297,7 @@ def check_alarms(client_id, shadow_state_from_event=None):
             # Get current value based on parameter type
             if parameter_type == 'state':
                 # Read from shadow REPORTED for all state parameters
-                # IN1, IN2, OUT1, OUT2, charging, motor_speed, power_saving
+                # i1, i2, o1, o2, charging, motor_speed, power_saving
                 current_value = shadow_state.get(variable_name)
             elif parameter_type == 'metrics':
                 # Read from telemetry table for sensor metrics

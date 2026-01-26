@@ -8,23 +8,21 @@ connections_table = dynamodb.Table(os.environ.get('CONNECTIONS_TABLE', 'WebSocke
 devices_table = dynamodb.Table(os.environ.get('DEVICES_TABLE', 'Devices'))
 
 # Shadow field mapping: short names (from firmware) -> full names (for compatibility)
+# Note: Now using short names directly (o1, o2, i1, i2) instead of OUT1, OUT2, IN1, IN2
 SHADOW_FIELD_MAP = {
     'ms': 'motor_speed',
-    'o1': 'OUT1',
-    'o2': 'OUT2',
     'ps': 'power_saving',
-    'i1': 'IN1',
-    'i2': 'IN2',
     'ch': 'charging'
 }
 
 def normalize_shadow_state(shadow_state):
-    """Convert short field names to full names for backward compatibility"""
+    """Convert field names for compatibility (only for non-IO fields)"""
     if not shadow_state:
         return shadow_state
     
     normalized = {}
     for key, value in shadow_state.items():
+        # Use mapping only for non-IO fields, keep IO fields as-is (o1, o2, i1, i2)
         full_name = SHADOW_FIELD_MAP.get(key, key)
         normalized[full_name] = value
     
@@ -102,7 +100,7 @@ def lambda_handler(event, context):
         shadow_version = event.get('version') or current.get('version') or event.get('previous', {}).get('version', 0)
         shadow_ts = event.get('timestamp') or current.get('timestamp') or event.get('previous', {}).get('timestamp', 0)
         
-        # Normalize shadow state (convert short names to full names)
+        # Normalize shadow state (convert short names to full names for non-IO fields)
         normalized_reported = normalize_shadow_state(reported)
         normalized_desired = normalize_shadow_state(desired)
         
@@ -110,25 +108,25 @@ def lambda_handler(event, context):
         print(f"   Reported keys (raw): {list(reported.keys())}, (normalized): {list(normalized_reported.keys())}")
         print(f"   Desired keys (raw): {list(desired.keys())}, (normalized): {list(normalized_desired.keys())}")
 
-        # Build the message to send to frontend (using normalized names)
+        # Build the message to send to frontend (using short names: o1, o2, i1, i2)
         message = {
             'type': 'SHADOW_UPDATE',
             'client_id': client_id,
             'timestamp': shadow_ts,
             'version': shadow_version,
             'reported': {
-                'out1_state': normalized_reported.get('OUT1', 0),
-                'out2_state': normalized_reported.get('OUT2', 0),
+                'out1_state': normalized_reported.get('o1', 0),
+                'out2_state': normalized_reported.get('o2', 0),
                 'motor_speed': normalized_reported.get('motor_speed', 0),
                 'power_saving': normalized_reported.get('power_saving', 0),
-                'in1_state': normalized_reported.get('IN1', 0),
-                'in2_state': normalized_reported.get('IN2', 0),
+                'in1_state': normalized_reported.get('i1', 0),
+                'in2_state': normalized_reported.get('i2', 0),
                 'charging': normalized_reported.get('charging', 0),
                 'connection_status': normalized_reported.get('connection_status', 'unknown')
             },
             'desired': {
-                'out1_state': normalized_desired.get('OUT1'),
-                'out2_state': normalized_desired.get('OUT2'),
+                'out1_state': normalized_desired.get('o1'),
+                'out2_state': normalized_desired.get('o2'),
                 'motor_speed': normalized_desired.get('motor_speed'),
                 'power_saving': normalized_desired.get('power_saving')
             }

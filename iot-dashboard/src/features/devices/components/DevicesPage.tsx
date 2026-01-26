@@ -1187,10 +1187,10 @@ const DevicesPage: React.FC<DevicesPageProps> = ({ user, onSelectDevice, onLogou
       if (result.state) {
         return {
           client_id: clientId,
-          in1_state: result.state.in1_state || result.state.IN1 || 0,
-          in2_state: result.state.in2_state || result.state.IN2 || 0,
-          out1_state: result.state.out1_state || result.state.OUT1 || 0,
-          out2_state: result.state.out2_state || result.state.OUT2 || 0,
+          in1_state: result.state.in1_state || result.state.i1 || result.state.IN1 || 0,
+          in2_state: result.state.in2_state || result.state.i2 || result.state.IN2 || 0,
+          out1_state: result.state.out1_state || result.state.o1 || result.state.OUT1 || 0,
+          out2_state: result.state.out2_state || result.state.o2 || result.state.OUT2 || 0,
           motor_speed: result.state.motor_speed || 0,
           power_saving: result.state.power_saving || 0,
           charging: result.state.charging || 0,
